@@ -1,4 +1,4 @@
-"""Seed one demo account per role: MANAGER, LECTURER, STUDENT.
+"""Seed one demo account per role: ADMIN, MANAGER, LECTURER, STUDENT.
 
 Run inside the api container:
     docker compose exec api python scripts/seed_accounts.py
@@ -14,6 +14,7 @@ from app.database import get_engine
 PASSWORD = "12345@Abc"
 
 ACCOUNTS = [
+    ("admin@gmail.com", "Admin", "ADMIN", None),
     ("manager@gmail.com", "Manager", "MANAGER", None),
     ("lecturer@gmail.com", "Lecturer", "LECTURER", "GV_DEMO"),
     ("student@gmail.com", "Student", "STUDENT", "SV_DEMO"),
