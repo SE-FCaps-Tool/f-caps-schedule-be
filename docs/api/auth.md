@@ -1,0 +1,88 @@
+# Auth và current user
+
+## `GET /health`
+
+- **Auth:** public.
+- **Response `200`:**
+
+```json
+{ "status": "ok", "service": "api" }
+```
+
+Dùng cho health check của FE/dev tooling, không dùng để xác định user đã đăng nhập.
+
+## `POST /api/v1/auth/login`
+
+Đăng nhập bằng account đang `ACTIVE`.
+
+- **Auth:** public; không cần CSRF.
+- **Body:** [`LoginPayload`](schemas.md#loginpayload).
+- **Success `200`:**
+
+```json
+{ "role": "MANAGER", "expires_at": "2026-08-19T03:00:00+00:00" }
+```
+
+- **Set-Cookie:** session cookie HttpOnly và `scheduler_csrf` readable by JavaScript. Tên session cookie có thể cấu hình, vì vậy FE chỉ nên dùng `credentials: "include"`.
+- **`401`:** `Invalid credentials` nếu email/password sai hoặc account không active.
+- **`429`:** quá 10 lần thử trong cửa sổ throttle; đọc `Retry-After` để hiển thị thời gian chờ.
+- **Lưu ý:** email được xử lý không phân biệt hoa thường; không lưu password ở frontend state/localStorage.
+
+Ví dụ:
+
+```ts
+await fetch(`${API_URL}/api/v1/auth/login`, {
+  method: "POST",
+  credentials: "include",
+  headers: { "Content-Type": "application/json", Accept: "application/json" },
+  body: JSON.stringify({ email, password }),
+});
+```
+
+## `POST /api/v1/auth/logout`
+
+- **Auth:** public về mặt route; nếu có session thì session bị revoke.
+- **CSRF:** không yêu cầu.
+- **Response `200`:**
+
+```json
+{ "status": "signed_out" }
+```
+
+Backend xóa session cookie và `scheduler_csrf`. FE nên reset toàn bộ cached user/query sau khi gọi.
+
+## `GET /api/v1/auth/me`
+
+Trả identity của session hiện tại.
+
+- **Auth:** tất cả role đã đăng nhập.
+- **Response `200`:**
+
+```json
+{ "role": "LECTURER", "status": "ACTIVE", "account_id": 17 }
+```
+
+- **`401`:** chưa có session, session hết hạn hoặc session đã revoke.
+
+Đây là endpoint nên gọi khi app khởi động, refresh trang và sau khi nhận `401` ở API khác.
+
+## `GET /api/v1/me`
+
+Alias ngắn cho current user dùng ở UI guard.
+
+- **Auth:** tất cả role đã đăng nhập.
+- **Response `200`:**
+
+```json
+{ "role": "MANAGER", "status": "ACTIVE" }
+```
+
+- **`401`:** chưa đăng nhập.
+
+## Quy tắc session cho FE
+
+- Không tự copy HttpOnly session token.
+- Luôn bật `credentials: "include"`.
+- Lấy CSRF token từ cookie `scheduler_csrf` cho `POST/PATCH/DELETE`.
+- Không retry vô hạn khi `401`; chỉ thử hydrate lại một lần, sau đó chuyển về login.
+- `403` là lỗi permission/scope, không phải lỗi session hết hạn.

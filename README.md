@@ -93,4 +93,4 @@ Excel import/export has been removed from V1. Initial data is entered through Ad
 
 ## Operating workflow
 
-See [the operator guide](docs/operator-guide.md) for the end-to-end local workflow and [the release checklist](docs/release-checklist.md) for evidence and pilot measurements still required before a real rollout.
+See [the operator guide](docs/operator-guide.md) for the end-to-end local workflow, [the FE API guide](docs/api/README.md) for the complete route/request/response contract, and [the release checklist](docs/release-checklist.md) for evidence and pilot measurements still required before a real rollout.
