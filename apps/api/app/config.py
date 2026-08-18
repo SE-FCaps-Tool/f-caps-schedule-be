@@ -10,8 +10,13 @@ class Settings(BaseSettings):
     session_cookie_name: str = "scheduler_session"
     session_idle_minutes: int = 15
     session_absolute_hours: int = 8
+    cors_origins: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
 @lru_cache
