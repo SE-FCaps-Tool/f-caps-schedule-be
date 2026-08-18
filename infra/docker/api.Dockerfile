@@ -12,8 +12,11 @@ RUN pip install --no-cache-dir \
     "argon2-cffi>=23.1,<26.0" \
     "python-multipart>=0.0.20,<1.0" \
     "ortools>=9.12,<10.0" \
+    "openpyxl>=3.1,<4.0" \
     "pytest>=8.3,<10.0" \
     "httpx2>=0.1.0"
 COPY apps/api ./
+COPY tools /app/tools
+COPY SE_CapstoneProject_SP26_ReviewDefense_New.xlsx /app/SE_CapstoneProject_SP26_ReviewDefense_New.xlsx
 ENV PYTHONPATH=/app/apps/api
 EXPOSE 8000

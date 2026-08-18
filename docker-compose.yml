@@ -17,7 +17,7 @@ services:
       timeout: 5s
       retries: 10
 
-  migrate:
+  db-init:
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -29,7 +29,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "alembic upgrade head"
+    command: >-
+      sh -c "alembic upgrade head &&
+      python /app/tools/import_excel_database.py
+      /app/SE_CapstoneProject_SP26_ReviewDefense_New.xlsx
+      --skip-if-imported"
 
   api:
     build:
@@ -43,7 +47,7 @@ services:
     volumes:
       - ./apps/api:/app/apps/api
     depends_on:
-      migrate:
+      db-init:
         condition: service_completed_successfully
     command: sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
@@ -57,7 +61,7 @@ services:
     volumes:
       - ./apps/api:/app/apps/api
     depends_on:
-      migrate:
+      db-init:
         condition: service_completed_successfully
     command: sh -c "python -m app.worker"
 

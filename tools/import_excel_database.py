@@ -11,13 +11,13 @@ import argparse
 import datetime as dt
 import json
 import math
+import os
 import re
 import subprocess
 from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
-
 
 DEMO_PASSWORD_HASH = (
     "$argon2id$v=19$m=65536,t=3,p=4$V6pAiT9HmR/z0IItWjtNuA$"
@@ -115,13 +115,50 @@ def add_sql(lines: list[str], statement: str) -> None:
     lines.append(statement.rstrip(";") + ";")
 
 
+def psycopg_url(database_url: str) -> str:
+    return database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+
+
+def database_has_data(database_url: str) -> bool:
+    import psycopg
+
+    with psycopg.connect(psycopg_url(database_url)) as connection:
+        return bool(
+            connection.execute(
+                "SELECT EXISTS ("
+                "SELECT 1 FROM excel_import_batches UNION ALL "
+                "SELECT 1 FROM accounts UNION ALL "
+                "SELECT 1 FROM projects UNION ALL "
+                "SELECT 1 FROM groups UNION ALL "
+                "SELECT 1 FROM sessions"
+                ")"
+            ).fetchone()[0]
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("workbook", type=Path)
+    parser.add_argument("--database-url", default=os.getenv("DATABASE_URL"))
+    parser.add_argument("--skip-if-imported", action="store_true")
     args = parser.parse_args()
     workbook_path = args.workbook.resolve()
     if not workbook_path.is_file():
         raise SystemExit(f"Workbook not found: {workbook_path}")
+    if args.skip_if_imported:
+        if not args.database_url:
+            raise SystemExit("--skip-if-imported requires DATABASE_URL or --database-url")
+        if database_has_data(args.database_url):
+            print(
+                json.dumps(
+                    {
+                        "source": str(workbook_path),
+                        "status": "skipped",
+                        "reason": "database_already_populated",
+                    }
+                )
+            )
+            return
 
     values_book = load_workbook(workbook_path, data_only=True, read_only=True)
     formulas_book = load_workbook(workbook_path, data_only=False, read_only=True)
@@ -214,8 +251,10 @@ def main() -> None:
         f"({sql(MAJOR_CODE)}, {sql('Software Engineering')})",
     )
     for email, display_name, role in (
-        ("admin@capstone.local", "Scheduler Admin", "ADMIN"),
-        ("manager@capstone.local", "Scheduler Manager", "MANAGER"),
+        ("admin1@gmail.com", "Scheduler Admin 1", "ADMIN"),
+        ("admin2@gmail.com", "Scheduler Admin 2", "ADMIN"),
+        ("manager1@gmail.com", "Scheduler Manager 1", "MANAGER"),
+        ("manager2@gmail.com", "Scheduler Manager 2", "MANAGER"),
     ):
         add_sql(
             lines,
@@ -228,8 +267,12 @@ def main() -> None:
             f"{sql(role)}::system_role FROM accounts WHERE email = {sql(email)}",
         )
 
-    for lecturer_code in sorted(lecturer_codes):
-        email = f"{slug(lecturer_code)}@excel.local"
+    for lecturer_number, lecturer_code in enumerate(sorted(lecturer_codes), start=1):
+        email = (
+            f"lecturer{lecturer_number}@gmail.com"
+            if lecturer_number <= 2
+            else f"{slug(lecturer_code)}@excel.local"
+        )
         add_sql(
             lines,
             "INSERT INTO accounts (email, display_name, password_hash) VALUES "
@@ -246,6 +289,25 @@ def main() -> None:
             f"{sql(lecturer_code)} FROM accounts WHERE email = {sql(email)}",
         )
 
+    for student_number in range(1, 3):
+        email = f"student{student_number}@gmail.com"
+        student_code = f"SV{student_number:03d}"
+        add_sql(
+            lines,
+            "INSERT INTO accounts (email, display_name, password_hash) VALUES "
+            f"({sql(email)}, {sql(f'Sinh viên {student_number:03d}')}, {sql(DEMO_PASSWORD_HASH)})",
+        )
+        add_sql(
+            lines,
+            "INSERT INTO account_roles (account_id, role) SELECT id, 'STUDENT'::system_role "
+            f"FROM accounts WHERE email = {sql(email)}",
+        )
+        add_sql(
+            lines,
+            "INSERT INTO students (account_id, student_code) SELECT id, "
+            f"{sql(student_code)} FROM accounts WHERE email = {sql(email)}",
+        )
+
     for room in rooms:
         add_sql(
             lines,
@@ -260,7 +322,7 @@ def main() -> None:
         "Defense1": ("DEFENSE_1_1", 5),
         "Defense2": ("DEFENSE_2", 5),
     }
-    admin_id = "(SELECT id FROM accounts WHERE email = 'admin@capstone.local')"
+    admin_id = "(SELECT id FROM accounts WHERE email = 'admin1@gmail.com')"
     for round_type, reviewer_count in round_specs.values():
         add_sql(
             lines,
@@ -334,6 +396,29 @@ def main() -> None:
                     f"WHERE p.semester_id = {semester_lookup} AND p.code = {sql(project_code)} "
                     "ON CONFLICT (project_id, lecturer_id) DO UPDATE SET supervisor_type = EXCLUDED.supervisor_type",
                 )
+
+    first_project = next(
+        (
+            project
+            for project in project_rows
+            if clean_code(project["values"][2]) and clean_code(project["values"][3])
+        ),
+        None,
+    )
+    if first_project:
+        first_project_code = clean_code(first_project["values"][2])
+        first_group_code = clean_code(first_project["values"][3])
+        for student_number, membership_role in ((1, "LEADER"), (2, "MEMBER")):
+            add_sql(
+                lines,
+                "INSERT INTO group_memberships (group_id, student_id, membership_role) "
+                "SELECT g.id, s.id, "
+                f"{sql(membership_role)}::membership_role FROM groups g "
+                "JOIN projects p ON p.id = g.project_id "
+                f"JOIN students s ON s.student_code = {sql(f'SV{student_number:03d}')} "
+                f"WHERE p.semester_id = {semester_lookup} AND p.code = {sql(first_project_code)} "
+                f"AND g.code = {sql(first_group_code)}",
+            )
 
     # Review sheets contain complete date/slot/room/reviewer data, so project them into sessions.
     for sheet_name, rows in review_rows.items():
@@ -495,30 +580,36 @@ def main() -> None:
 
     lines.append("COMMIT;")
     sql_payload = "\n".join(lines) + "\n"
-    command = [
-        "docker",
-        "compose",
-        "exec",
-        "-T",
-        "postgres",
-        "psql",
-        "-U",
-        "scheduler",
-        "-d",
-        "scheduler",
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-X",
-        "-q",
-    ]
-    subprocess.run(
-        command,
-        input=sql_payload,
-        text=True,
-        encoding="utf-8",
-        check=True,
-        cwd=Path.cwd(),
-    )
+    if args.database_url:
+        import psycopg
+
+        with psycopg.connect(psycopg_url(args.database_url), autocommit=True) as connection:
+            connection.execute(sql_payload)
+    else:
+        command = [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "postgres",
+            "psql",
+            "-U",
+            "scheduler",
+            "-d",
+            "scheduler",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-X",
+            "-q",
+        ]
+        subprocess.run(
+            command,
+            input=sql_payload,
+            text=True,
+            encoding="utf-8",
+            check=True,
+            cwd=Path.cwd(),
+        )
     print(
         json.dumps(
             {

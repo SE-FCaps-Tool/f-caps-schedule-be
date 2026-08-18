@@ -37,8 +37,10 @@ def load_seed_fixture(
         )
 
         for email, display_name, role in (
-            ("admin@capstone.local", "Scheduler Admin", "ADMIN"),
-            ("manager@capstone.local", "Scheduler Manager", "MANAGER"),
+            ("admin1@gmail.com", "Scheduler Admin 1", "ADMIN"),
+            ("admin2@gmail.com", "Scheduler Admin 2", "ADMIN"),
+            ("manager1@gmail.com", "Scheduler Manager 1", "MANAGER"),
+            ("manager2@gmail.com", "Scheduler Manager 2", "MANAGER"),
         ):
             account_id = _id(
                 session,
@@ -119,7 +121,7 @@ def load_seed_fixture(
                 RETURNING id
                 """,
                 {
-                    "email": f"{student['student_code'].lower()}@scheduler.test",
+                    "email": student["email"],
                     "display_name": student.get("display_name", student["student_code"]),
                     "password_hash": DEMO_PASSWORD_HASH,
                 },

@@ -26,9 +26,23 @@ Services:
 - Health: http://localhost:8000/health
 - PostgreSQL: localhost:5432, database `scheduler`
 
-API and worker containers run `alembic upgrade head` on startup. Do not edit the old `schema.sql` as an operational migration; Alembic migrations are the database source of truth.
+The one-shot `db-init` service runs Alembic and imports
+`SE_CapstoneProject_SP26_ReviewDefense_New.xlsx` when a new database has no application
+data. Restarts skip the import, so existing data is not replaced. Do not edit the old
+`schema.sql` as an operational migration; Alembic migrations are the database source of
+truth.
 
-The seed fixture is loaded through the Admin endpoint when needed:
+To recreate the database and bootstrap the workbook from scratch, remove only this
+project's Compose volume and start the stack again:
+
+```powershell
+docker compose down -v
+docker compose up --build
+```
+
+The synthetic test fixture is separate from the automatic Excel bootstrap and is loaded
+through the Admin endpoint only on a clean, non-Excel test database. Do not combine the
+two datasets:
 
 ```powershell
 curl.exe -X POST http://localhost:8000/api/v1/admin/seed-fixture `
@@ -37,9 +51,14 @@ curl.exe -X POST http://localhost:8000/api/v1/admin/seed-fixture `
 
 Local demo accounts use the password `SchedulerDemo2026!`:
 
-- `admin@capstone.local`
-- `manager@capstone.local`
-- seeded students use `<student-code lower>@scheduler.test`
+- `admin1@gmail.com`, `admin2@gmail.com`
+- `manager1@gmail.com`, `manager2@gmail.com`
+- `lecturer1@gmail.com`, `lecturer2@gmail.com`
+- `student1@gmail.com`, `student2@gmail.com`
+
+`student1@gmail.com` is seeded as an active group leader; `student2@gmail.com` is an
+active member of the same group. The Excel-backed dataset keeps additional lecturer
+accounts required by its imported schedules.
 
 These credentials are for local development only and must be replaced before any shared deployment.
 
