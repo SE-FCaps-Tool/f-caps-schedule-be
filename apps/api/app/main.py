@@ -1,8 +1,11 @@
 import hashlib
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -18,7 +21,33 @@ from .routes.schedule_operations import router as schedule_operations_router
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None)
+    swagger_assets = Path(__file__).with_name("static") / "swagger"
+    app.mount("/_docs", StaticFiles(directory=swagger_assets), name="swagger-assets")
+
+    @app.get("/docs", include_in_schema=False)
+    def swagger_ui() -> HTMLResponse:
+        return HTMLResponse(
+            """
+            <!doctype html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <link rel="stylesheet" href="/_docs/swagger-ui.css" />
+                <title>Capstone Defense Scheduler API - Swagger UI</title>
+            </head>
+            <body>
+                <div id="swagger-ui"></div>
+                <script src="/_docs/swagger-ui-bundle.js"></script>
+                <script src="/_docs/swagger-ui-init.js"></script>
+            </body>
+            </html>
+            """
+        )
+
+    @app.get("/docs/oauth2-redirect", include_in_schema=False)
+    def swagger_ui_redirect() -> HTMLResponse:
+        return get_swagger_ui_oauth2_redirect_html()
 
     @app.middleware("http")
     async def csrf_guard(request: Request, call_next):
