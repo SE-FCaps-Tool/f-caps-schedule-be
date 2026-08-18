@@ -12,4 +12,5 @@ coverage/
 .ruff_cache/
 playwright-report/
 test-results/
-
+.agents/
+.codex/

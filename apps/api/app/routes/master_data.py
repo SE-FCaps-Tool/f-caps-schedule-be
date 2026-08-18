@@ -212,10 +212,7 @@ def list_accounts(db: Db, user: User) -> list[dict[str, object]]:
     rows = db.execute(
         text(
             "SELECT a.id, a.email, a.display_name, a.status, a.created_at, "
-            "COALESCE("
-            "jsonb_agg(ar.role::text ORDER BY ar.role) FILTER (WHERE ar.role IS NOT NULL), "
-            "'[]'::jsonb"
-            ") AS roles "
+            "COALESCE(MIN(ar.role::text), '') AS role "
             "FROM accounts a "
             "LEFT JOIN account_roles ar ON ar.account_id = a.id "
             "GROUP BY a.id ORDER BY a.email"

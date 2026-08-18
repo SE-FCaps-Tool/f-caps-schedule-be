@@ -49,7 +49,7 @@ def test_admin_account_lifecycle_is_audited(client):
     accounts = client.get("/api/v1/accounts", headers=admin_headers)
     assert accounts.status_code == 200, accounts.text
     created_account = next(item for item in accounts.json() if item["id"] == account_id)
-    assert created_account["roles"] == ["MANAGER"]
+    assert created_account["role"] == "MANAGER"
     disabled = client.patch(
         f"/api/v1/accounts/{account_id}/status",
         json={"status": "INACTIVE", "reason": "End of local pilot"},

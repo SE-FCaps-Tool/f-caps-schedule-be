@@ -38,9 +38,9 @@ Tất cả route trong file này đều có prefix `/api/v1`.
 ### `GET /accounts`
 
 - **Role:** `ADMIN`.
-- **Response `200`:** array `{ id, email, display_name, status, created_at, roles }`, trong đó `roles` là array role.
+- **Response `200`:** array `{ id, email, display_name, status, created_at, role }`, trong đó `role` là string.
 
-Ví dụ field role: `"roles": ["STUDENT"]` (không phải chuỗi PostgreSQL dạng `"{STUDENT}"`).
+Ví dụ field role: `"role": "STUDENT"`.
 
 ### `POST /accounts`
 
