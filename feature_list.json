@@ -1,0 +1,54 @@
+{
+  "features": [
+    {
+      "id": "backend-exact-copy",
+      "title": "Copy nguyên trạng toàn bộ backend và project artifacts",
+      "user_visible_behavior": "Target giữ nguyên cấu trúc, source, migration, test, worker, importer, docs, config và workbook của source.",
+      "verification_command": "Hash manifest và path inventory của target khớp source allowlist; không flatten apps/api.",
+      "status": "passing",
+      "evidence": "Phase 01: copied 125 allowlisted files; SHA256 mismatches 0; apps/web, web Dockerfile and erd-viewer absent; workbook SHA256 matches source.",
+      "notes": "Chỉ loại FE và generated machine-local files; không sửa dependency hoặc tài liệu.",
+      "priority": "P1"
+    },
+    {
+      "id": "frontend-only-removal",
+      "title": "Chỉ loại bỏ FE khỏi target",
+      "user_visible_behavior": "Target không chứa apps/web, FE Dockerfile hoặc web Compose service; Compose còn postgres, api, worker.",
+      "verification_command": "docker compose -p f_caps_schedule_be -f docker-compose.yml config --services trả đúng postgres, api, worker và resolved model không có web.",
+      "status": "passing",
+      "evidence": "Phase 02: Compose services exactly postgres, api, worker; target model contains no web/Vite/5173; volume declared f_caps_schedule_be_postgres_data and actual mount verified.",
+      "notes": "FE text references trong docs được giữ nguyên theo exact-copy scope.",
+      "priority": "P1"
+    },
+    {
+      "id": "database-isolated-clone",
+      "title": "Clone database vào volume riêng không đụng source",
+      "user_visible_behavior": "Backend target dùng bản sao logic của database Excel hiện tại với cùng head, counts và keys.",
+      "verification_command": "Dump/restore vào f_caps_schedule_be_postgres_data; read-only parity pass cho canonical và toàn bộ excel_* tables.",
+      "status": "passing",
+      "evidence": "Phases 03-04: dump restored to f_caps_schedule_be_postgres_data; head/counts/round types and all canonical+excel_* deterministic key sets matched source; read-only parity pass.",
+      "notes": "Không mount capstonedefensescheduler_postgres_data trực tiếp.",
+      "priority": "P1"
+    },
+    {
+      "id": "backend-artifact-preservation",
+      "title": "Giữ importer, worker, docs, plans và workbook",
+      "user_visible_behavior": "Các artifact backend hiện có vẫn ở đúng path và không bị rewrite trong extraction.",
+      "verification_command": "Kiểm tra apps/api, apps/worker, tools, infra/docker/api.Dockerfile, docs, plans và SE_CapstoneProject_SP26_ReviewDefense_New.xlsx tồn tại.",
+      "status": "passing",
+      "evidence": "Phases 01 and 05: apps/api, apps/worker, tools, docs, plans, metadata and workbook copied; allowlist hashes matched with 0 mismatches; target runtime and full pytest passed on disposable database scheduler_test_20260818102827186.",
+      "notes": "Importer không được chạy trong extraction; dependency/build repair là scope riêng.",
+      "priority": "P1"
+    },
+    {
+      "id": "source-immutability",
+      "title": "Source repository không đổi và database an toàn trước cutover",
+      "user_visible_behavior": "Source code giữ nguyên; database source được kiểm chứng parity trước khi volume cũ bị xóa có chủ đích.",
+      "verification_command": "Source hash không đổi; health, counts và keys trước cutover khớp baseline; dump checksum được giữ trước khi gỡ container/volume cũ.",
+      "status": "passing",
+      "evidence": "Phases 00–07: source file hashes match baseline; source/target read-only snapshots match all baseline counts and Alembic head; old API/worker/Postgres containers and source volume were removed only after parity; target runs on f_caps_schedule_be_postgres_data; retained dump SHA256 e2cee9a9893504dfe5e9d362fa82aa234424004aa415490a8630b718fada3762.",
+      "notes": "Source repository không bị xóa/sửa; old DB volume đã được xóa có chủ đích sau parity/cutover. Rollback dump vẫn giữ ngoài repository.",
+      "priority": "P1"
+    }
+  ]
+}

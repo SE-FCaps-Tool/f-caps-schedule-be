@@ -1,0 +1,212 @@
+from datetime import UTC, datetime
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.auth import CurrentUser, get_current_user
+from app.database import get_db
+from app.services.access import is_management_user, visible_session_ids
+from app.services.ical import build_ical
+
+router = APIRouter(prefix="/api/v1", tags=["operations"])
+Db = Annotated[Session, Depends(get_db)]
+User = Annotated[CurrentUser, Depends(get_current_user)]
+
+
+def _require(user: CurrentUser, *roles: str) -> None:
+    if user.role not in roles:
+        raise HTTPException(status_code=403, detail="Insufficient permission")
+
+
+def _version_scope(db: Session, round_id: int | None = None) -> dict[str, Any] | None:
+    row = db.execute(
+        text(
+            "SELECT sv.id AS version_id, sv.round_id, sv.status, sv.created_at, "
+            "r.type, r.semester_id, s.code AS semester_code "
+            "FROM schedule_versions sv JOIN rounds r ON r.id = sv.round_id "
+            "JOIN semesters s ON s.id = r.semester_id "
+            "WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) "
+            "AND sv.status IN ('PUBLISHED', 'VALID') ORDER BY "
+            "CASE WHEN sv.status = 'PUBLISHED' THEN 0 ELSE 1 END, sv.activated_at DESC NULLS LAST, sv.id DESC LIMIT 1"
+        ),
+        {"round_id": round_id},
+    ).mappings().one_or_none()
+    return {**dict(row), "generated_at": datetime.now(UTC)} if row else None
+
+
+@router.get("/dashboard")
+def manager_dashboard(db: Db, user: User, round_id: int | None = None) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    params = {"round_id": round_id}
+    availability = db.execute(
+        text(
+            "SELECT COUNT(DISTINCT ri.lecturer_id) AS invited, "
+            "COUNT(DISTINCT CASE WHEN la.lecturer_id IS NOT NULL THEN ri.lecturer_id END) AS responded "
+            "FROM round_invitations ri LEFT JOIN lecturer_availabilities la "
+            "ON la.round_id = ri.round_id AND la.lecturer_id = ri.lecturer_id "
+            "WHERE (CAST(:round_id AS INTEGER) IS NULL OR ri.round_id = CAST(:round_id AS INTEGER))"
+        ),
+        params,
+    ).mappings().one()
+    selected = _version_scope(db, round_id)
+    if selected:
+        groups = db.execute(
+            text(
+                "SELECT COUNT(*) AS total, COUNT(s.id) AS scheduled FROM round_groups rg "
+                "LEFT JOIN sessions s ON s.group_id = rg.group_id AND s.schedule_version_id = :version_id "
+                "WHERE (CAST(:round_id AS INTEGER) IS NULL OR rg.round_id = CAST(:round_id AS INTEGER))"
+            ),
+            {"round_id": round_id, "version_id": selected["version_id"]},
+        ).mappings().one()
+    else:
+        groups = {"total": 0, "scheduled": 0}
+    load = db.execute(
+        text(
+            "SELECT l.id, l.lecturer_code, a.display_name, COUNT(sr.session_id) AS session_count "
+            "FROM lecturers l JOIN accounts a ON a.id = l.account_id LEFT JOIN session_reviewers sr ON sr.lecturer_id = l.id "
+            "AND (:version_id IS NULL OR sr.schedule_version_id = :version_id) "
+            "GROUP BY l.id, l.lecturer_code, a.display_name ORDER BY session_count DESC, l.lecturer_code LIMIT 10"
+        ),
+        {"version_id": selected["version_id"] if selected else None},
+    ).mappings().all()
+    return {
+        "availability": {"invited": availability["invited"], "responded": availability["responded"]},
+        "groups": {"total": groups["total"], "scheduled": groups["scheduled"], "unscheduled": groups["total"] - groups["scheduled"]},
+        "pending_reschedule_requests": db.execute(text("SELECT COUNT(*) FROM reschedule_requests WHERE status = 'REQUESTED'")).scalar_one(),
+        "changes": db.execute(text("SELECT COUNT(*) FROM schedule_change_records")).scalar_one(),
+        "version": selected,
+        "lecturer_load": [dict(row) for row in load],
+        "attention_groups": [dict(row) for row in db.execute(text("SELECT id, code, status FROM groups WHERE status IN ('D12_CONDITIONAL', 'FAILED', 'DROPPED') ORDER BY id LIMIT 20")).mappings().all()],
+    }
+
+
+@router.get("/reports/lecturer-load")
+def lecturer_load_report(db: Db, user: User, round_id: int | None = None) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    selected = _version_scope(db, round_id)
+    rows = db.execute(
+        text(
+            "SELECT l.id AS lecturer_id, l.lecturer_code, a.display_name, COUNT(sr.session_id) AS session_count, "
+            "r.h12_semester_quota AS quota, CASE WHEN r.h12_semester_quota > 0 THEN ROUND(COUNT(sr.session_id)::numeric * 100 / r.h12_semester_quota, 1) ELSE NULL END AS quota_percent "
+            "FROM lecturers l JOIN accounts a ON a.id = l.account_id "
+            "LEFT JOIN session_reviewers sr ON sr.lecturer_id = l.id AND sr.schedule_version_id = :version_id "
+            "LEFT JOIN schedule_versions sv ON sv.id = :version_id LEFT JOIN rounds r ON r.id = sv.round_id "
+            "WHERE (CAST(:round_id AS INTEGER) IS NULL OR r.id = CAST(:round_id AS INTEGER)) GROUP BY l.id, l.lecturer_code, a.display_name, r.h12_semester_quota "
+            "ORDER BY l.lecturer_code"
+        ),
+        {"round_id": round_id, "version_id": selected["version_id"] if selected else None},
+    ).mappings().all()
+    return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
+
+
+@router.get("/reports/unscheduled")
+def unscheduled_report(db: Db, user: User, round_id: int) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    generated_at = datetime.now(UTC)
+    rows = db.execute(text("SELECT sv.id, sv.version_no, sv.status, sv.input_snapshot, sv.created_at, r.type, s.code AS semester_code FROM schedule_versions sv JOIN rounds r ON r.id = sv.round_id JOIN semesters s ON s.id = r.semester_id WHERE sv.round_id = :round_id ORDER BY sv.version_no DESC"), {"round_id": round_id}).mappings().all()
+    return {"round_id": round_id, "generated_at": generated_at, "versions": [{"version_id": row["id"], "version_no": row["version_no"], "status": row["status"], "created_at": row["created_at"], "unscheduled": (row["input_snapshot"] or {}).get("unscheduled", []), "provenance": {"semester_code": row["semester_code"], "round_type": row["type"], "version_id": row["id"], "generated_at": generated_at}} for row in rows]}
+
+
+@router.get("/reports/provenance/{version_id}")
+def report_provenance(version_id: int, db: Db, user: User) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
+    if user.role not in {"ADMIN", "MANAGER"} and not visible_session_ids(db, user, version_id=version_id):
+        raise HTTPException(status_code=403, detail="Report is outside the actor's scope.")
+    row = db.execute(text("SELECT sv.id AS version_id, sv.version_no, sv.status, sv.created_at, r.id AS round_id, r.type, s.code AS semester_code FROM schedule_versions sv JOIN rounds r ON r.id = sv.round_id JOIN semesters s ON s.id = r.semester_id WHERE sv.id = :version_id"), {"version_id": version_id}).mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+    return {**dict(row), "generated_at": datetime.now(UTC)}
+
+
+@router.get("/reports/quality")
+def group_quality_report(db: Db, user: User) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    rows = db.execute(text("SELECT g.id, g.code, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_members, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leaders FROM groups g LEFT JOIN group_memberships gm ON gm.group_id = g.id GROUP BY g.id, g.code HAVING COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') < 4 OR COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') <> 1 ORDER BY g.code")).mappings().all()
+    return {"version": _version_scope(db), "rows": [dict(row) for row in rows]}
+
+
+@router.get("/reports/remediation")
+def remediation_report(db: Db, user: User, round_id: int | None = None) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    selected = _version_scope(db, round_id)
+    rows = db.execute(text("SELECT rc.id, rc.group_id, g.code AS group_code, rc.due_at, rc.status, rc.verifier_lecturer_id FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id LEFT JOIN session_results sr ON sr.id = rc.session_result_id LEFT JOIN sessions s ON s.id = sr.session_id LEFT JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) ORDER BY rc.due_at"), {"round_id": round_id}).mappings().all()
+    return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
+
+
+@router.get("/reports/outcomes")
+def outcomes_report(db: Db, user: User, round_id: int | None = None) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    selected = _version_scope(db, round_id)
+    rows = db.execute(text("SELECT r.type, sr.outcome, COUNT(*) AS count FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR r.id = CAST(:round_id AS INTEGER)) GROUP BY r.type, sr.outcome ORDER BY r.type, sr.outcome"), {"round_id": round_id}).mappings().all()
+    return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
+
+
+@router.get("/notifications")
+def list_notifications(db: Db, user: User, limit: int = 50) -> list[dict[str, Any]]:
+    _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
+    scope = "" if user.account_id is None and is_management_user(user) else "WHERE recipient_account_id = :account_id"
+    rows = db.execute(text(f"SELECT id, event_type, payload, status, sent_at, created_at FROM notifications {scope} ORDER BY created_at DESC LIMIT :limit"), {"limit": min(max(limit, 1), 100), "account_id": user.account_id}).mappings().all()
+    return [dict(row) for row in rows]
+
+
+@router.post("/notifications/{notification_id}/retry")
+def retry_notification(notification_id: int, db: Db, user: User) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    with db.begin():
+        row = db.execute(text("UPDATE notifications SET status = 'PENDING', sent_at = NULL WHERE id = :id AND status = 'FAILED' RETURNING id, status, dedupe_key"), {"id": notification_id}).mappings().one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail={"code": "NOTIFICATION_NOT_RETRYABLE", "message": "Failed notification does not exist."})
+        db.execute(text("UPDATE outbox_jobs SET status = 'PENDING', available_at = now() WHERE dedupe_key = :dedupe_key AND status = 'FAILED'"), {"dedupe_key": row["dedupe_key"]})
+    return dict(row)
+
+
+@router.get("/schedule/versions/{version_id}/calendar.ics")
+def calendar_export(version_id: int, db: Db, user: User) -> Response:
+    _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
+    if user.role not in {"ADMIN", "MANAGER"} and not visible_session_ids(db, user, version_id=version_id):
+        raise HTTPException(status_code=403, detail="Calendar is outside the actor's scope.")
+    session_ids = visible_session_ids(db, user, version_id=version_id)
+    scope = "" if user.role in {"ADMIN", "MANAGER"} else "AND s.id = ANY(:session_ids)"
+    rows = db.execute(text(f"SELECT s.id, g.code AS group_code, rm.code AS room_code, s.start_at, s.end_at FROM sessions s JOIN groups g ON g.id = s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id WHERE s.schedule_version_id = :version_id {scope} ORDER BY s.start_at"), {"version_id": version_id, "session_ids": list(session_ids) or [0]}).mappings().all()
+    if not rows:
+        exists = db.execute(text("SELECT 1 FROM schedule_versions WHERE id = :id"), {"id": version_id}).scalar_one_or_none()
+        if exists is None:
+            raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+    content = build_ical([dict(row) for row in rows], calendar_name=f"Capstone Scheduler {version_id}")
+    return Response(content=content, media_type="text/calendar; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="schedule-{version_id}.ics"'})
+
+
+@router.get("/my/schedule")
+def personal_schedule(
+    db: Db,
+    user: User,
+    version_id: int | None = None,
+    from_at: datetime | None = None,
+    to_at: datetime | None = None,
+) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
+    selected = _version_scope(db) if version_id is None else db.execute(
+        text(
+            "SELECT sv.id AS version_id, sv.round_id, sv.status, sv.created_at, r.type, r.semester_id, s.code AS semester_code "
+            "FROM schedule_versions sv JOIN rounds r ON r.id = sv.round_id JOIN semesters s ON s.id = r.semester_id WHERE sv.id = :version_id"
+        ),
+        {"version_id": version_id},
+    ).mappings().one_or_none()
+    if selected is None:
+        return {"version": None, "generated_at": datetime.now(UTC), "sessions": []}
+    visible = visible_session_ids(db, user, version_id=int(selected["version_id"]))
+    if not visible:
+        return {"version": selected, "generated_at": datetime.now(UTC), "sessions": []}
+    rows = db.execute(
+        text(
+            "SELECT s.id, s.group_id, g.code AS group_code, g.project_id, s.start_at, s.end_at, s.room_id, rm.code AS room_code, s.status "
+            "FROM sessions s JOIN groups g ON g.id = s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id "
+            "WHERE s.schedule_version_id = :version_id AND s.id = ANY(:session_ids) "
+            "AND (CAST(:from_at AS TIMESTAMPTZ) IS NULL OR s.end_at > CAST(:from_at AS TIMESTAMPTZ)) "
+            "AND (CAST(:to_at AS TIMESTAMPTZ) IS NULL OR s.start_at < CAST(:to_at AS TIMESTAMPTZ)) ORDER BY s.start_at, s.id"
+        ),
+        {"version_id": int(selected["version_id"]), "session_ids": list(visible), "from_at": from_at, "to_at": to_at},
+    ).mappings().all()
+    return {"version": selected, "generated_at": datetime.now(UTC), "sessions": [dict(row) for row in rows]}

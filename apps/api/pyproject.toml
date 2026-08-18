@@ -1,0 +1,36 @@
+[project]
+name = "capstone-defense-scheduler-api"
+version = "0.1.0"
+description = "Scheduler-only backend for Capstone Defense Scheduler"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.34,<1.0",
+  "pydantic-settings>=2.8,<3.0",
+  "sqlalchemy>=2.0,<3.0",
+  "alembic>=1.15,<2.0",
+  "psycopg[binary]>=3.2,<4.0",
+  "argon2-cffi>=23.1,<26.0",
+  "python-multipart>=0.0.20,<1.0",
+  "ortools>=9.12,<10.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1.0",
+  "pytest>=8.3,<10.0",
+  "pytest-cov>=6.0,<7.0",
+  "ruff>=0.11,<1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+markers = [
+  "integration: requires the local PostgreSQL Docker service",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

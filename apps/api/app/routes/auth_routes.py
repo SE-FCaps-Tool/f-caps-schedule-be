@@ -1,0 +1,115 @@
+import hashlib
+import math
+import secrets
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
+
+from argon2 import PasswordHasher
+from argon2.exceptions import VerificationError, VerifyMismatchError
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.auth import CurrentUser, get_current_user
+from app.config import Settings, get_settings
+from app.database import get_db
+
+router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+Db = Annotated[Session, Depends(get_db)]
+SettingsDep = Annotated[Settings, Depends(get_settings)]
+User = Annotated[CurrentUser, Depends(get_current_user)]
+password_hasher = PasswordHasher()
+
+
+class LoginPayload(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=256)
+
+
+@router.post("/login")
+def login(payload: LoginPayload, response: Response, request: Request, db: Db, settings: SettingsDep) -> dict[str, str]:
+    client_host = request.client.host if request.client else None
+    throttle = _record_login_attempt(db, payload.email, client_host)
+    if throttle["blocked"]:
+        raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.", headers={"Retry-After": str(throttle["retry_after"])})
+    row = db.execute(
+        text(
+            "SELECT a.id, a.password_hash, a.status, ar.role FROM accounts a "
+            "JOIN account_roles ar ON ar.account_id = a.id WHERE lower(a.email) = lower(:email) "
+            "ORDER BY ar.role LIMIT 1"
+        ),
+        {"email": payload.email.strip()},
+    ).mappings().one_or_none()
+    if row is None or str(row["status"]) != "ACTIVE":
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    try:
+        password_hasher.verify(row["password_hash"], payload.password)
+    except (VerificationError, VerifyMismatchError, TypeError) as exc:
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid credentials") from exc
+    token = secrets.token_urlsafe(48)
+    csrf_token = secrets.token_urlsafe(32)
+    now = datetime.now(UTC)
+    expires = now + timedelta(hours=settings.session_absolute_hours)
+    db.execute(
+        text(
+            "INSERT INTO auth_sessions (account_id, token_hash, csrf_token_hash, expires_at) "
+            "VALUES (:account_id, :token_hash, :csrf_token_hash, :expires_at)"
+        ),
+        {"account_id": row["id"], "token_hash": _hash(token), "csrf_token_hash": _hash(csrf_token), "expires_at": expires},
+    )
+    db.execute(
+        text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'LOGIN_SUCCESS', 'account', :entity_id, CAST(:after_json AS JSONB))"),
+        {"actor_id": row["id"], "entity_id": str(row["id"]), "after_json": '{"session": "created"}'},
+    )
+    db.execute(text("DELETE FROM auth_login_throttles WHERE identifier = :identifier"), {"identifier": _login_identifier(payload.email, client_host)})
+    db.commit()
+    secure = settings.app_env not in {"development", "test"}
+    response.set_cookie(settings.session_cookie_name, token, httponly=True, secure=secure, samesite="lax", max_age=settings.session_absolute_hours * 3600)
+    response.set_cookie("scheduler_csrf", csrf_token, httponly=False, secure=secure, samesite="lax", max_age=settings.session_absolute_hours * 3600)
+    return {"role": str(row["role"]), "expires_at": expires.isoformat()}
+
+
+@router.post("/logout")
+def logout(response: Response, request: Request, db: Db, settings: SettingsDep) -> dict[str, str]:
+    session_token = request.cookies.get(settings.session_cookie_name)
+    if session_token:
+        row = db.execute(text("UPDATE auth_sessions SET revoked_at = now() WHERE token_hash = :token_hash RETURNING account_id"), {"token_hash": _hash(session_token)}).mappings().one_or_none()
+        if row is not None:
+            db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'LOGOUT', 'account', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": row["account_id"], "entity_id": str(row["account_id"]), "after_json": '{"session": "revoked"}'})
+        db.commit()
+    response.delete_cookie(settings.session_cookie_name)
+    response.delete_cookie("scheduler_csrf")
+    return {"status": "signed_out"}
+
+
+@router.get("/me")
+def authenticated_me(user: User) -> dict[str, str | int | None]:
+    return {"role": user.role, "status": user.status, "account_id": user.account_id}
+
+
+def _hash(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _login_identifier(email: str, client_host: str | None) -> str:
+    return _hash(f"{email.strip().lower()}|{client_host or 'unknown'}")
+
+
+def _record_login_attempt(db: Session, email: str, client_host: str | None) -> dict[str, int | bool]:
+    identifier = _login_identifier(email, client_host)
+    row = db.execute(
+        text(
+            "INSERT INTO auth_login_throttles (identifier, window_started_at, attempts, updated_at) VALUES (:identifier, now(), 1, now()) "
+            "ON CONFLICT (identifier) DO UPDATE SET "
+            "attempts = CASE WHEN auth_login_throttles.window_started_at <= now() - interval '15 minutes' THEN 1 ELSE auth_login_throttles.attempts + 1 END, "
+            "window_started_at = CASE WHEN auth_login_throttles.window_started_at <= now() - interval '15 minutes' THEN now() ELSE auth_login_throttles.window_started_at END, "
+            "updated_at = now() RETURNING attempts, window_started_at"
+        ),
+        {"identifier": identifier},
+    ).mappings().one()
+    now = datetime.now(UTC)
+    retry_after = max(1, math.ceil(((row["window_started_at"] + timedelta(minutes=15)) - now).total_seconds()))
+    return {"blocked": int(row["attempts"]) > 10, "retry_after": retry_after}
