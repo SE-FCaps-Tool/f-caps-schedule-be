@@ -46,6 +46,10 @@ def test_admin_account_lifecycle_is_audited(client):
     )
     assert created.status_code == 201, created.text
     account_id = created.json()["id"]
+    accounts = client.get("/api/v1/accounts", headers=admin_headers)
+    assert accounts.status_code == 200, accounts.text
+    created_account = next(item for item in accounts.json() if item["id"] == account_id)
+    assert created_account["roles"] == ["MANAGER"]
     disabled = client.patch(
         f"/api/v1/accounts/{account_id}/status",
         json={"status": "INACTIVE", "reason": "End of local pilot"},
@@ -135,6 +139,14 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     own_headers = {"X-Test-Session": f"active-lecturer:{lecturer['account_id']}"}
     conflict = client.post(f"/api/v1/lecturers/{lecturer['id']}/conflicts", json={"project_id": project.json()["id"], "reason": "Declared conflict"}, headers=own_headers)
     assert conflict.status_code == 200, conflict.text
+    lecturers = client.get("/api/v1/lecturers", headers=manager_headers)
+    assert lecturers.status_code == 200, lecturers.text
+    lecturer_details = next(item for item in lecturers.json() if item["id"] == lecturer["id"])
+    assert lecturer_details["account_id"] == lecturer["account_id"]
+    assert lecturer_details["email"]
+    assert lecturer_details["display_name"]
+    assert lecturer_details["account_status"] in {"ACTIVE", "INACTIVE"}
+    assert {item["project_id"] for item in lecturer_details["conflicts"]} >= {project.json()["id"]}
 
 
 @pytest.mark.integration

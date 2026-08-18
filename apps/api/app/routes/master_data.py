@@ -209,7 +209,18 @@ def list_semesters(db: Db, user: User) -> list[dict[str, object]]:
 @router.get("/accounts")
 def list_accounts(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN")
-    rows = db.execute(text("SELECT a.id, a.email, a.display_name, a.status, a.created_at, COALESCE(array_agg(ar.role ORDER BY ar.role) FILTER (WHERE ar.role IS NOT NULL), ARRAY[]::system_role[]) AS roles FROM accounts a LEFT JOIN account_roles ar ON ar.account_id = a.id GROUP BY a.id ORDER BY a.email")).mappings().all()
+    rows = db.execute(
+        text(
+            "SELECT a.id, a.email, a.display_name, a.status, a.created_at, "
+            "COALESCE("
+            "jsonb_agg(ar.role::text ORDER BY ar.role) FILTER (WHERE ar.role IS NOT NULL), "
+            "'[]'::jsonb"
+            ") AS roles "
+            "FROM accounts a "
+            "LEFT JOIN account_roles ar ON ar.account_id = a.id "
+            "GROUP BY a.id ORDER BY a.email"
+        )
+    ).mappings().all()
     return [dict(row) for row in rows]
 
 
@@ -325,7 +336,21 @@ def list_projects(db: Db, user: User) -> list[dict[str, object]]:
 def list_lecturers(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
-        text("SELECT id, lecturer_code, account_id FROM lecturers ORDER BY lecturer_code")
+        text(
+            "SELECT l.id, l.lecturer_code, l.account_id, a.email, a.display_name, "
+            "a.status AS account_status, "
+            "COALESCE("
+            "jsonb_agg("
+            "jsonb_build_object('project_id', cd.project_id, 'reason', cd.reason) "
+            "ORDER BY cd.project_id"
+            ") FILTER (WHERE cd.id IS NOT NULL), '[]'::jsonb"
+            ") AS conflicts "
+            "FROM lecturers l "
+            "JOIN accounts a ON a.id = l.account_id "
+            "LEFT JOIN conflict_declarations cd ON cd.lecturer_id = l.id "
+            "GROUP BY l.id, l.lecturer_code, l.account_id, a.email, a.display_name, a.status "
+            "ORDER BY l.lecturer_code"
+        )
     ).mappings()
     return [dict(row) for row in rows]
 

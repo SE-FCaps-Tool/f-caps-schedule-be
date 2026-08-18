@@ -40,6 +40,8 @@ Tất cả route trong file này đều có prefix `/api/v1`.
 - **Role:** `ADMIN`.
 - **Response `200`:** array `{ id, email, display_name, status, created_at, roles }`, trong đó `roles` là array role.
 
+Ví dụ field role: `"roles": ["STUDENT"]` (không phải chuỗi PostgreSQL dạng `"{STUDENT}"`).
+
 ### `POST /accounts`
 
 - **Role:** `ADMIN`.
@@ -115,7 +117,29 @@ Tất cả route trong file này đều có prefix `/api/v1`.
 ### `GET /lecturers`
 
 - **Role:** `ADMIN`, `MANAGER`.
-- **Response:** array `{ id, lecturer_code, account_id }`.
+- **Response:** array `{ id, lecturer_code, account_id, email, display_name, account_status, conflicts }`.
+- `conflicts` là mảng các object `{ project_id, reason }`; lecturer chưa có conflict sẽ trả về `[]`.
+
+Ví dụ:
+
+```json
+[
+  {
+    "id": 1,
+    "lecturer_code": "LEC001",
+    "account_id": 20,
+    "email": "lecturer1@gmail.com",
+    "display_name": "Lecturer One",
+    "account_status": "ACTIVE",
+    "conflicts": [
+      {
+        "project_id": 12,
+        "reason": "Supervisor conflict"
+      }
+    ]
+  }
+]
+```
 
 ### `POST /lecturers`
 
