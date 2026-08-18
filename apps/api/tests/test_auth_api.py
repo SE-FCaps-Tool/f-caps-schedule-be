@@ -10,7 +10,7 @@ def test_local_login_sets_session_and_csrf_and_logout_revokes_session(client):
 
     login = client.post(
         "/api/v1/auth/login",
-        json={"email": "manager@capstone.local", "password": "SchedulerDemo2026!"},
+        json={"email": "manager1@gmail.com", "password": "SchedulerDemo2026!"},
     )
     assert login.status_code == 200, login.text
     assert "scheduler_session" in login.cookies
