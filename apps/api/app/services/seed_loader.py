@@ -20,8 +20,12 @@ def load_seed_fixture(
         semester_id = _id(
             session,
             """
-            INSERT INTO semesters (code, name) VALUES (:code, :name)
-            ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
+            INSERT INTO semesters (code, name, start_date, end_date)
+            VALUES (:code, :name, :start_date, :end_date)
+            ON CONFLICT (code) DO UPDATE SET
+                name = EXCLUDED.name,
+                start_date = EXCLUDED.start_date,
+                end_date = EXCLUDED.end_date
             RETURNING id
             """,
             semester_data,

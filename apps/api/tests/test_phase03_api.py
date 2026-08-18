@@ -6,10 +6,18 @@ import pytest
 @pytest.mark.integration
 def test_manager_can_create_semester_and_duplicate_code_is_rejected(client):
     code = f"API-{uuid4().hex[:8]}"
-    payload = {"code": code, "name": "API Test Semester"}
+    payload = {
+        "code": code,
+        "name": "API Test Semester",
+        "start_date": "2030-01-01",
+        "end_date": "2030-04-15",
+    }
     created = client.post("/api/v1/semesters", json=payload, headers={"X-Test-Session": "active-manager"})
     assert created.status_code == 201
     assert created.json()["code"] == code.upper()
+    assert created.json()["status"] == "UPCOMING"
+    assert created.json()["start_date"] == "2030-01-01"
+    assert created.json()["end_date"] == "2030-04-15"
 
     duplicate = client.post(
         "/api/v1/semesters", json=payload, headers={"X-Test-Session": "active-manager"}
@@ -37,6 +45,62 @@ def test_invalid_semester_payload_is_rejected_before_database_access(client):
         headers={"X-Test-Session": "active-manager"},
     )
     assert response.status_code == 422
+
+
+@pytest.mark.integration
+def test_semester_duration_and_status_transitions(client):
+    headers = {"X-Test-Session": "active-manager"}
+    created = client.post(
+        "/api/v1/semesters",
+        json={
+            "code": f"DURATION-{uuid4().hex[:8]}",
+            "name": "Duration Test Semester",
+            "start_date": "2030-01-01",
+            "end_date": "2030-04-15",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+    semester_id = created.json()["id"]
+
+    activated = client.post(
+        f"/api/v1/semesters/{semester_id}/transition",
+        json={"target_status": "ACTIVE", "reason": "Open semester"},
+        headers=headers,
+    )
+    assert activated.status_code == 200
+    assert activated.json() == {"id": semester_id, "status": "ACTIVE"}
+
+    closed = client.post(
+        f"/api/v1/semesters/{semester_id}/transition",
+        json={"target_status": "CLOSED", "reason": "Semester completed"},
+        headers=headers,
+    )
+    assert closed.status_code == 200
+    assert closed.json() == {"id": semester_id, "status": "CLOSED"}
+
+
+@pytest.mark.parametrize(
+    ("start_date", "end_date"),
+    [
+        ("2030-01-01", "2030-04-14"),
+        ("2030-01-01", "2030-05-01"),
+        ("2030-04-15", "2030-01-01"),
+    ],
+)
+def test_invalid_semester_duration_is_rejected(client, start_date, end_date):
+    response = client.post(
+        "/api/v1/semesters",
+        json={
+            "code": f"INVALID-{uuid4().hex[:8]}",
+            "name": "Invalid Duration",
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+        headers={"X-Test-Session": "active-manager"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "SEMESTER_DURATION_INVALID"
 
 
 def test_manager_only_endpoint_rejects_lecturer(client):

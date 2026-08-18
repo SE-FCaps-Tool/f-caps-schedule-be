@@ -43,7 +43,7 @@ services:
       APP_ENV: development
       DATABASE_URL: postgresql+psycopg://scheduler:scheduler@postgres:5432/scheduler
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./apps/api:/app/apps/api
     depends_on:

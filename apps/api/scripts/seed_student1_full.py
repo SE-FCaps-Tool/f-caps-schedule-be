@@ -84,12 +84,16 @@ def main() -> None:
         semester_id = _id(
             session,
             """
-            INSERT INTO semesters (code, name, status)
-            VALUES (:code, :name, 'ACTIVE')
-            ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
+            INSERT INTO semesters (code, name, start_date, end_date, status)
+            VALUES (:code, :name, :start_date, :end_date, 'ACTIVE')
+            ON CONFLICT (code) DO UPDATE SET
+                name = EXCLUDED.name,
+                start_date = EXCLUDED.start_date,
+                end_date = EXCLUDED.end_date,
+                status = 'ACTIVE'
             RETURNING id
             """,
-            SEMESTER,
+            {**SEMESTER, "start_date": "2026-05-11", "end_date": "2026-08-23"},
         )
         major_id = _id(
             session,

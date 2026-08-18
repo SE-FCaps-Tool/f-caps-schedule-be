@@ -14,12 +14,10 @@ Mọi route nghiệp vụ bắt đầu bằng `/api/v1`. Ví dụ: `GET http://l
 
 ### Cross-origin khi FE chạy repo riêng
 
-Backend hiện không bật `CORSMiddleware`. Vì vậy FE chạy trực tiếp ở `http://localhost:5173` gọi sang `http://localhost:8000` sẽ cần một trong hai cách:
-
-- dùng dev-server proxy để browser gọi cùng origin với FE; hoặc
-- khi triển khai, cấu hình CORS cụ thể với origin của FE và `allow_credentials=true`.
-
-Không dùng `Access-Control-Allow-Origin: *` cùng cookie session.
+Backend đã bật `CORSMiddleware`. Danh sách origin lấy từ biến môi trường
+`CORS_ORIGINS` (mặc định `http://localhost:3000`); khi FE chạy ở origin khác, thêm origin
+đó vào biến này. Vì API dùng cookie session nên không dùng
+`Access-Control-Allow-Origin: *`; `allow_credentials=true` phải đi cùng origin cụ thể.
 
 Backend là cookie-session API, không dùng `Authorization: Bearer`. Frontend phải gửi cookie cross-request:
 
@@ -147,6 +145,8 @@ Thiếu hoặc sai `X-CSRF-Token` sẽ bị từ chối trước khi route nghi�
 
 Chi tiết request/response theo nhóm:
 
+- [API architecture và luồng nghiệp vụ](api-reorganization.md)
+- [ADMIN-only API](admin-api.md)
 - [Auth và current user](auth.md)
 - [Master data và round setup](master-data.md)
 - [Scheduler, lịch và vận hành thay đổi](scheduling.md)
@@ -159,7 +159,7 @@ Chi tiết request/response theo nhóm:
 
 ### Master data và round setup
 
-`GET/POST /api/v1/semesters`, `GET/POST /api/v1/accounts`, `PATCH /api/v1/accounts/{account_id}/status`, `POST /api/v1/accounts/{account_id}/roles`, `DELETE /api/v1/accounts/{account_id}/roles/{role}`, `POST /api/v1/admin/seed-fixture`, `GET /api/v1/audit`, `GET /api/v1/majors`, `GET /api/v1/students`, `GET/POST /api/v1/projects`, `GET/POST /api/v1/lecturers`, `POST /api/v1/lecturers/{lecturer_id}/conflicts`, `GET/POST /api/v1/rooms`, `GET/POST /api/v1/groups`, `POST /api/v1/groups/{group_id}/members/{student_id}/drop`, `POST /api/v1/groups/{group_id}/leader`, `GET/POST /api/v1/rounds`, `POST /api/v1/rounds/{round_id}/transition`, `POST /api/v1/rounds/{round_id}/unlock`, `POST /api/v1/rounds/{round_id}/resources`, `POST /api/v1/rounds/{round_id}/days`, `POST /api/v1/rounds/{round_id}/lecturers/{lecturer_id}/availability`, `POST /api/v1/rounds/{round_id}/groups/{group_id}/availability`, `POST /api/v1/rounds/{round_id}/invitations`, `POST /api/v1/rounds/{round_id}/invitations/{lecturer_id}/response`, `GET /api/v1/rounds/{round_id}/registration`, `GET /api/v1/rounds/{round_id}/my-availability`, `GET /api/v1/my/rounds`, `GET /api/v1/my/invitations`
+`GET/POST /api/v1/semesters`, `POST /api/v1/semesters/{semester_id}/transition`, `GET/POST /api/v1/accounts`, `PATCH /api/v1/accounts/{account_id}/status`, `POST /api/v1/accounts/{account_id}/roles`, `DELETE /api/v1/accounts/{account_id}/roles/{role}`, `POST /api/v1/admin/seed-fixture`, `GET /api/v1/audit`, `GET /api/v1/majors`, `GET /api/v1/students`, `GET/POST /api/v1/projects`, `GET/POST /api/v1/lecturers`, `POST /api/v1/lecturers/{lecturer_id}/conflicts`, `GET/POST /api/v1/rooms`, `GET/POST /api/v1/groups`, `POST /api/v1/groups/{group_id}/members/{student_id}/drop`, `POST /api/v1/groups/{group_id}/leader`, `GET/POST /api/v1/rounds`, `POST /api/v1/rounds/{round_id}/transition`, `POST /api/v1/rounds/{round_id}/unlock`, `POST /api/v1/rounds/{round_id}/resources`, `POST /api/v1/rounds/{round_id}/days`, `POST /api/v1/rounds/{round_id}/lecturers/{lecturer_id}/availability`, `POST /api/v1/rounds/{round_id}/groups/{group_id}/availability`, `POST /api/v1/rounds/{round_id}/invitations`, `POST /api/v1/rounds/{round_id}/invitations/{lecturer_id}/response`, `GET /api/v1/rounds/{round_id}/registration`, `GET /api/v1/rounds/{round_id}/my-availability`, `GET /api/v1/my/rounds`, `GET /api/v1/my/invitations`
 
 ### Schedule operations
 

@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser, get_current_user
+from app.config import Settings, get_settings
 from app.database import get_db
 from app.domain.availability import invitation_response
 from app.domain.enums import RoundStatus, SystemRole
@@ -32,6 +33,7 @@ from app.services.seed_loader import load_seed_fixture
 router = APIRouter(prefix="/api/v1", tags=["management"])
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
+SettingsDep = Annotated[Settings, Depends(get_settings)]
 password_hasher = PasswordHasher()
 
 
@@ -52,7 +54,8 @@ def _actor_id(db: Session, user: CurrentUser) -> int | None:
 class SemesterCreate(BaseModel):
     code: str = Field(min_length=1, max_length=32)
     name: str = Field(min_length=1, max_length=160)
-    status: str = Field(default="DRAFT", pattern="^(DRAFT|ACTIVE|CLOSED)$")
+    start_date: date
+    end_date: date
 
     @field_validator("code")
     @classmethod
@@ -63,6 +66,11 @@ class SemesterCreate(BaseModel):
     @classmethod
     def normalize_name(cls, value: str) -> str:
         return value.strip()
+
+
+class SemesterTransitionPayload(BaseModel):
+    target_status: Literal["ACTIVE", "CLOSED"]
+    reason: str = Field(min_length=1, max_length=1000)
 
 
 class RoundCreate(BaseModel):
@@ -193,7 +201,7 @@ class LeaderPayload(BaseModel):
 def list_semesters(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
-        text("SELECT id, code, name, status, created_at FROM semesters ORDER BY code")
+        text("SELECT id, code, name, start_date, end_date, status, created_at FROM semesters ORDER BY code")
     ).mappings()
     return [dict(row) for row in rows]
 
@@ -560,22 +568,36 @@ def change_group_leader(group_id: int, payload: LeaderPayload, db: Db, user: Use
 
 
 @router.post("/semesters", status_code=status.HTTP_201_CREATED)
-def create_semester(payload: SemesterCreate, db: Db, user: User) -> dict[str, object]:
+def create_semester(
+    payload: SemesterCreate, db: Db, user: User, settings: SettingsDep
+) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
+    duration_days = (payload.end_date - payload.start_date).days + 1
+    if (
+        payload.end_date < payload.start_date
+        or not settings.semester_min_duration_days
+        <= duration_days
+        <= settings.semester_max_duration_days
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "SEMESTER_DURATION_INVALID",
+                "message": (
+                    "Semester duration must be between "
+                    f"{settings.semester_min_duration_days} and "
+                    f"{settings.semester_max_duration_days} inclusive days."
+                ),
+            },
+        )
     try:
         with db.begin():
-            if payload.status == "ACTIVE":
-                active = db.execute(
-                    text("SELECT 1 FROM semesters WHERE status = 'ACTIVE' LIMIT 1")
-                ).scalar_one_or_none()
-                if active is not None:
-                    raise DomainError("ACTIVE_SEMESTER_EXISTS", "Only one semester may be ACTIVE.")
             row = db.execute(
                 text(
                     """
-                    INSERT INTO semesters (code, name, status)
-                    VALUES (:code, :name, :status)
-                    RETURNING id, code, name, status, created_at
+                    INSERT INTO semesters (code, name, start_date, end_date, status)
+                    VALUES (:code, :name, :start_date, :end_date, 'UPCOMING')
+                    RETURNING id, code, name, start_date, end_date, status, created_at
                     """
                 ),
                 payload.model_dump(),
@@ -587,7 +609,16 @@ def create_semester(payload: SemesterCreate, db: Db, user: User) -> dict[str, ob
                     VALUES (:actor_id, 'MASTER_DATA_CREATED', 'semester', :entity_id, CAST(:after_json AS JSONB))
                     """
                 ),
-                {"actor_id": _actor_id(db, user), "entity_id": str(row["id"]), "after_json": str(payload.model_dump_json())},
+                {
+                    "actor_id": _actor_id(db, user),
+                    "entity_id": str(row["id"]),
+                    "after_json": _json(
+                        {
+                            **payload.model_dump(mode="json"),
+                            "status": "UPCOMING",
+                        }
+                    ),
+                },
             )
     except DomainError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
@@ -597,6 +628,78 @@ def create_semester(payload: SemesterCreate, db: Db, user: User) -> dict[str, ob
             detail={"code": "DATA_DUPLICATE", "message": "Semester code already exists."},
         ) from exc
     return dict(row)
+
+
+@router.post("/semesters/{semester_id}/transition")
+def transition_semester(
+    semester_id: int,
+    payload: SemesterTransitionPayload,
+    db: Db,
+    user: User,
+) -> dict[str, object]:
+    _require(user, "ADMIN", "MANAGER")
+    try:
+        with db.begin():
+            row = db.execute(
+                text("SELECT id, status FROM semesters WHERE id = :id FOR UPDATE"),
+                {"id": semester_id},
+            ).mappings().one_or_none()
+            if row is None:
+                raise DomainError("SEMESTER_NOT_FOUND", "Semester does not exist.")
+
+            current_status = str(row["status"])
+            allowed = {
+                "UPCOMING": "ACTIVE",
+                "ACTIVE": "CLOSED",
+            }
+            if allowed.get(current_status) != payload.target_status:
+                raise DomainError(
+                    "SEMESTER_STATUS_INVALID",
+                    f"Invalid semester transition: {current_status} -> {payload.target_status}.",
+                )
+            if payload.target_status == "ACTIVE":
+                active = db.execute(
+                    text(
+                        "SELECT id FROM semesters "
+                        "WHERE status = 'ACTIVE' AND id <> :id LIMIT 1 FOR UPDATE"
+                    ),
+                    {"id": semester_id},
+                ).scalar_one_or_none()
+                if active is not None:
+                    raise DomainError(
+                        "ACTIVE_SEMESTER_EXISTS",
+                        "Only one semester may be ACTIVE.",
+                    )
+            db.execute(
+                text("UPDATE semesters SET status = CAST(:status AS semester_status) WHERE id = :id"),
+                {"status": payload.target_status, "id": semester_id},
+            )
+            db.execute(
+                text(
+                    "INSERT INTO audit_events "
+                    "(actor_id, action, entity_type, entity_id, reason, before_json, after_json) "
+                    "VALUES (:actor_id, 'SEMESTER_STATUS_CHANGED', 'semester', :entity_id, :reason, "
+                    "CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"
+                ),
+                {
+                    "actor_id": _actor_id(db, user),
+                    "entity_id": str(semester_id),
+                    "reason": payload.reason.strip(),
+                    "before_json": _json({"status": current_status}),
+                    "after_json": _json({"status": payload.target_status}),
+                },
+            )
+    except DomainError as exc:
+        raise HTTPException(
+            status_code=422 if exc.code != "SEMESTER_NOT_FOUND" else 404,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "ACTIVE_SEMESTER_EXISTS", "message": "Only one semester may be ACTIVE."},
+        ) from exc
+    return {"id": semester_id, "status": payload.target_status}
 
 
 @router.post("/admin/seed-fixture", status_code=status.HTTP_201_CREATED)

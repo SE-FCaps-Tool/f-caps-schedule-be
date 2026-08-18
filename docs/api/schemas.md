@@ -20,10 +20,20 @@
 ### `SemesterCreate`
 
 ```json
-{ "code": "SP26", "name": "Spring 2026", "status": "DRAFT" }
+{ "code": "SP26", "name": "Spring 2026", "start_date": "2026-05-11", "end_date": "2026-08-23" }
 ```
 
-`code`: 1–32; `name`: 1–160; `status`: `DRAFT` (default), `ACTIVE`, `CLOSED`.
+`code`: 1–32; `name`: 1–160; `start_date` và `end_date`: ISO `YYYY-MM-DD`.
+Semester mới luôn có status `UPCOMING`. Duration inclusive phải nằm trong cấu hình
+`SEMESTER_MIN_DURATION_DAYS` (default 105) và `SEMESTER_MAX_DURATION_DAYS` (default 120).
+
+### `SemesterTransitionPayload`
+
+```json
+{ "target_status": "ACTIVE", "reason": "Open semester" }
+```
+
+Chỉ cho phép `UPCOMING → ACTIVE` và `ACTIVE → CLOSED`; `reason` dài 1–1000 ký tự.
 
 ### `AccountCreate`
 

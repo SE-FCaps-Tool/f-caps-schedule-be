@@ -7,11 +7,11 @@ Tất cả route trong file này đều có prefix `/api/v1`.
 ### `GET /semesters`
 
 - **Role:** `ADMIN`, `MANAGER`.
-- **Response `200`:** array `{ id, code, name, status, created_at }`.
+- **Response `200`:** array `{ id, code, name, start_date, end_date, status, created_at }`.
 
 ```json
 [
-  { "id": 1, "code": "SP26", "name": "Spring 2026", "status": "ACTIVE", "created_at": "2026-08-18T02:00:00Z" }
+  { "id": 1, "code": "SP26", "name": "Spring 2026", "start_date": "2026-05-11", "end_date": "2026-08-23", "status": "UPCOMING", "created_at": "2026-08-18T02:00:00Z" }
 ]
 ```
 
@@ -19,9 +19,19 @@ Tất cả route trong file này đều có prefix `/api/v1`.
 
 - **Role:** `ADMIN`, `MANAGER`.
 - **Body:** [`SemesterCreate`](schemas.md#semestercreate).
-- **Success `201`:** object semester đầy đủ `{ id, code, name, status, created_at }`.
+- **Success `201`:** object semester đầy đủ `{ id, code, name, start_date, end_date, status, created_at }`; status luôn là `UPCOMING`.
 - **`409 DATA_DUPLICATE`:** code đã tồn tại.
-- **`422 ACTIVE_SEMESTER_EXISTS`:** chỉ được có một semester `ACTIVE`.
+- **`422 SEMESTER_DURATION_INVALID`:** thời lượng không nằm trong cấu hình 105–120 ngày hoặc ngày kết thúc trước ngày bắt đầu.
+
+### `POST /semesters/{semester_id}/transition`
+
+- **Role:** `ADMIN`, `MANAGER`.
+- **Body:** `{ "target_status": "ACTIVE|CLOSED", "reason": "..." }`.
+- **Transitions:** chỉ cho phép `UPCOMING → ACTIVE → CLOSED`.
+- **Success `200`:** `{ "id": 1, "status": "ACTIVE" }`.
+- **`422 ACTIVE_SEMESTER_EXISTS`:** đã có semester `ACTIVE` khác.
+- **`422 SEMESTER_STATUS_INVALID`:** transition không hợp lệ.
+- **`404 SEMESTER_NOT_FOUND`:** semester không tồn tại.
 
 ## Accounts và audit
 

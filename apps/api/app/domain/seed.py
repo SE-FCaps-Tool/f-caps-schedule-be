@@ -50,7 +50,12 @@ def seed_fixture_v1() -> dict[str, object]:
         )
     return {
         "version": FIXTURE_VERSION,
-        "semester": {"code": "SE-2026-2027", "name": "Software Engineering 2026–2027"},
+        "semester": {
+            "code": "SE-2026-2027",
+            "name": "Software Engineering 2026–2027",
+            "start_date": "2026-05-11",
+            "end_date": "2026-08-23",
+        },
         "major": {"code": "SE", "name": "Software Engineering"},
         "lecturers": lecturers,
         "rooms": rooms,

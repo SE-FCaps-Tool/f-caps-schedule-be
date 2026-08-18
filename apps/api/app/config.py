@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     session_idle_minutes: int = 15
     session_absolute_hours: int = 8
     cors_origins: str = "http://localhost:3000"
+    semester_min_duration_days: int = 105
+    semester_max_duration_days: int = 120
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -22,4 +24,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

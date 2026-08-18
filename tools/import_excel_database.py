@@ -242,8 +242,9 @@ def main() -> None:
 
     add_sql(
         lines,
-        "INSERT INTO semesters (code, name, status) VALUES "
-        f"({sql(SEMESTER_CODE)}, {sql('Excel import: SE_CapstoneProject_SP26_ReviewDefense_New')}, 'DRAFT')",
+        "INSERT INTO semesters (code, name, start_date, end_date, status) VALUES "
+        f"({sql(SEMESTER_CODE)}, {sql('Excel import: SE_CapstoneProject_SP26_ReviewDefense_New')}, "
+        "DATE '2026-05-11', DATE '2026-08-23', 'UPCOMING')",
     )
     add_sql(
         lines,
