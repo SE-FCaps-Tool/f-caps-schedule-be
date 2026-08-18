@@ -17,6 +17,20 @@ services:
       timeout: 5s
       retries: 10
 
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://scheduler:scheduler@postgres:5432/scheduler
+    volumes:
+      - ./apps/api:/app/apps/api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head"
+
   api:
     build:
       context: .
@@ -29,9 +43,9 @@ services:
     volumes:
       - ./apps/api:/app/apps/api
     depends_on:
-      postgres:
-        condition: service_healthy
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      migrate:
+        condition: service_completed_successfully
+    command: sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   worker:
     build:
@@ -43,9 +57,9 @@ services:
     volumes:
       - ./apps/api:/app/apps/api
     depends_on:
-      postgres:
-        condition: service_healthy
-    command: sh -c "alembic upgrade head && python -m app.worker"
+      migrate:
+        condition: service_completed_successfully
+    command: sh -c "python -m app.worker"
 
 volumes:
   postgres_data:
