@@ -1,7 +1,8 @@
 import pytest
+from fastapi import HTTPException
 
 from app.api_contract import external_id, parse_external_id, target_id_fields
-from app.routes.target_group_project import TargetGroupCreate, TargetProjectCreate
+from app.routes.target_group_project import TargetGroupCreate, TargetProjectCreate, _parse_group_id
 from app.routes.target_round_contract import (
     TargetAvailabilitySubmit,
     TargetInvitationResponse,
@@ -20,6 +21,18 @@ def test_external_id_codec_rejects_wrong_prefix_and_malformed_values():
         parse_external_id("prj_123", prefix="grp")
     with pytest.raises(ValueError):
         parse_external_id("grp_bad", prefix="grp")
+
+
+@pytest.mark.parametrize("value", [28, "28", "grp_28"])
+def test_target_group_path_id_accepts_numeric_and_public_forms(value):
+    assert _parse_group_id(value) == 28
+
+
+def test_target_group_path_id_rejects_other_resource_prefix():
+    with pytest.raises(HTTPException) as exc_info:
+        _parse_group_id("prj_28")
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail["code"] == "VALIDATION_ERROR"
 
 
 def test_target_id_fields_adapts_sql_mapping_without_mutating_source():

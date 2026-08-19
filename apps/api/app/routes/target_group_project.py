@@ -95,6 +95,18 @@ def _actor_id(db: Session, user: CurrentUser) -> int | None:
     ).scalar_one_or_none()
 
 
+def _parse_group_id(value: str | int) -> int:
+    """Accept the public ``grp_<id>`` form and legacy numeric path IDs."""
+
+    try:
+        return parse_external_id(value, prefix="grp")
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "VALIDATION_ERROR", "message": "group_id must be a valid group identifier."},
+        ) from exc
+
+
 @router.get("/semesters/{semester_id}/groups")
 def list_semester_groups(
     semester_id: int,
@@ -214,7 +226,8 @@ def create_semester_group(semester_id: int, payload: TargetGroupCreate, db: Db, 
 
 
 @router.get("/groups/{group_id}/members")
-def list_group_members(group_id: int, db: Db, user: User) -> dict[str, Any]:
+def list_group_members(group_id: str, db: Db, user: User) -> dict[str, Any]:
+    group_id = _parse_group_id(group_id)
     if user.role not in {"ADMIN", "MANAGER", "LECTURER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Group access is not available."})
     rows = db.execute(
@@ -240,7 +253,8 @@ def list_group_members(group_id: int, db: Db, user: User) -> dict[str, Any]:
 
 
 @router.post("/groups/{group_id}/actions/change-leader")
-def target_change_group_leader(group_id: int, payload: TargetChangeLeaderPayload, db: Db, user: User) -> dict[str, Any]:
+def target_change_group_leader(group_id: str, payload: TargetChangeLeaderPayload, db: Db, user: User) -> dict[str, Any]:
+    group_id = _parse_group_id(group_id)
     student_id = parse_external_id(payload.leader_id, prefix="stu")
     try:
         result = change_group_leader(group_id, LeaderPayload(student_id=student_id, reason=payload.reason), db, user)
@@ -257,8 +271,9 @@ def target_change_group_leader(group_id: int, payload: TargetChangeLeaderPayload
 
 
 @router.post("/groups/{group_id}/members/{membership_id}/actions/leave")
-def target_leave_group(group_id: int, membership_id: str | int, payload: TargetLeaveGroupPayload, db: Db, user: User) -> dict[str, Any]:
+def target_leave_group(group_id: str, membership_id: str | int, payload: TargetLeaveGroupPayload, db: Db, user: User) -> dict[str, Any]:
     _require_manager(user)
+    group_id = _parse_group_id(group_id)
     membership_id = parse_external_id(membership_id, prefix="mem")
     with db.begin():
         project_semester_id = db.execute(
@@ -306,8 +321,9 @@ def target_leave_group(group_id: int, membership_id: str | int, payload: TargetL
 
 
 @router.put("/groups/{group_id}/project")
-def assign_group_project(group_id: int, payload: ProjectAssignment, db: Db, user: User) -> dict[str, Any]:
+def assign_group_project(group_id: str, payload: ProjectAssignment, db: Db, user: User) -> dict[str, Any]:
     _require_manager(user)
+    group_id = _parse_group_id(group_id)
     if payload.project_id is None:
         result = dict(update_group(group_id, GroupUpdate(project_id=None), db, user))
         result["status"] = group_from_legacy(result["status"], project_assigned=False).value
