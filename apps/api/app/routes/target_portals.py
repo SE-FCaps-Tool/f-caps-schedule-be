@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +17,12 @@ from app.services.access import lecturer_id_for_account, student_id_for_account
 router = APIRouter(prefix="/api/v1", tags=["target-portals"])
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
+
+
+def _invitation_status(status: str, registration_deadline: datetime | None) -> str:
+    if status == "PENDING" and registration_deadline is not None and registration_deadline < datetime.now(UTC):
+        return "EXPIRED"
+    return status
 
 
 def _lecturer_id(db: Session, user: CurrentUser) -> int:
@@ -41,15 +48,31 @@ def lecturer_invitations(db: Db, user: User) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
         text(
-            "SELECT ri.round_id, ri.lecturer_id, ri.status, ri.response_reason, "
-            "ri.responded_at, r.type, r.status AS round_status, s.code AS semester_code "
+            "SELECT ri.round_id, ri.lecturer_id, ri.status::text AS status, ri.responded_at, "
+            "r.name AS round_name, r.type::text AS round_type, r.registration_deadline "
             "FROM round_invitations ri JOIN rounds r ON r.id = ri.round_id "
-            "JOIN semesters s ON s.id = r.semester_id WHERE ri.lecturer_id = :lecturer_id "
+            "WHERE ri.lecturer_id = :lecturer_id "
             "ORDER BY r.id DESC"
         ),
         {"lecturer_id": lecturer_id},
     ).mappings().all()
-    return success_payload([dict(row) for row in rows], meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
+    invitations = [
+        {
+            "id": f"inv_{row['round_id']}_{row['lecturer_id']}",
+            "round": {
+                # Keep this a JSON string while remaining compatible with the
+                # existing integer round path parameter used by the respond API.
+                "id": str(row["round_id"]),
+                "name": row["round_name"] or row["round_type"],
+                "type": row["round_type"],
+                "registrationDeadline": row["registration_deadline"],
+            },
+            "status": _invitation_status(row["status"], row["registration_deadline"]),
+            "respondedAt": row["responded_at"],
+        }
+        for row in rows
+    ]
+    return success_payload(invitations)
 
 
 @router.get("/lecturer/me/sessions")
