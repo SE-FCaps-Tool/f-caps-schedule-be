@@ -280,6 +280,8 @@ API riêng và không thay thế quy trình import Excel.
 
 ## 5. Tạo lecturer
 
+> Endpoint này cho phép `ADMIN` và `MANAGER`. `MANAGER` được quản lý lecturer/room phục vụ vận hành lịch; các API account/role hệ thống vẫn chỉ dành cho `ADMIN`.
+
 ```http
 POST /api/v1/lecturers
 Cookie: scheduler_session=<session>

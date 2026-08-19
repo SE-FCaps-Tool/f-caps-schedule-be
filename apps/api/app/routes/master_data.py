@@ -426,7 +426,7 @@ def list_lecturers(db: Db, user: User) -> list[dict[str, object]]:
 
 @router.post("/lecturers", status_code=status.HTTP_201_CREATED, response_model=LecturerResponse)
 def create_lecturer(payload: LecturerCreate, db: Db, user: User) -> dict[str, object]:
-    _require(user, "ADMIN")
+    _require(user, "ADMIN", "MANAGER")
     try:
         code = normalize_code(payload.lecturer_code)
         with db.begin():
@@ -472,7 +472,7 @@ def list_rooms(db: Db, user: User) -> list[dict[str, object]]:
 
 @router.post("/rooms", status_code=status.HTTP_201_CREATED, response_model=RoomResponse)
 def create_room(payload: RoomCreate, db: Db, user: User) -> dict[str, object]:
-    _require(user, "ADMIN")
+    _require(user, "ADMIN", "MANAGER")
     try:
         with db.begin():
             row = db.execute(

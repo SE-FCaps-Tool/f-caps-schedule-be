@@ -67,6 +67,12 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 - `GET /lecturers` → `[{ id, lecturer_code, account_id, email, display_name, account_status, conflicts }]`.
 - `GET /rooms` → `[{ id, code, name, capacity, active }]`.
 
+### `POST /lecturers`, `POST /rooms`
+
+- **Role:** `ADMIN`, `MANAGER`.
+- Manager có thể tạo lecturer mới (kèm account + role `LECTURER`) và tạo room để dùng làm resource cho round.
+- Request/response giữ nguyên contract trong [`admin-api.md`](admin-api.md); mọi thao tác ghi đều có CSRF và audit log.
+
 ### `GET /projects`
 
 - **Role:** `ADMIN`, `MANAGER`.
