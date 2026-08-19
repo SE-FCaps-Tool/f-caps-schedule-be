@@ -15,3 +15,9 @@ test-results/
 .agents/
 .codex/
 .claude/
+
+# Local agent/session artifacts
+.hs.json
+AGENTS.md
+CLAUDE.md
+docs/api/round-create-resultownermode-fix.md
