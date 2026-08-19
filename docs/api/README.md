@@ -15,8 +15,8 @@ Mọi route nghiệp vụ bắt đầu bằng `/api/v1`. Ví dụ: `GET http://l
 ### Cross-origin khi FE chạy repo riêng
 
 Backend đã bật `CORSMiddleware`. Danh sách origin lấy từ biến môi trường
-`CORS_ORIGINS` (mặc định `http://localhost:3000`); khi FE chạy ở origin khác, thêm origin
-đó vào biến này. Vì API dùng cookie session nên không dùng
+`CORS_ORIGINS` (mặc định gồm `localhost` và `127.0.0.1` trên cổng `3000` và `5173`); khi
+FE chạy ở origin khác, thêm origin đó vào biến này. Vì API dùng cookie session nên không dùng
 `Access-Control-Allow-Origin: *`; `allow_credentials=true` phải đi cùng origin cụ thể.
 
 Backend là cookie-session API, không dùng `Authorization: Bearer`. Frontend phải gửi cookie cross-request:

@@ -24,6 +24,7 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgresql+psycopg://scheduler:scheduler@postgres:5432/scheduler
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -42,6 +43,7 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgresql+psycopg://scheduler:scheduler@postgres:5432/scheduler
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
     volumes:
       - ./apps/api:/app/apps/api
     depends_on:

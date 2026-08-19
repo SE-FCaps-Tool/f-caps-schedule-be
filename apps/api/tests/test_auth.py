@@ -24,3 +24,18 @@ def test_cookie_mutation_requires_double_submit_csrf(client):
 
     assert response.status_code == 403
     assert response.json()["detail"] == "CSRF validation failed"
+
+
+def test_cors_allows_local_frontend_origins_with_credentials(client):
+    response = client.options(
+        "/api/v1/me",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert response.headers["access-control-allow-credentials"] == "true"

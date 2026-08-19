@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     session_cookie_name: str = "scheduler_session"
     session_idle_minutes: int = 15
     session_absolute_hours: int = 8
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = (
+        "http://localhost:3000,http://localhost:5173,"
+        "http://127.0.0.1:3000,http://127.0.0.1:5173"
+    )
     semester_min_duration_days: int = 105
     semester_max_duration_days: int = 120
 

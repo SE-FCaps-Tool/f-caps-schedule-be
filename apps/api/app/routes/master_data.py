@@ -1,3 +1,4 @@
+import copy
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 
@@ -943,7 +944,10 @@ def seed_fixture(db: Db, user: User) -> dict[str, object]:
     try:
         actor_id = _actor_id(db, user)
         db.commit()
-        counts = load_seed_fixture(db, seed_fixture_v1(), actor_id=actor_id)
+        fixture = copy.deepcopy(seed_fixture_v1())
+        for lecturer in fixture["lecturers"]:
+            lecturer["email"] = f"fixture-{lecturer['email']}"
+        counts = load_seed_fixture(db, fixture, actor_id=actor_id)
     except IntegrityError as exc:
         raise HTTPException(
             status_code=422,
