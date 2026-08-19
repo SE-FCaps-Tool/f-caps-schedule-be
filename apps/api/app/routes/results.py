@@ -19,6 +19,7 @@ from app.services.access import (
     can_read_session,
     lecturer_id_for_account,
 )
+from app.response_models import ActionResponse, RemediationResponse, ResultDetailResponse, ResultWriteResponse
 
 router = APIRouter(prefix="/api/v1", tags=["results"])
 Db = Annotated[Session, Depends(get_db)]
@@ -123,7 +124,7 @@ def _queue_event(
         )
 
 
-@router.get("/sessions/{session_id}/result")
+@router.get("/sessions/{session_id}/result", response_model=ResultDetailResponse)
 def get_result(session_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     if not can_read_session(db, user, session_id):
@@ -137,7 +138,7 @@ def get_result(session_id: int, db: Db, user: User) -> dict[str, Any]:
     }
 
 
-@router.get("/remediation")
+@router.get("/remediation", response_model=list[RemediationResponse])
 def list_remediation_cases(db: Db, user: User) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     query = (
@@ -165,7 +166,7 @@ def list_remediation_cases(db: Db, user: User) -> list[dict[str, Any]]:
     return rows
 
 
-@router.post("/sessions/{session_id}/result", status_code=status.HTTP_201_CREATED)
+@router.post("/sessions/{session_id}/result", status_code=status.HTTP_201_CREATED, response_model=ResultWriteResponse)
 def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "MANAGER", "LECTURER")
     context = _session_context(db, session_id)
@@ -355,7 +356,7 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
         ) from exc
 
 
-@router.post("/remediation/{case_id}/decision")
+@router.post("/remediation/{case_id}/decision", response_model=ActionResponse, response_model_exclude_none=True)
 def decide_remediation(
     case_id: int, payload: RemediationDecisionPayload, db: Db, user: User
 ) -> dict[str, Any]:
@@ -404,7 +405,7 @@ def decide_remediation(
     return {"id": case_id, "status": status_value}
 
 
-@router.post("/remediation/{case_id}/overdue-fail")
+@router.post("/remediation/{case_id}/overdue-fail", response_model=ActionResponse, response_model_exclude_none=True)
 def fail_overdue_remediation(
     case_id: int, payload: OverdueFailPayload, db: Db, user: User
 ) -> dict[str, Any]:

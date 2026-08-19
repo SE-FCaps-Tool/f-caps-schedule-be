@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
 from app.database import get_db
+from app.response_models import LoginResponse, LogoutResponse, MeResponse
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 Db = Annotated[Session, Depends(get_db)]
@@ -27,7 +28,7 @@ class LoginPayload(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
-@router.post("/login")
+@router.post("/login", response_model=LoginResponse)
 def login(payload: LoginPayload, response: Response, request: Request, db: Db, settings: SettingsDep) -> dict[str, str]:
     client_host = request.client.host if request.client else None
     throttle = _record_login_attempt(db, payload.email, client_host)
@@ -72,7 +73,7 @@ def login(payload: LoginPayload, response: Response, request: Request, db: Db, s
     return {"role": str(row["role"]), "expires_at": expires.isoformat()}
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=LogoutResponse)
 def logout(response: Response, request: Request, db: Db, settings: SettingsDep) -> dict[str, str]:
     session_token = request.cookies.get(settings.session_cookie_name)
     if session_token:
@@ -85,7 +86,7 @@ def logout(response: Response, request: Request, db: Db, settings: SettingsDep) 
     return {"status": "signed_out"}
 
 
-@router.get("/me")
+@router.get("/me", response_model=MeResponse)
 def authenticated_me(user: User) -> dict[str, str | int | None]:
     return {"role": user.role, "status": user.status, "account_id": user.account_id}
 

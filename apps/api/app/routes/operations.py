@@ -9,6 +9,18 @@ from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.services.access import is_management_user, visible_session_ids
 from app.services.ical import build_ical
+from app.response_models import (
+    DashboardResponse,
+    LecturerLoadReportResponse,
+    NotificationResponse,
+    NotificationRetryResponse,
+    OutcomesReportResponse,
+    PersonalScheduleResponse,
+    QualityReportResponse,
+    RemediationReportResponse,
+    UnscheduledReportResponse,
+    VersionSummaryResponse,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["operations"])
 Db = Annotated[Session, Depends(get_db)]
@@ -37,7 +49,7 @@ def _version_scope(db: Session, round_id: int | None = None, semester_id: int | 
     return {**dict(row), "generated_at": datetime.now(UTC)} if row else None
 
 
-@router.get("/dashboard")
+@router.get("/dashboard", response_model=DashboardResponse)
 def manager_dashboard(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     params = {"round_id": round_id, "semester_id": semester_id}
@@ -115,7 +127,7 @@ def manager_dashboard(db: Db, user: User, round_id: int | None = None, semester_
     }
 
 
-@router.get("/reports/lecturer-load")
+@router.get("/reports/lecturer-load", response_model=LecturerLoadReportResponse)
 def lecturer_load_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     selected = _version_scope(db, round_id, semester_id)
@@ -134,7 +146,7 @@ def lecturer_load_report(db: Db, user: User, round_id: int | None = None, semest
     return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
 
 
-@router.get("/reports/unscheduled")
+@router.get("/reports/unscheduled", response_model=UnscheduledReportResponse)
 def unscheduled_report(db: Db, user: User, round_id: int) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     generated_at = datetime.now(UTC)
@@ -142,7 +154,7 @@ def unscheduled_report(db: Db, user: User, round_id: int) -> dict[str, Any]:
     return {"round_id": round_id, "generated_at": generated_at, "versions": [{"version_id": row["id"], "version_no": row["version_no"], "status": row["status"], "created_at": row["created_at"], "unscheduled": (row["input_snapshot"] or {}).get("unscheduled", []), "provenance": {"semester_code": row["semester_code"], "round_type": row["type"], "version_id": row["id"], "generated_at": generated_at}} for row in rows]}
 
 
-@router.get("/reports/provenance/{version_id}")
+@router.get("/reports/provenance/{version_id}", response_model=VersionSummaryResponse)
 def report_provenance(version_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     if user.role not in {"ADMIN", "MANAGER"} and not visible_session_ids(db, user, version_id=version_id):
@@ -153,14 +165,14 @@ def report_provenance(version_id: int, db: Db, user: User) -> dict[str, Any]:
     return {**dict(row), "generated_at": datetime.now(UTC)}
 
 
-@router.get("/reports/quality")
+@router.get("/reports/quality", response_model=QualityReportResponse)
 def group_quality_report(db: Db, user: User, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(text("SELECT g.id, g.code, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_members, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leaders FROM groups g JOIN projects p ON p.id = g.project_id LEFT JOIN group_memberships gm ON gm.group_id = g.id WHERE (CAST(:semester_id AS INTEGER) IS NULL OR p.semester_id = CAST(:semester_id AS INTEGER)) GROUP BY g.id, g.code HAVING COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') < 4 OR COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') <> 1 ORDER BY g.code"), {"semester_id": semester_id}).mappings().all()
     return {"version": _version_scope(db, None, semester_id), "rows": [dict(row) for row in rows]}
 
 
-@router.get("/reports/remediation")
+@router.get("/reports/remediation", response_model=RemediationReportResponse)
 def remediation_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     selected = _version_scope(db, round_id, semester_id)
@@ -168,7 +180,7 @@ def remediation_report(db: Db, user: User, round_id: int | None = None, semester
     return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
 
 
-@router.get("/reports/outcomes")
+@router.get("/reports/outcomes", response_model=OutcomesReportResponse)
 def outcomes_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     selected = _version_scope(db, round_id, semester_id)
@@ -176,7 +188,7 @@ def outcomes_report(db: Db, user: User, round_id: int | None = None, semester_id
     return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
 
 
-@router.get("/notifications")
+@router.get("/notifications", response_model=list[NotificationResponse])
 def list_notifications(db: Db, user: User, limit: int = 50) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     scope = "" if user.account_id is None and is_management_user(user) else "WHERE recipient_account_id = :account_id"
@@ -184,7 +196,7 @@ def list_notifications(db: Db, user: User, limit: int = 50) -> list[dict[str, An
     return [dict(row) for row in rows]
 
 
-@router.post("/notifications/{notification_id}/retry")
+@router.post("/notifications/{notification_id}/retry", response_model=NotificationRetryResponse)
 def retry_notification(notification_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
@@ -211,7 +223,7 @@ def calendar_export(version_id: int, db: Db, user: User) -> Response:
     return Response(content=content, media_type="text/calendar; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="schedule-{version_id}.ics"'})
 
 
-@router.get("/my/schedule")
+@router.get("/my/schedule", response_model=PersonalScheduleResponse)
 def personal_schedule(
     db: Db,
     user: User,

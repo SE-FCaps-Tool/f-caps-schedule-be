@@ -29,6 +29,36 @@ from app.services.access import (
     student_id_for_account,
 )
 from app.services.seed_loader import load_seed_fixture
+from app.response_models import (
+    AccountResponse,
+    AccountRoleResponse,
+    ActionResponse,
+    AuditResponse,
+    AvailabilityResponse,
+    AvailabilityWriteResponse,
+    ConflictResponse,
+    DropoutResponse,
+    GroupMutationResponse,
+    GroupResponse,
+    InvitationActionResponse,
+    InvitationCreateResponse,
+    LeaderChangeResponse,
+    LecturerResponse,
+    MajorResponse,
+    MyInvitationResponse,
+    MyAvailabilityResponse,
+    MyRoundResponse,
+    ProjectMutationResponse,
+    RegistrationResponse,
+    RoundDayCreateResponse,
+    ProjectResponse,
+    RoomResponse,
+    RoundResourceResponse,
+    RoundResponse,
+    SemesterResponse,
+    SeedFixtureResponse,
+    StudentResponse,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["management"])
 Db = Annotated[Session, Depends(get_db)]
@@ -202,7 +232,7 @@ class LeaderPayload(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
-@router.get("/semesters")
+@router.get("/semesters", response_model=list[SemesterResponse])
 def list_semesters(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
@@ -211,7 +241,7 @@ def list_semesters(db: Db, user: User) -> list[dict[str, object]]:
     return [dict(row) for row in rows]
 
 
-@router.get("/accounts")
+@router.get("/accounts", response_model=list[AccountResponse])
 def list_accounts(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
@@ -226,7 +256,7 @@ def list_accounts(db: Db, user: User) -> list[dict[str, object]]:
     return [dict(row) for row in rows]
 
 
-@router.post("/accounts", status_code=status.HTTP_201_CREATED)
+@router.post("/accounts", status_code=status.HTTP_201_CREATED, response_model=AccountResponse)
 def create_account(payload: AccountCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     try:
@@ -239,7 +269,7 @@ def create_account(payload: AccountCreate, db: Db, user: User) -> dict[str, obje
     return {"id": account_id, "email": payload.email.strip().lower(), "display_name": payload.display_name.strip(), "role": payload.role, "status": "ACTIVE"}
 
 
-@router.patch("/accounts/{account_id}/status")
+@router.patch("/accounts/{account_id}/status", response_model=ActionResponse, response_model_exclude_none=True)
 def update_account_status(account_id: int, payload: AccountStatusPayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     require_change_reason = payload.reason.strip()
@@ -252,7 +282,7 @@ def update_account_status(account_id: int, payload: AccountStatusPayload, db: Db
     return {"id": account_id, "status": payload.status}
 
 
-@router.post("/accounts/{account_id}/roles")
+@router.post("/accounts/{account_id}/roles", response_model=AccountRoleResponse, response_model_exclude_none=True)
 def add_account_role(account_id: int, payload: AccountRolePayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     with db.begin():
@@ -263,7 +293,7 @@ def add_account_role(account_id: int, payload: AccountRolePayload, db: Db, user:
     return {"id": account_id, "role": payload.role}
 
 
-@router.delete("/accounts/{account_id}/roles/{role}")
+@router.delete("/accounts/{account_id}/roles/{role}", response_model=AccountRoleResponse, response_model_exclude_none=True)
 def remove_account_role(account_id: int, role: str, reason: str, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     normalized_role = role.upper()
@@ -282,7 +312,7 @@ def remove_account_role(account_id: int, role: str, reason: str, db: Db, user: U
     return {"id": account_id, "role": normalized_role, "status": "REMOVED"}
 
 
-@router.get("/audit")
+@router.get("/audit", response_model=list[AuditResponse])
 def list_audit_events(
     db: Db,
     user: User,
@@ -305,21 +335,21 @@ def list_audit_events(
     return [dict(row) for row in rows]
 
 
-@router.get("/majors")
+@router.get("/majors", response_model=list[MajorResponse])
 def list_majors(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(text("SELECT id, code, name FROM majors ORDER BY code")).mappings()
     return [dict(row) for row in rows]
 
 
-@router.get("/students")
+@router.get("/students", response_model=list[StudentResponse])
 def list_students(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(text("SELECT id, student_code FROM students ORDER BY student_code")).mappings()
     return [dict(row) for row in rows]
 
 
-@router.get("/projects")
+@router.get("/projects", response_model=list[ProjectResponse])
 def list_projects(db: Db, user: User, semester_id: int | None = None) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
@@ -337,7 +367,7 @@ def list_projects(db: Db, user: User, semester_id: int | None = None) -> list[di
     return [dict(row) for row in rows]
 
 
-@router.get("/lecturers")
+@router.get("/lecturers", response_model=list[LecturerResponse])
 def list_lecturers(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
@@ -360,7 +390,7 @@ def list_lecturers(db: Db, user: User) -> list[dict[str, object]]:
     return [dict(row) for row in rows]
 
 
-@router.post("/lecturers", status_code=status.HTTP_201_CREATED)
+@router.post("/lecturers", status_code=status.HTTP_201_CREATED, response_model=LecturerResponse)
 def create_lecturer(payload: LecturerCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     try:
@@ -399,14 +429,14 @@ def create_lecturer(payload: LecturerCreate, db: Db, user: User) -> dict[str, ob
     return dict(row)
 
 
-@router.get("/rooms")
+@router.get("/rooms", response_model=list[RoomResponse])
 def list_rooms(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(text("SELECT id, code, name, capacity, active FROM rooms ORDER BY code")).mappings()
     return [dict(row) for row in rows]
 
 
-@router.post("/rooms", status_code=status.HTTP_201_CREATED)
+@router.post("/rooms", status_code=status.HTTP_201_CREATED, response_model=RoomResponse)
 def create_room(payload: RoomCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     try:
@@ -437,7 +467,7 @@ def create_room(payload: RoomCreate, db: Db, user: User) -> dict[str, object]:
     return dict(row)
 
 
-@router.get("/groups")
+@router.get("/groups", response_model=list[GroupResponse])
 def list_groups(db: Db, user: User, semester_id: int | None = None) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
@@ -460,7 +490,7 @@ def list_groups(db: Db, user: User, semester_id: int | None = None) -> list[dict
     return [{**dict(row), "ui_status": status_alias.get(str(row["status"]), row["status"])} for row in rows]
 
 
-@router.post("/projects", status_code=status.HTTP_201_CREATED)
+@router.post("/projects", status_code=status.HTTP_201_CREATED, response_model=ProjectMutationResponse)
 def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     try:
@@ -520,7 +550,7 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
     return {"id": project_id, "code": normalize_code(payload.code), "title": payload.title.strip()}
 
 
-@router.post("/groups", status_code=status.HTTP_201_CREATED)
+@router.post("/groups", status_code=status.HTTP_201_CREATED, response_model=GroupMutationResponse)
 def create_group(payload: GroupCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     members = [member.model_dump() for member in payload.members]
@@ -575,7 +605,7 @@ def create_group(payload: GroupCreate, db: Db, user: User) -> dict[str, object]:
     return {"id": group_id, "code": normalize_code(payload.code), "member_count": len(members)}
 
 
-@router.post("/groups/{group_id}/members/{student_id}/drop")
+@router.post("/groups/{group_id}/members/{student_id}/drop", response_model=DropoutResponse)
 def approve_dropout(group_id: int, student_id: int, payload: DropoutPayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
@@ -588,7 +618,7 @@ def approve_dropout(group_id: int, student_id: int, payload: DropoutPayload, db:
     return {"group_id": group_id, "student_id": student_id, "status": "DROPPED", "warning": "GROUP_BELOW_MINIMUM_MAY_CONTINUE"}
 
 
-@router.post("/groups/{group_id}/leader")
+@router.post("/groups/{group_id}/leader", response_model=LeaderChangeResponse)
 def change_group_leader(group_id: int, payload: LeaderPayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
@@ -601,7 +631,7 @@ def change_group_leader(group_id: int, payload: LeaderPayload, db: Db, user: Use
     return {"group_id": group_id, "leader_student_id": payload.student_id}
 
 
-@router.post("/semesters", status_code=status.HTTP_201_CREATED)
+@router.post("/semesters", status_code=status.HTTP_201_CREATED, response_model=SemesterResponse)
 def create_semester(
     payload: SemesterCreate, db: Db, user: User, settings: SettingsDep
 ) -> dict[str, object]:
@@ -664,7 +694,7 @@ def create_semester(
     return dict(row)
 
 
-@router.post("/semesters/{semester_id}/transition")
+@router.post("/semesters/{semester_id}/transition", response_model=ActionResponse, response_model_exclude_none=True)
 def transition_semester(
     semester_id: int,
     payload: SemesterTransitionPayload,
@@ -736,7 +766,7 @@ def transition_semester(
     return {"id": semester_id, "status": payload.target_status}
 
 
-@router.post("/admin/seed-fixture", status_code=status.HTTP_201_CREATED)
+@router.post("/admin/seed-fixture", status_code=status.HTTP_201_CREATED, response_model=SeedFixtureResponse)
 def seed_fixture(db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     try:
@@ -751,7 +781,7 @@ def seed_fixture(db: Db, user: User) -> dict[str, object]:
     return {"fixture": counts["version"], "counts": counts}
 
 
-@router.get("/rounds")
+@router.get("/rounds", response_model=list[RoundResponse])
 def list_rounds(db: Db, user: User, semester_id: int | None = None) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
@@ -768,7 +798,7 @@ def list_rounds(db: Db, user: User, semester_id: int | None = None) -> list[dict
     return [dict(row) for row in rows]
 
 
-@router.post("/rounds", status_code=status.HTTP_201_CREATED)
+@router.post("/rounds", status_code=status.HTTP_201_CREATED, response_model=RoundResponse)
 def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     if payload.start_date and payload.end_date and payload.end_date < payload.start_date:
@@ -799,7 +829,7 @@ def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
                          :h12_sessions_per_part, :h12_sessions_per_day, :h12_semester_quota,
                          :max_groups_per_timeslot, :max_minutes_per_part, :max_minutes_per_day, CAST(:soft_weights AS JSONB), :created_by
                     )
-                    RETURNING id, semester_id, type, status, reviewer_count, result_owner_mode,
+                    RETURNING id, semester_id, type, status, reviewer_count, result_owner_mode, group_selection_mode,
                                session_duration_minutes, start_date, end_date, registration_deadline,
                                h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
                                max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights
@@ -818,7 +848,7 @@ def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
     return dict(row)
 
 
-@router.post("/rounds/{round_id}/transition")
+@router.post("/rounds/{round_id}/transition", response_model=ActionResponse, response_model_exclude_none=True)
 def transition_round_status(round_id: int, payload: RoundTransitionPayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     try:
@@ -851,7 +881,7 @@ def transition_round_status(round_id: int, payload: RoundTransitionPayload, db: 
     return {"round_id": round_id, "status": after.value}
 
 
-@router.post("/rounds/{round_id}/unlock")
+@router.post("/rounds/{round_id}/unlock", response_model=ActionResponse, response_model_exclude_none=True)
 def unlock_round(round_id: int, payload: UnlockPayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     with db.begin():
@@ -866,7 +896,7 @@ def unlock_round(round_id: int, payload: UnlockPayload, db: Db, user: User) -> d
     return {"round_id": round_id, "status": "COMPLETED"}
 
 
-@router.post("/rounds/{round_id}/resources")
+@router.post("/rounds/{round_id}/resources", response_model=RoundResourceResponse)
 def attach_round_resources(
     round_id: int,
     payload: RoundResources,
@@ -925,7 +955,7 @@ def attach_round_resources(
     return {"round_id": round_id, **counts}
 
 
-@router.post("/rounds/{round_id}/days", status_code=status.HTTP_201_CREATED)
+@router.post("/rounds/{round_id}/days", status_code=status.HTTP_201_CREATED, response_model=RoundDayCreateResponse)
 def create_round_day(
     round_id: int,
     payload: RoundDayCreate,
@@ -972,7 +1002,7 @@ def create_round_day(
     return {"round_id": round_id, "day_id": day_id, "timeslot_ids": slot_ids}
 
 
-@router.post("/rounds/{round_id}/lecturers/{lecturer_id}/availability")
+@router.post("/rounds/{round_id}/lecturers/{lecturer_id}/availability", response_model=AvailabilityWriteResponse)
 def submit_lecturer_availability(
     round_id: int,
     lecturer_id: int,
@@ -1062,7 +1092,7 @@ def submit_lecturer_availability(
     }
 
 
-@router.post("/rounds/{round_id}/groups/{group_id}/availability")
+@router.post("/rounds/{round_id}/groups/{group_id}/availability", response_model=AvailabilityWriteResponse)
 def submit_group_availability(
     round_id: int,
     group_id: int,
@@ -1130,7 +1160,7 @@ def submit_group_availability(
     }
 
 
-@router.post("/rounds/{round_id}/invitations")
+@router.post("/rounds/{round_id}/invitations", response_model=InvitationCreateResponse)
 def invite_reviewers(
     round_id: int,
     payload: InvitationCreate,
@@ -1181,7 +1211,7 @@ def invite_reviewers(
     return {"round_id": round_id, "invited_count": len(set(payload.lecturer_ids))}
 
 
-@router.post("/rounds/{round_id}/invitations/{lecturer_id}/response")
+@router.post("/rounds/{round_id}/invitations/{lecturer_id}/response", response_model=InvitationActionResponse)
 def respond_to_invitation(
     round_id: int,
     lecturer_id: int,
@@ -1230,7 +1260,7 @@ def respond_to_invitation(
     return {"round_id": round_id, "lecturer_id": lecturer_id, "response": "REJECTED" if stored_response == "DECLINED" else stored_response}
 
 
-@router.get("/rounds/{round_id}/registration")
+@router.get("/rounds/{round_id}/registration", response_model=RegistrationResponse)
 def registration_dashboard(round_id: int, db: Db, user: User) -> dict[str, int]:
     _require(user, "ADMIN", "MANAGER")
     counts = db.execute(
@@ -1248,7 +1278,7 @@ def registration_dashboard(round_id: int, db: Db, user: User) -> dict[str, int]:
     return {key: int(value) for key, value in counts.items()}
 
 
-@router.get("/rounds/{round_id}/my-availability")
+@router.get("/rounds/{round_id}/my-availability", response_model=MyAvailabilityResponse)
 def my_availability(round_id: int, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     round_row = db.execute(text("SELECT id, type, group_selection_mode, registration_deadline FROM rounds WHERE id = :round_id"), {"round_id": round_id}).mappings().one_or_none()
@@ -1281,7 +1311,7 @@ def my_availability(round_id: int, db: Db, user: User) -> dict[str, object]:
     return response
 
 
-@router.get("/my/rounds")
+@router.get("/my/rounds", response_model=list[MyRoundResponse])
 def list_my_rounds(db: Db, user: User) -> list[dict[str, object]]:
     """Return rounds relevant to the current actor without widening data scope."""
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
@@ -1324,7 +1354,7 @@ def list_my_rounds(db: Db, user: User) -> list[dict[str, object]]:
     return [dict(row) for row in rows]
 
 
-@router.get("/my/invitations")
+@router.get("/my/invitations", response_model=list[MyInvitationResponse])
 def list_my_invitations(db: Db, user: User) -> list[dict[str, object]]:
     """Return only invitations belonging to the authenticated Lecturer."""
     _require(user, "LECTURER")
@@ -1344,7 +1374,7 @@ def list_my_invitations(db: Db, user: User) -> list[dict[str, object]]:
     return [dict(row) for row in rows]
 
 
-@router.post("/lecturers/{lecturer_id}/conflicts")
+@router.post("/lecturers/{lecturer_id}/conflicts", response_model=ConflictResponse)
 def declare_conflict(
     lecturer_id: int,
     payload: ConflictCreate,

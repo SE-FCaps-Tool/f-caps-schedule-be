@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from .auth import CurrentUser, get_current_user
 from .config import get_settings
 from .database import get_engine
+from .response_models import HealthResponse, PublicMeResponse
 from .routes.auth_routes import router as auth_router
 from .routes.master_data import router as master_data_router
 from .routes.manager_extensions import router as manager_extensions_router
@@ -87,11 +88,11 @@ def create_app() -> FastAPI:
     app.include_router(operations_router)
     app.include_router(auth_router)
 
-    @app.get("/health", tags=["system"])
+    @app.get("/health", tags=["system"], response_model=HealthResponse)
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "api"}
 
-    @app.get("/api/v1/me", tags=["auth"])
+    @app.get("/api/v1/me", tags=["auth"], response_model=PublicMeResponse)
     def me(user: Annotated[CurrentUser, Depends(get_current_user)]) -> dict[str, str]:
         return {"role": user.role, "status": user.status}
 
