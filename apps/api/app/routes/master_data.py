@@ -160,8 +160,8 @@ class RoundCreate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     type: str
     reviewer_count: int = Field(gt=0)
-    start_date: date | None = None
-    end_date: date | None = None
+    start_date: date
+    end_date: date
     result_owner_mode: bool = False
     group_selection_mode: bool = False
     group_preference_deadline: datetime | None = None
@@ -186,13 +186,24 @@ class RoundCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_registration_deadlines(self) -> Self:
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
         if self.registration_deadline is not None and self.registration_deadline.tzinfo is None:
             raise ValueError("registration_deadline must include a timezone offset")
         if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:
             raise ValueError("group_preference_deadline must include a timezone offset")
+        if self.registration_deadline is not None and not (
+            self.start_date <= self.registration_deadline.date() <= self.end_date
+        ):
+            raise ValueError("registration_deadline must fall within start_date and end_date")
+        if self.group_preference_deadline is not None and not (
+            self.start_date <= self.group_preference_deadline.date() <= self.end_date
+        ):
+            raise ValueError("group_preference_deadline must fall within start_date and end_date")
         if self.group_selection_mode:
             if self.registration_deadline is None or self.group_preference_deadline is None:
                 raise ValueError("both registration deadlines are required when group_selection_mode is enabled")
+        if self.registration_deadline is not None and self.group_preference_deadline is not None:
             if self.group_preference_deadline <= self.registration_deadline:
                 raise ValueError("group_preference_deadline must be after registration_deadline")
         return self
@@ -258,6 +269,8 @@ class AccountCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=160)
     password: str = Field(min_length=12, max_length=256)
     role: Literal["ADMIN", "MANAGER", "LECTURER", "STUDENT"]
+    lecturer_code: str | None = Field(default=None, min_length=1, max_length=32)
+    student_code: str | None = Field(default=None, min_length=1, max_length=32)
 
 
 class AccountStatusPayload(BaseModel):
@@ -268,6 +281,8 @@ class AccountStatusPayload(BaseModel):
 class AccountRolePayload(BaseModel):
     role: Literal["ADMIN", "MANAGER", "LECTURER", "STUDENT"]
     reason: str = Field(min_length=1, max_length=1000)
+    lecturer_code: str | None = Field(default=None, min_length=1, max_length=32)
+    student_code: str | None = Field(default=None, min_length=1, max_length=32)
 
 
 class UnlockPayload(BaseModel):
@@ -380,13 +395,21 @@ def list_accounts(db: Db, user: User) -> list[dict[str, object]]:
 @router.post("/accounts", status_code=status.HTTP_201_CREATED, response_model=AccountResponse)
 def create_account(payload: AccountCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
+    if payload.role == "LECTURER" and not payload.lecturer_code:
+        raise HTTPException(status_code=422, detail={"code": "LECTURER_CODE_REQUIRED", "message": "lecturer_code is required when role is LECTURER."})
+    if payload.role == "STUDENT" and not payload.student_code:
+        raise HTTPException(status_code=422, detail={"code": "STUDENT_CODE_REQUIRED", "message": "student_code is required when role is STUDENT."})
     try:
         with db.begin():
             account_id = db.execute(text("INSERT INTO accounts (email, display_name, password_hash) VALUES (:email, :display_name, :password_hash) RETURNING id"), {"email": payload.email.strip().lower(), "display_name": payload.display_name.strip(), "password_hash": password_hasher.hash(payload.password)}).scalar_one()
             db.execute(text("INSERT INTO account_roles (account_id, role) VALUES (:account_id, CAST(:role AS system_role))"), {"account_id": account_id, "role": payload.role})
+            if payload.role == "LECTURER":
+                db.execute(text("INSERT INTO lecturers (account_id, lecturer_code) VALUES (:account_id, :lecturer_code)"), {"account_id": account_id, "lecturer_code": normalize_code(payload.lecturer_code)})
+            elif payload.role == "STUDENT":
+                db.execute(text("INSERT INTO students (account_id, student_code) VALUES (:account_id, :student_code)"), {"account_id": account_id, "student_code": normalize_code(payload.student_code)})
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'ACCOUNT_CREATED', 'account', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(account_id), "after_json": _json({"email": payload.email.strip().lower(), "role": payload.role})})
     except IntegrityError as exc:
-        raise HTTPException(status_code=409, detail={"code": "ACCOUNT_DUPLICATE", "message": "Email already exists."}) from exc
+        raise HTTPException(status_code=409, detail={"code": "ACCOUNT_DUPLICATE", "message": "Email or code already exists."}) from exc
     return {"id": account_id, "email": payload.email.strip().lower(), "display_name": payload.display_name.strip(), "role": payload.role, "status": "ACTIVE"}
 
 
@@ -406,11 +429,26 @@ def update_account_status(account_id: int, payload: AccountStatusPayload, db: Db
 @router.post("/accounts/{account_id}/roles", response_model=AccountRoleResponse, response_model_exclude_none=True)
 def add_account_role(account_id: int, payload: AccountRolePayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
-    with db.begin():
-        if db.execute(text("SELECT 1 FROM accounts WHERE id = :id"), {"id": account_id}).scalar_one_or_none() is None:
-            raise HTTPException(status_code=404, detail={"code": "ACCOUNT_NOT_FOUND", "message": "Account does not exist."})
-        db.execute(text("INSERT INTO account_roles (account_id, role) VALUES (:account_id, CAST(:role AS system_role)) ON CONFLICT DO NOTHING"), {"account_id": account_id, "role": payload.role})
-        db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'ACCOUNT_ROLE_ADDED', 'account', :entity_id, :reason, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(account_id), "reason": payload.reason.strip(), "after_json": _json({"role": payload.role})})
+    try:
+        with db.begin():
+            if db.execute(text("SELECT 1 FROM accounts WHERE id = :id"), {"id": account_id}).scalar_one_or_none() is None:
+                raise HTTPException(status_code=404, detail={"code": "ACCOUNT_NOT_FOUND", "message": "Account does not exist."})
+            db.execute(text("INSERT INTO account_roles (account_id, role) VALUES (:account_id, CAST(:role AS system_role)) ON CONFLICT DO NOTHING"), {"account_id": account_id, "role": payload.role})
+            if payload.role == "LECTURER":
+                has_lecturer = db.execute(text("SELECT 1 FROM lecturers WHERE account_id = :account_id"), {"account_id": account_id}).scalar_one_or_none()
+                if has_lecturer is None:
+                    if not payload.lecturer_code:
+                        raise HTTPException(status_code=422, detail={"code": "LECTURER_CODE_REQUIRED", "message": "lecturer_code is required when granting the LECTURER role."})
+                    db.execute(text("INSERT INTO lecturers (account_id, lecturer_code) VALUES (:account_id, :lecturer_code)"), {"account_id": account_id, "lecturer_code": normalize_code(payload.lecturer_code)})
+            elif payload.role == "STUDENT":
+                has_student = db.execute(text("SELECT 1 FROM students WHERE account_id = :account_id"), {"account_id": account_id}).scalar_one_or_none()
+                if has_student is None:
+                    if not payload.student_code:
+                        raise HTTPException(status_code=422, detail={"code": "STUDENT_CODE_REQUIRED", "message": "student_code is required when granting the STUDENT role."})
+                    db.execute(text("INSERT INTO students (account_id, student_code) VALUES (:account_id, :student_code)"), {"account_id": account_id, "student_code": normalize_code(payload.student_code)})
+            db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'ACCOUNT_ROLE_ADDED', 'account', :entity_id, :reason, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(account_id), "reason": payload.reason.strip(), "after_json": _json({"role": payload.role})})
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail={"code": "CODE_DUPLICATE", "message": "lecturer_code or student_code already exists."}) from exc
     return {"id": account_id, "role": payload.role}
 
 
@@ -1150,8 +1188,6 @@ def create_round_with_days(
     days: list[RoundDayCreate] | None = None,
 ) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
-    if payload.start_date and payload.end_date and payload.end_date < payload.start_date:
-        raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
     try:
         validate_round_configuration(
             {
@@ -1207,6 +1243,8 @@ def create_round_with_days(
                 )
             if days:
                 for day in days:
+                    if not (payload.start_date <= day.day_date <= payload.end_date):
+                        raise DomainError("TIMESLOT_OUT_OF_RANGE", "A round day must fall within start_date and end_date.")
                     day_id = db.execute(
                         text("INSERT INTO round_days (round_id, day_date) VALUES (:round_id, :day_date) RETURNING id"),
                         {"round_id": row["id"], "day_date": day.day_date},
@@ -1366,6 +1404,15 @@ def create_round_day(
             raise DomainError("TIMESLOT_INVALID", "Timeslot end must be after its start.")
         with db.begin():
             ensure_round_semester_writable(db, round_id)
+            round_range = db.execute(
+                text("SELECT start_date, end_date FROM rounds WHERE id = :round_id"),
+                {"round_id": round_id},
+            ).mappings().one_or_none()
+            if round_range is None:
+                raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
+            start_date, end_date = round_range["start_date"], round_range["end_date"]
+            if start_date and end_date and not (start_date <= payload.day_date <= end_date):
+                raise DomainError("TIMESLOT_OUT_OF_RANGE", "A round day must fall within the round's start_date and end_date.")
             day_id = db.execute(
                 text(
                     "INSERT INTO round_days (round_id, day_date) VALUES (:round_id, :day_date) "

@@ -90,6 +90,8 @@ def test_legacy_round_create_enforces_sequential_deadlines():
                 "group_selection_mode": True,
                 "session_duration_minutes": 60,
                 "room_types": ["NORMAL"],
+                "start_date": "2030-01-01",
+                "end_date": "2030-03-01",
             }
         )
 

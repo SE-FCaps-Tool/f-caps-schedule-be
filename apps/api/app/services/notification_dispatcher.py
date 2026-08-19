@@ -138,6 +138,32 @@ def process_availability_reminders(db: Session) -> int:
     return len(lecturer_rows) + len(leader_rows)
 
 
+def process_round_auto_close(db: Session) -> int:
+    """Close registration once a round's end_date has passed."""
+    closed = db.execute(
+        text(
+            "UPDATE rounds SET status = 'REGISTRATION_CLOSED', lecturer_registration_closed_at = now() "
+            "WHERE status = 'OPEN_REGISTRATION' AND end_date IS NOT NULL AND end_date < CURRENT_DATE "
+            "RETURNING id"
+        )
+    ).mappings().all()
+    for round_row in closed:
+        db.execute(
+            text(
+                "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, before_json, after_json) "
+                "VALUES (NULL, 'ROUND_TRANSITION', 'round', :entity_id, 'end_date passed', "
+                "CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"
+            ),
+            {
+                "entity_id": str(round_row["id"]),
+                "before_json": '{"status": "OPEN_REGISTRATION"}',
+                "after_json": '{"status": "REGISTRATION_CLOSED"}',
+            },
+        )
+    db.commit()
+    return len(closed)
+
+
 def _insert_event(db: Session, event_type: str, key: str, payload: dict[str, Any], recipient_id: int) -> None:
     import json
 

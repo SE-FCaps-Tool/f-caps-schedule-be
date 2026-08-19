@@ -10,6 +10,7 @@ from app.services.notification_dispatcher import (
     process_availability_reminders,
     process_outbox,
     process_remediation_reminders,
+    process_round_auto_close,
 )
 
 
@@ -17,6 +18,7 @@ def run() -> None:
     engine = get_engine(get_settings().database_url)
     while True:
         with Session(engine) as db:
+            process_round_auto_close(db)
             process_remediation_reminders(db)
             process_availability_reminders(db)
             process_outbox(db)

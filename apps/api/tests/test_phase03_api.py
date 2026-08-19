@@ -158,6 +158,8 @@ def test_manager_can_create_round_day_and_manager_entered_availability(client):
             "room_types": ["NORMAL"],
             "result_owner_mode": True,
             "session_duration_minutes": 30,
+            "start_date": "2030-01-15",
+            "end_date": "2030-02-15",
         },
         headers={"X-Test-Session": "active-manager"},
     )

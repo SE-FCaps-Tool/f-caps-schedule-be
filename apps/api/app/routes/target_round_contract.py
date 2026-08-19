@@ -176,14 +176,18 @@ class TargetRoundCreate(BaseModel):
             )
             for day in self.days
         ]
+        boundary_dates = [day.day_date for day in self.days]
+        boundary_dates.append(self.registration_deadline.date())
+        if self.group_preference_deadline is not None:
+            boundary_dates.append(self.group_preference_deadline.date())
         legacy = RoundCreate(
             semester_id=semester_id,
             name=self.name,
             description=self.description,
             type=self.type,
             reviewer_count=self.reviewer_count,
-            start_date=min(day.day_date for day in self.days),
-            end_date=max(day.day_date for day in self.days),
+            start_date=min(boundary_dates),
+            end_date=max(boundary_dates),
             result_owner_mode=self.result_owner_mode,
             group_selection_mode=self.group_selection_mode,
             group_preference_deadline=self.group_preference_deadline,
