@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -131,15 +132,172 @@ def _leader_group_ids(db: Session, student_id: int) -> list[int]:
     return [int(row[0]) for row in db.execute(text("SELECT group_id FROM group_memberships WHERE student_id = :student_id AND membership_role = 'LEADER' AND status = 'ACTIVE'"), {"student_id": student_id}).all()]
 
 
+def _local_session(session: Any | None) -> dict[str, Any] | None:
+    if session is None:
+        return None
+    local_start = session["start_at"].astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
+    local_end = session["end_at"].astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
+    return {
+        "id": str(session["id"]),
+        "date": local_start.date().isoformat(),
+        "startTime": local_start.strftime("%H:%M"),
+        "endTime": local_end.strftime("%H:%M"),
+        "room": session["room_code"],
+    }
+
+
 @router.get("/leader/me/dashboard")
 def leader_dashboard(db: Db, user: User) -> dict[str, Any]:
     student_id = _student_id(db, user)
-    group_ids = _leader_group_ids(db, student_id)
-    groups = db.execute(
-        text("SELECT g.id, g.code, g.status::text AS status, p.id AS project_id, p.code AS project_code, p.title FROM groups g LEFT JOIN projects p ON p.id = g.project_id WHERE g.id = ANY(:group_ids) ORDER BY g.code"),
-        {"group_ids": group_ids or [0]},
+    group = db.execute(
+        text(
+            "SELECT g.id, g.code, g.status::text AS group_status, g.project_id, "
+            "COUNT(active_members.id) AS member_count, "
+            "p.code AS project_code, p.title AS project_title, p.status::text AS project_status "
+            "FROM group_memberships leader "
+            "JOIN groups g ON g.id = leader.group_id "
+            "LEFT JOIN group_memberships active_members ON active_members.group_id = g.id AND active_members.status = 'ACTIVE' "
+            "LEFT JOIN projects p ON p.id = g.project_id "
+            "LEFT JOIN semesters sem ON sem.id = p.semester_id "
+            "WHERE leader.student_id = :student_id AND leader.membership_role = 'LEADER' AND leader.status = 'ACTIVE' "
+            "GROUP BY g.id, g.code, g.status, g.project_id, p.code, p.title, p.status, sem.status "
+            "ORDER BY (sem.status::text = 'ACTIVE') DESC NULLS LAST, g.code, g.id LIMIT 1"
+        ),
+        {"student_id": student_id},
+    ).mappings().one_or_none()
+    if group is None:
+        return success_payload(
+            {
+                "group": None,
+                "project": None,
+                "mainSupervisor": None,
+                "coSupervisor": None,
+                "currentRound": None,
+                "preferenceStatus": None,
+                "deadline": None,
+                "upcomingSession": None,
+                "latestResult": None,
+                "remediation": None,
+            }
+        )
+
+    group_id = int(group["id"])
+    supervisors = db.execute(
+        text(
+            "SELECT ps.supervisor_type::text AS supervisor_type, l.id, a.display_name "
+            "FROM project_supervisors ps JOIN lecturers l ON l.id = ps.lecturer_id "
+            "JOIN accounts a ON a.id = l.account_id "
+            "WHERE ps.project_id = :project_id ORDER BY ps.supervisor_type, l.id"
+        ),
+        {"project_id": group["project_id"] or 0},
     ).mappings().all()
-    return success_payload({"groups": [dict(row) for row in groups], "groupCount": len(groups)})
+    supervisor_by_type = {row["supervisor_type"]: {"id": str(row["id"]), "name": row["display_name"]} for row in supervisors}
+
+    current_round = db.execute(
+        text(
+            "SELECT r.id, r.name, r.type::text AS type, r.status::text AS status, "
+            "r.group_selection_mode, r.group_preference_deadline "
+            "FROM round_groups rg JOIN rounds r ON r.id = rg.round_id "
+            "WHERE rg.group_id = :group_id AND r.status::text = 'OPEN_REGISTRATION' "
+            "ORDER BY r.id DESC LIMIT 1"
+        ),
+        {"group_id": group_id},
+    ).mappings().one_or_none()
+    preference_status = "NOT_REQUIRED"
+    if current_round is not None and current_round["group_selection_mode"]:
+        submitted = db.execute(
+            text(
+                "SELECT 1 FROM group_slot_preferences "
+                "WHERE round_id = :round_id AND group_id = :group_id AND selected = TRUE LIMIT 1"
+            ),
+            {"round_id": current_round["id"], "group_id": group_id},
+        ).scalar_one_or_none()
+        preference_status = "SUBMITTED" if submitted is not None else "PENDING"
+
+    upcoming = db.execute(
+        text(
+            "SELECT s.id, s.start_at, s.end_at, rm.code AS room_code "
+            "FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+            "LEFT JOIN rooms rm ON rm.id = s.room_id "
+            "WHERE s.group_id = :group_id AND sv.status::text = 'PUBLISHED' "
+            "AND s.status::text = 'SCHEDULED' AND s.start_at >= now() "
+            "ORDER BY s.start_at, s.id LIMIT 1"
+        ),
+        {"group_id": group_id},
+    ).mappings().one_or_none()
+    result = db.execute(
+        text(
+            "SELECT r.type::text AS round_type, sr.outcome::text AS outcome, sr.entered_at "
+            "FROM session_results sr JOIN sessions s ON s.id = sr.session_id "
+            "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+            "JOIN rounds r ON r.id = sv.round_id "
+            "WHERE s.group_id = :group_id AND sv.status::text IN ('ACTIVE', 'PUBLISHED') "
+            "ORDER BY sr.entered_at DESC, sr.id DESC LIMIT 1"
+        ),
+        {"group_id": group_id},
+    ).mappings().one_or_none()
+    remediation = db.execute(
+        text(
+            "SELECT due_at, status::text AS status FROM remediation_cases "
+            "WHERE group_id = :group_id ORDER BY due_at DESC, id DESC LIMIT 1"
+        ),
+        {"group_id": group_id},
+    ).mappings().one_or_none()
+
+    project = None
+    if group["project_id"] is not None:
+        project_status = "CANCELLED" if group["project_status"] == "ARCHIVED" else "ACTIVE"
+        if group["project_status"] != "ARCHIVED" and group["group_status"] in {
+            "ELIGIBLE_D12",
+            "D12_CONDITIONAL",
+            "PENDING_D2",
+            "COMPLETED",
+            "FAILED",
+        }:
+            project_status = group["group_status"]
+        project = {
+            "id": str(group["project_id"]),
+            "code": group["project_code"],
+            "titleVi": group["project_title"],
+            "titleEn": None,
+            "status": project_status,
+        }
+    round_payload = None
+    if current_round is not None:
+        round_payload = {
+            "id": str(current_round["id"]),
+            "name": current_round["name"] or current_round["type"],
+            "type": current_round["type"],
+            "status": current_round["status"],
+        }
+    result_payload = None
+    if result is not None:
+        local_result = result["entered_at"].astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
+        result_payload = {
+            "roundType": result["round_type"],
+            "kind": "REVIEW" if result["round_type"].startswith("REVIEW_") else "DEFENSE",
+            "value": result["outcome"],
+            "date": local_result.date().isoformat(),
+        }
+    return success_payload(
+        {
+            "group": {"id": str(group_id), "code": group["code"], "memberCount": int(group["member_count"]), "maxMembers": 5},
+            "project": project,
+            "mainSupervisor": supervisor_by_type.get("MAIN"),
+            "coSupervisor": supervisor_by_type.get("CO"),
+            "currentRound": round_payload,
+            "preferenceStatus": preference_status,
+            "deadline": current_round["group_preference_deadline"] if current_round is not None else None,
+            "upcomingSession": _local_session(upcoming),
+            "latestResult": result_payload,
+            "remediation": None
+            if remediation is None
+            else {
+                "deadline": remediation["due_at"],
+                "status": "PENDING" if remediation["status"] == "OPEN" else remediation["status"],
+            },
+        }
+    )
 
 
 @router.get("/leader/me/sessions")

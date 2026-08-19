@@ -165,7 +165,108 @@ Success response PUT giữ nguyên shape:
 Manager/Admin vẫn có thể nhập thay ngoài cửa sổ Lecturer bằng endpoint quản lý
 hiện có.
 
-## 5. Student Group Preference
+## 5. Leader Dashboard
+
+### Endpoint
+
+```http
+GET /api/v1/leader/me/dashboard
+```
+
+Request không có body hoặc query. Endpoint dùng cookie session và không cần
+CSRF vì là request GET.
+
+### Response
+
+```json
+{
+  "data": {
+    "group": {
+      "id": "7",
+      "code": "G01",
+      "memberCount": 4,
+      "maxMembers": 5
+    },
+    "project": {
+      "id": "12",
+      "code": "PRJ01",
+      "titleVi": "Capstone Defense Scheduler",
+      "titleEn": null,
+      "status": "ACTIVE"
+    },
+    "mainSupervisor": {"id": "21", "name": "Nguyen Van A"},
+    "coSupervisor": null,
+    "currentRound": {
+      "id": "85",
+      "name": "Defense 1.1",
+      "type": "DEFENSE_1_1",
+      "status": "OPEN_REGISTRATION"
+    },
+    "preferenceStatus": "PENDING",
+    "deadline": "2030-01-22T16:59:00Z",
+    "upcomingSession": {
+      "id": "301",
+      "date": "2030-02-01",
+      "startTime": "09:00",
+      "endTime": "09:30",
+      "room": "P-201"
+    },
+    "latestResult": {
+      "roundType": "REVIEW_2",
+      "kind": "REVIEW",
+      "value": "LEVEL_1",
+      "date": "2030-01-10"
+    },
+    "remediation": {
+      "deadline": "2030-01-15T16:59:00Z",
+      "status": "PENDING"
+    }
+  }
+}
+```
+
+Các object trên đều có thể là `null` theo type FE. Nếu Student không phải active
+Leader của nhóm nào, BE trả đủ các key nhưng toàn bộ giá trị là `null`.
+
+Các ID lồng trong `group`, `project`, `mainSupervisor`, `coSupervisor`,
+`currentRound` và `upcomingSession` là numeric string, ví dụ `"85"`, không có
+prefix. `memberCount` và `maxMembers` là number; `maxMembers` hiện là `5`.
+
+Quy tắc chọn dữ liệu:
+
+- Chỉ xét membership `LEADER` đang `ACTIVE`. Nếu có nhiều nhóm, BE ưu tiên nhóm
+  có Project thuộc Semester `ACTIVE`, sau đó sắp theo mã nhóm và ID.
+- `currentRound` chỉ là Round gắn với nhóm và đang `OPEN_REGISTRATION`; nếu có
+  nhiều Round phù hợp, BE lấy Round có ID lớn nhất. Round ở trạng thái khác không
+  được trả trong field này.
+- `deadline` là `groupPreferenceDeadline` của `currentRound`, hoặc `null` khi
+  không có `currentRound`.
+- `preferenceStatus = NOT_REQUIRED` khi không có Round đang mở hoặc Round không
+  bật `groupSelectionMode`; bằng `SUBMITTED` khi đã tồn tại ít nhất một preference
+  `selected=true`; còn lại là `PENDING`.
+- `upcomingSession` chỉ lấy session tương lai gần nhất có trạng thái `SCHEDULED`
+  thuộc Schedule Version `PUBLISHED`. `date`, `startTime`, `endTime` dùng múi giờ
+  `Asia/Ho_Chi_Minh`.
+- `latestResult.kind` là `REVIEW` với Round type bắt đầu bằng `REVIEW_`, các loại
+  còn lại là `DEFENSE`.
+
+Mapping `project.status` từ dữ liệu BE sang `ProjectStatus` của FE:
+
+- Project `ARCHIVED` → `CANCELLED`.
+- Project còn active và Group đã tiến triển → một trong `ELIGIBLE_D12`,
+  `D12_CONDITIONAL`, `PENDING_D2`, `COMPLETED`, `FAILED` theo trạng thái Group.
+- Các trường hợp active còn lại, bao gồm Group `PENDING_D11` → `ACTIVE`.
+
+`project.titleEn` hiện luôn là `null`. BE hiện không tạo giá trị `DRAFT` từ
+endpoint Dashboard.
+
+Mapping `remediation.status`:
+
+- Trạng thái DB `OPEN` → `PENDING` cho FE.
+- `PASSED`, `OVERDUE`, `FAILED` được giữ nguyên.
+- `remediation = null` khi nhóm chưa có remediation case.
+
+## 6. Student Group Preference
 
 ### Endpoints
 
@@ -211,6 +312,11 @@ Success response GET giữ nguyên shape:
 }
 ```
 
+GET chỉ trả timeslot đang `active=true`. Với timeslot chưa được nhóm chọn hoặc
+chưa từng lưu, `selected` và `source` có thể là `null`; FE chuẩn hóa
+`selected === true` thành boolean khi render. Với lựa chọn do Leader lưu,
+`source` là `FORM`.
+
 Success response PUT giữ nguyên shape:
 
 ```json
@@ -225,11 +331,17 @@ Success response PUT giữ nguyên shape:
 }
 ```
 
+PUT dùng replacement semantics: `timeslotIds` là toàn bộ danh sách lựa chọn mới,
+không phải danh sách bổ sung. Các lựa chọn cũ không còn trong request bị xóa;
+gửi `{"timeslotIds": []}` sẽ xóa toàn bộ lựa chọn. Chỉ ID của timeslot đang
+`active=true` và thuộc Round được chấp nhận; gửi ID ngoài tập này trả
+`422 AVAILABILITY_SLOT_INVALID` và không lưu một phần request.
+
 Trong thay đổi hiện tại, BE chưa lọc slot theo supervisor, COI hoặc số reviewer
 khả dụng. FE hiển thị danh sách timeslot BE trả về và không tự tính các điều kiện
 này.
 
-## 6. Lecturer Invitations
+## 7. Lecturer Invitations
 
 Các endpoint này dùng cookie session hiện tại của hệ thống, không dùng Bearer
 JWT. Request thay đổi dữ liệu phải gửi thêm CSRF token theo cơ chế cookie +
@@ -296,7 +408,7 @@ Từ chối; `reason` là bắt buộc:
 
 FE chỉ cần kiểm tra HTTP status 2xx khi thành công, không cần đọc success body.
 
-## 7. Error handling FE cần hỗ trợ
+## 8. Error handling FE cần hỗ trợ
 
 Target endpoints trả lỗi theo dạng:
 
@@ -320,11 +432,12 @@ Các mã liên quan:
 | 403 | `GROUP_NOT_IN_ROUND` | Leader đang truy cập nhóm không thuộc Round |
 | 422 | `GROUP_NOT_IN_ROUND` | Manager truy cập nhóm không thuộc Round |
 | 422 | `VALIDATION_ERROR` | Request tạo Round hoặc deadline không hợp lệ |
+| 422 | `AVAILABILITY_SLOT_INVALID` | Preference chứa timeslot không active hoặc không thuộc Round |
 
 FE nên refetch Round Detail khi nhận `REGISTRATION_PHASE_INVALID`, vì deadline
 hoặc trạng thái Round có thể vừa chuyển trong lúc màn hình đang mở.
 
-## 8. Checklist tích hợp FE
+## 9. Checklist tích hợp FE
 
 - Round Detail đọc `response.data.data`.
 - Không map snake_case cho Round Detail.
@@ -333,6 +446,10 @@ hoặc trạng thái Round có thể vừa chuyển trong lúc màn hình đang 
 - Đồng hồ FE chỉ phục vụ UX; không thay thế validation từ BE.
 - Khi nhận `409 REGISTRATION_PHASE_INVALID`, khóa form và refetch Round Detail.
 - Không hiển thị UI Group Preference khi `groupSelectionMode=false`.
+- Dashboard chỉ dùng `currentRound` do BE trả; không suy ra Round đang mở từ
+  lịch sử Round khác.
+- PUT Group Preference gửi toàn bộ selection hiện tại; gửi mảng rỗng để bỏ chọn
+  tất cả.
 - Không gửi deadline thiếu timezone offset.
 - Đọc invitation từ `response.data.data` và dùng `invitation.round.id` trực
   tiếp cho endpoint phản hồi.

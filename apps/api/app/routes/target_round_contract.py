@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api_contract import external_id, parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.domain.registration_phase import RegistrationPhase
 from app.routes.manager_extensions import resend_invitation
 from app.routes.master_data import (
     AvailabilitySubmit,
@@ -26,13 +27,14 @@ from app.routes.master_data import (
     list_rounds,
     my_availability,
     registration_dashboard,
+    require_registration_phase,
     respond_to_invitation,
     submit_group_availability,
     submit_lecturer_availability,
     transition_round_status,
 )
 from app.scheduler.validator import _eligible
-from app.services.access import lecturer_id_for_account
+from app.services.access import is_active_group_leader, lecturer_id_for_account
 
 router = APIRouter(prefix="/api/v1", tags=["target-rounds"])
 Db = Annotated[Session, Depends(get_db)]
@@ -130,8 +132,14 @@ class TargetRoundCreate(BaseModel):
             raise ValueError(f"{self.type} requires {expected_reviewers} reviewers")
         if self.result_owner_mode and self.type not in {"DEFENSE_1_1", "DEFENSE_2"}:
             raise ValueError("resultOwnerMode is only available for DEFENSE_1_1 and DEFENSE_2")
+        if self.registration_deadline.tzinfo is None:
+            raise ValueError("registrationDeadline must include a timezone offset")
         if self.group_selection_mode and self.group_preference_deadline is None:
             raise ValueError("groupPreferenceDeadline is required when groupSelectionMode is enabled")
+        if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:
+            raise ValueError("groupPreferenceDeadline must include a timezone offset")
+        if self.group_selection_mode and self.group_preference_deadline <= self.registration_deadline:
+            raise ValueError("groupPreferenceDeadline must be after registrationDeadline")
         if any(room_type not in {"NORMAL", "SEMINAR", "LAB"} for room_type in self.room_types):
             raise ValueError("roomTypes must contain only NORMAL, SEMINAR, or LAB")
 
@@ -356,14 +364,27 @@ def remind_invitation(round_id: int, invitation_id: int, db: Db, user: User) -> 
 
 @router.get("/rounds/{round_id}/groups/{group_id}/preferences")
 def get_group_preferences(round_id: int, group_id: int, db: Db, user: User) -> dict[str, Any]:
-    if user.role not in {"ADMIN", "MANAGER", "LECTURER", "STUDENT"}:
+    if user.role not in {"ADMIN", "MANAGER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Group preference access is not available."})
+    if user.role == "STUDENT" and not is_active_group_leader(db, user, group_id):
+        raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "Only the active Leader of this group may view group preferences."})
+    attached = db.execute(
+        text("SELECT 1 FROM round_groups WHERE round_id = :round_id AND group_id = :group_id"),
+        {"round_id": round_id, "group_id": group_id},
+    ).scalar_one_or_none()
+    if attached is None:
+        error_status = 403 if user.role == "STUDENT" else 422
+        raise HTTPException(status_code=error_status, detail={"code": "GROUP_NOT_IN_ROUND", "message": "The group is not registered for this round."})
+    if user.role == "STUDENT":
+        round_row = require_registration_phase(db, round_id, RegistrationPhase.GROUP)
+        if not round_row["group_selection_mode"]:
+            raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
     rows = db.execute(
         text(
             "SELECT ts.id AS timeslot_id, ts.start_at, ts.end_at, gsp.selected, gsp.source "
             "FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id "
             "LEFT JOIN group_slot_preferences gsp ON gsp.timeslot_id = ts.id AND gsp.round_id = :round_id AND gsp.group_id = :group_id "
-            "WHERE rd.round_id = :round_id ORDER BY ts.start_at"
+            "WHERE rd.round_id = :round_id AND ts.active = TRUE ORDER BY ts.start_at"
         ),
         {"round_id": round_id, "group_id": group_id},
     ).mappings().all()

@@ -1,5 +1,5 @@
 from datetime import UTC, date, datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from argon2 import PasswordHasher
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,6 +21,7 @@ from app.domain.master_data import (
     validate_group_members,
     validate_project_supervisors,
 )
+from app.domain.registration_phase import RegistrationPhase, resolve_registration_phase
 from app.domain.round_setup import validate_round_configuration
 from app.domain.seed import seed_fixture_v1
 from app.domain.status_compat import project_from_legacy
@@ -72,6 +73,38 @@ from app.services.semester_queries import (
 router = APIRouter(prefix="/api/v1", tags=["management"])
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
+
+
+def registration_phase_for_round(db: Session, round_id: int) -> tuple[dict[str, object], RegistrationPhase]:
+    row = db.execute(
+        text(
+            "SELECT status::text AS status, registration_deadline, group_preference_deadline, group_selection_mode "
+            "FROM rounds WHERE id = :round_id"
+        ),
+        {"round_id": round_id},
+    ).mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
+    phase = resolve_registration_phase(
+        round_status=row["status"],
+        registration_deadline=row["registration_deadline"],
+        group_preference_deadline=row["group_preference_deadline"],
+        now=datetime.now(UTC),
+    )
+    return dict(row), phase
+
+
+def require_registration_phase(db: Session, round_id: int, expected: RegistrationPhase) -> dict[str, object]:
+    row, actual = registration_phase_for_round(db, round_id)
+    if actual is not expected:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "REGISTRATION_PHASE_INVALID",
+                "message": f"This action requires the {expected.value} registration phase; current phase is {actual.value}.",
+            },
+        )
+    return row
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 password_hasher = PasswordHasher()
 
@@ -131,7 +164,7 @@ class RoundCreate(BaseModel):
     group_selection_mode: bool = False
     group_preference_deadline: datetime | None = None
     session_duration_minutes: int = Field(gt=0, le=480)
-    registration_deadline: str | None = None
+    registration_deadline: datetime | None = None
     h12_sessions_per_part: int = Field(default=4, gt=0)
     h12_sessions_per_day: int = Field(default=8, gt=0)
     h12_semester_quota: int | None = Field(default=None, gt=0)
@@ -148,6 +181,19 @@ class RoundCreate(BaseModel):
         if set(value) - allowed or any(weight < 0 for weight in value.values()):
             raise ValueError("soft_weights must contain non-negative S1-S9 values")
         return value
+
+    @model_validator(mode="after")
+    def validate_registration_deadlines(self) -> Self:
+        if self.registration_deadline is not None and self.registration_deadline.tzinfo is None:
+            raise ValueError("registration_deadline must include a timezone offset")
+        if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:
+            raise ValueError("group_preference_deadline must include a timezone offset")
+        if self.group_selection_mode:
+            if self.registration_deadline is None or self.group_preference_deadline is None:
+                raise ValueError("both registration deadlines are required when group_selection_mode is enabled")
+            if self.group_preference_deadline <= self.registration_deadline:
+                raise ValueError("group_preference_deadline must be after registration_deadline")
+        return self
 
 
 class RoundTransitionPayload(BaseModel):
@@ -184,7 +230,8 @@ class AvailabilitySubmit(BaseModel):
 
 
 class InvitationCreate(BaseModel):
-    lecturer_ids: list[int] = Field(min_length=1)
+    model_config = ConfigDict(populate_by_name=True)
+    lecturer_ids: list[int] = Field(min_length=1, alias="lecturerIds")
 
 
 class InvitationResponsePayload(BaseModel):
@@ -1337,18 +1384,13 @@ def submit_lecturer_availability(
         own_lecturer_id = lecturer_id_for_account(db, user.account_id)
         if own_lecturer_id is None or own_lecturer_id != lecturer_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "A Lecturer may edit only their own availability."})
-        round_row = db.execute(text("SELECT registration_deadline FROM rounds WHERE id = :round_id"), {"round_id": round_id}).mappings().one_or_none()
-        if round_row is None:
-            raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
-        round_deadline = round_row["registration_deadline"]
         accepted = db.execute(
             text("SELECT 1 FROM round_invitations WHERE round_id = :round_id AND lecturer_id = :lecturer_id AND status = 'ACCEPTED'"),
             {"round_id": round_id, "lecturer_id": lecturer_id},
         ).scalar_one_or_none()
         if accepted is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "A Lecturer may edit availability only after accepting the round invitation."})
-        if round_deadline is not None and round_deadline < datetime.now(UTC):
-            raise HTTPException(status_code=409, detail={"code": "AVAILABILITY_DEADLINE_PASSED", "message": "Availability is closed; only Manager may enter it after the deadline."})
+        require_registration_phase(db, round_id, RegistrationPhase.LECTURER)
         db.commit()
     try:
         with db.begin():
@@ -1358,7 +1400,7 @@ def submit_lecturer_availability(
                     """
                     SELECT ts.id FROM timeslots ts
                     JOIN round_days rd ON rd.id = ts.round_day_id
-                    WHERE rd.round_id = :round_id ORDER BY ts.id
+                    WHERE rd.round_id = :round_id AND ts.active = TRUE ORDER BY ts.id
                     """
                 ),
                 {"round_id": round_id},
@@ -1426,24 +1468,38 @@ def submit_group_availability(
     _require(user, "ADMIN", "MANAGER", "STUDENT")
     if user.role == "STUDENT" and not is_active_group_leader(db, user, group_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "Only the active Leader of this group may edit group availability."})
-    group_selection_mode = db.execute(text("SELECT group_selection_mode FROM rounds WHERE id = :round_id"), {"round_id": round_id}).scalar_one_or_none()
-    if group_selection_mode is None:
-        raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
-    if not group_selection_mode:
-        raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
     attached = db.execute(text("SELECT 1 FROM round_groups WHERE round_id = :round_id AND group_id = :group_id"), {"round_id": round_id, "group_id": group_id}).scalar_one_or_none()
     if attached is None:
-        raise HTTPException(status_code=422, detail={"code": "GROUP_NOT_IN_ROUND", "message": "The group is not registered for this round."})
+        error_status = 403 if user.role == "STUDENT" else 422
+        raise HTTPException(status_code=error_status, detail={"code": "GROUP_NOT_IN_ROUND", "message": "The group is not registered for this round."})
+    round_row, _ = registration_phase_for_round(db, round_id)
+    if not round_row["group_selection_mode"]:
+        raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
+    if user.role == "STUDENT":
+        require_registration_phase(db, round_id, RegistrationPhase.GROUP)
     db.commit()
     try:
         with db.begin():
+            locked_attachment = db.execute(
+                text(
+                    "SELECT 1 FROM round_groups "
+                    "WHERE round_id = :round_id AND group_id = :group_id FOR UPDATE"
+                ),
+                {"round_id": round_id, "group_id": group_id},
+            ).scalar_one_or_none()
+            if locked_attachment is None:
+                error_status = 403 if user.role == "STUDENT" else 422
+                raise HTTPException(
+                    status_code=error_status,
+                    detail={"code": "GROUP_NOT_IN_ROUND", "message": "The group is not registered for this round."},
+                )
             ensure_round_semester_writable(db, round_id)
             slot_rows = db.execute(
                 text(
                     """
                     SELECT ts.id FROM timeslots ts
                     JOIN round_days rd ON rd.id = ts.round_day_id
-                    WHERE rd.round_id = :round_id ORDER BY ts.id
+                    WHERE rd.round_id = :round_id AND ts.active = TRUE ORDER BY ts.id
                     """
                 ),
                 {"round_id": round_id},
@@ -1451,15 +1507,20 @@ def submit_group_availability(
             selected = set(payload.selected_timeslot_ids)
             if not selected.issubset(set(slot_rows)):
                 raise DomainError("AVAILABILITY_SLOT_INVALID", "Selection contains a slot outside the round.")
-            effective_slots = selected if selected else set(slot_rows)
-            for timeslot_id in effective_slots:
+            effective_slots = selected
+            db.execute(
+                text(
+                    "DELETE FROM group_slot_preferences "
+                    "WHERE round_id = :round_id AND group_id = :group_id"
+                ),
+                {"round_id": round_id, "group_id": group_id},
+            )
+            for timeslot_id in selected:
                 db.execute(
                     text(
                         """
                         INSERT INTO group_slot_preferences (round_id, group_id, timeslot_id, selected, source, updated_by)
                         VALUES (:round_id, :group_id, :timeslot_id, TRUE, :source, :updated_by)
-                        ON CONFLICT (round_id, group_id, timeslot_id) DO UPDATE SET
-                            selected = TRUE, source = EXCLUDED.source, updated_by = EXCLUDED.updated_by
                         """
                     ),
                     {"round_id": round_id, "group_id": group_id, "timeslot_id": timeslot_id, "source": "MANAGER" if user.role in {"ADMIN", "MANAGER"} else "FORM", "updated_by": user.account_id},
@@ -1607,7 +1668,7 @@ def registration_dashboard(round_id: int, db: Db, user: User) -> dict[str, int]:
 @router.get("/rounds/{round_id}/my-availability", response_model=MyAvailabilityResponse)
 def my_availability(round_id: int, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
-    round_row = db.execute(text("SELECT id, type, group_selection_mode, registration_deadline FROM rounds WHERE id = :round_id"), {"round_id": round_id}).mappings().one_or_none()
+    round_row = db.execute(text("SELECT id, type, status::text AS status, group_selection_mode, registration_deadline, group_preference_deadline FROM rounds WHERE id = :round_id"), {"round_id": round_id}).mappings().one_or_none()
     if round_row is None:
         raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
     slots = db.execute(text("SELECT ts.id, ts.start_at, ts.end_at, rd.day_date FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id WHERE rd.round_id = :round_id ORDER BY ts.start_at"), {"round_id": round_id}).mappings().all()
@@ -1622,13 +1683,17 @@ def my_availability(round_id: int, db: Db, user: User) -> dict[str, object]:
         ).scalar_one_or_none()
         if accepted is None:
             raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "This round is not available to the Lecturer."})
+        require_registration_phase(db, round_id, RegistrationPhase.LECTURER)
         response["lecturer_id"] = lecturer_id
         response["selected_timeslot_ids"] = [row["timeslot_id"] for row in db.execute(text("SELECT timeslot_id FROM lecturer_availabilities WHERE round_id = :round_id AND lecturer_id = :lecturer_id AND state = 'AVAILABLE'"), {"round_id": round_id, "lecturer_id": lecturer_id}).mappings().all()]
     elif user.role == "STUDENT":
         student_id = student_id_for_account(db, user.account_id)
-        groups = db.execute(text("SELECT DISTINCT g.id, g.code FROM groups g JOIN group_memberships gm ON gm.group_id = g.id JOIN round_groups rg ON rg.group_id = g.id WHERE rg.round_id = :round_id AND gm.student_id = :student_id AND gm.status = 'ACTIVE'"), {"round_id": round_id, "student_id": student_id or 0}).mappings().all()
+        groups = db.execute(text("SELECT DISTINCT g.id, g.code FROM groups g JOIN group_memberships gm ON gm.group_id = g.id JOIN round_groups rg ON rg.group_id = g.id WHERE rg.round_id = :round_id AND gm.student_id = :student_id AND gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER'"), {"round_id": round_id, "student_id": student_id or 0}).mappings().all()
         if not groups:
             raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "This round has no active group belonging to the Student."})
+        if not round_row["group_selection_mode"]:
+            raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
+        require_registration_phase(db, round_id, RegistrationPhase.GROUP)
         response["groups"] = [dict(row) for row in groups]
         response["selected_by_group"] = {row["id"]: [item["timeslot_id"] for item in db.execute(text("SELECT timeslot_id FROM group_slot_preferences WHERE round_id = :round_id AND group_id = :group_id AND selected = TRUE"), {"round_id": round_id, "group_id": row["id"]}).mappings().all()] for row in groups}
     else:
