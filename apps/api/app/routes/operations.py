@@ -20,7 +20,7 @@ def _require(user: CurrentUser, *roles: str) -> None:
         raise HTTPException(status_code=403, detail="Insufficient permission")
 
 
-def _version_scope(db: Session, round_id: int | None = None) -> dict[str, Any] | None:
+def _version_scope(db: Session, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any] | None:
     row = db.execute(
         text(
             "SELECT sv.id AS version_id, sv.round_id, sv.status, sv.created_at, "
@@ -28,35 +28,37 @@ def _version_scope(db: Session, round_id: int | None = None) -> dict[str, Any] |
             "FROM schedule_versions sv JOIN rounds r ON r.id = sv.round_id "
             "JOIN semesters s ON s.id = r.semester_id "
             "WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) "
+            "AND (CAST(:semester_id AS INTEGER) IS NULL OR r.semester_id = CAST(:semester_id AS INTEGER)) "
             "AND sv.status IN ('PUBLISHED', 'VALID') ORDER BY "
             "CASE WHEN sv.status = 'PUBLISHED' THEN 0 ELSE 1 END, sv.activated_at DESC NULLS LAST, sv.id DESC LIMIT 1"
         ),
-        {"round_id": round_id},
+        {"round_id": round_id, "semester_id": semester_id},
     ).mappings().one_or_none()
     return {**dict(row), "generated_at": datetime.now(UTC)} if row else None
 
 
 @router.get("/dashboard")
-def manager_dashboard(db: Db, user: User, round_id: int | None = None) -> dict[str, Any]:
+def manager_dashboard(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
-    params = {"round_id": round_id}
+    params = {"round_id": round_id, "semester_id": semester_id}
     availability = db.execute(
         text(
             "SELECT COUNT(DISTINCT ri.lecturer_id) AS invited, "
             "COUNT(DISTINCT CASE WHEN la.lecturer_id IS NOT NULL THEN ri.lecturer_id END) AS responded "
-            "FROM round_invitations ri LEFT JOIN lecturer_availabilities la "
+            "FROM round_invitations ri JOIN rounds ar ON ar.id = ri.round_id LEFT JOIN lecturer_availabilities la "
             "ON la.round_id = ri.round_id AND la.lecturer_id = ri.lecturer_id "
-            "WHERE (CAST(:round_id AS INTEGER) IS NULL OR ri.round_id = CAST(:round_id AS INTEGER))"
+            "WHERE (CAST(:round_id AS INTEGER) IS NULL OR ri.round_id = CAST(:round_id AS INTEGER)) "
+            "AND (CAST(:semester_id AS INTEGER) IS NULL OR ar.semester_id = CAST(:semester_id AS INTEGER))"
         ),
         params,
     ).mappings().one()
-    selected = _version_scope(db, round_id)
+    selected = _version_scope(db, round_id, semester_id)
     if selected:
         groups = db.execute(
             text(
                 "SELECT COUNT(*) AS total, COUNT(s.id) AS scheduled FROM round_groups rg "
                 "LEFT JOIN sessions s ON s.group_id = rg.group_id AND s.schedule_version_id = :version_id "
-                "WHERE (CAST(:round_id AS INTEGER) IS NULL OR rg.round_id = CAST(:round_id AS INTEGER))"
+                "WHERE rg.round_id = (SELECT round_id FROM schedule_versions WHERE id = :version_id)"
             ),
             {"round_id": round_id, "version_id": selected["version_id"]},
         ).mappings().one()
@@ -67,25 +69,56 @@ def manager_dashboard(db: Db, user: User, round_id: int | None = None) -> dict[s
             "SELECT l.id, l.lecturer_code, a.display_name, COUNT(sr.session_id) AS session_count "
             "FROM lecturers l JOIN accounts a ON a.id = l.account_id LEFT JOIN session_reviewers sr ON sr.lecturer_id = l.id "
             "AND (:version_id IS NULL OR sr.schedule_version_id = :version_id) "
+            "LEFT JOIN schedule_versions lsv ON lsv.id = sr.schedule_version_id LEFT JOIN rounds lr ON lr.id = lsv.round_id "
+            "WHERE (CAST(:semester_id AS INTEGER) IS NULL OR lr.semester_id = CAST(:semester_id AS INTEGER)) "
             "GROUP BY l.id, l.lecturer_code, a.display_name ORDER BY session_count DESC, l.lecturer_code LIMIT 10"
         ),
-        {"version_id": selected["version_id"] if selected else None},
+        {"version_id": selected["version_id"] if selected else None, "semester_id": semester_id},
     ).mappings().all()
+    scope_semester = semester_id if semester_id is not None else (db.execute(
+        text("SELECT semester_id FROM rounds WHERE id = :round_id"), {"round_id": round_id}
+    ).scalar_one_or_none() if round_id is not None else db.execute(
+        text("SELECT id FROM semesters WHERE status = 'ACTIVE' ORDER BY id DESC LIMIT 1")
+    ).scalar_one_or_none())
+    totals = db.execute(
+        text(
+            "SELECT "
+            "(SELECT COUNT(*) FROM projects WHERE (CAST(:semester_id AS BIGINT) IS NULL OR semester_id = CAST(:semester_id AS BIGINT))) AS projects, "
+            "(SELECT COUNT(*) FROM groups g JOIN projects p ON p.id = g.project_id WHERE (CAST(:semester_id AS BIGINT) IS NULL OR p.semester_id = CAST(:semester_id AS BIGINT))) AS groups, "
+            "(SELECT COUNT(*) FROM students st JOIN group_memberships gm ON gm.student_id = st.id JOIN groups g ON g.id = gm.group_id JOIN projects p ON p.id = g.project_id WHERE gm.status = 'ACTIVE' AND (CAST(:semester_id AS BIGINT) IS NULL OR p.semester_id = CAST(:semester_id AS BIGINT))) AS students, "
+            "(SELECT COUNT(*) FROM lecturers) AS lecturers"
+        ),
+        {"semester_id": scope_semester},
+    ).mappings().one()
+    attention = db.execute(
+        text(
+            "SELECT "
+            "COUNT(*) FILTER (WHERE active_members < 4) AS under_four, "
+            "COUNT(*) FILTER (WHERE leaders <> 1) AS no_leader "
+            "FROM (SELECT g.id, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_members, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leaders "
+            "FROM groups g JOIN projects p ON p.id = g.project_id LEFT JOIN group_memberships gm ON gm.group_id = g.id "
+            "WHERE (CAST(:semester_id AS BIGINT) IS NULL OR p.semester_id = CAST(:semester_id AS BIGINT)) GROUP BY g.id) q"
+        ),
+        {"semester_id": scope_semester},
+    ).mappings().one()
+    remediation_overdue = db.execute(text("SELECT COUNT(*) FROM remediation_cases rc JOIN groups rg ON rg.id = rc.group_id JOIN projects rp ON rp.id = rg.project_id WHERE (rc.status = 'OVERDUE' OR (rc.status = 'OPEN' AND rc.due_at < now())) AND (CAST(:semester_id AS INTEGER) IS NULL OR rp.semester_id = CAST(:semester_id AS INTEGER))"), {"semester_id": scope_semester}).scalar_one()
     return {
+        "totals": {key: int(value or 0) for key, value in totals.items()},
         "availability": {"invited": availability["invited"], "responded": availability["responded"]},
         "groups": {"total": groups["total"], "scheduled": groups["scheduled"], "unscheduled": groups["total"] - groups["scheduled"]},
-        "pending_reschedule_requests": db.execute(text("SELECT COUNT(*) FROM reschedule_requests WHERE status = 'REQUESTED'")).scalar_one(),
-        "changes": db.execute(text("SELECT COUNT(*) FROM schedule_change_records")).scalar_one(),
+        "pending_reschedule_requests": db.execute(text("SELECT COUNT(*) FROM reschedule_requests rr WHERE rr.status = 'REQUESTED' AND (CAST(:semester_id AS INTEGER) IS NULL OR EXISTS (SELECT 1 FROM sessions ss JOIN schedule_versions svv ON svv.id = ss.schedule_version_id JOIN rounds rrr ON rrr.id = svv.round_id WHERE ss.id = rr.session_id AND rrr.semester_id = CAST(:semester_id AS INTEGER)))"), {"semester_id": scope_semester}).scalar_one(),
+        "changes": db.execute(text("SELECT COUNT(*) FROM schedule_change_records scr WHERE CAST(:semester_id AS INTEGER) IS NULL OR EXISTS (SELECT 1 FROM schedule_versions svv JOIN rounds rrr ON rrr.id = svv.round_id WHERE svv.id = scr.schedule_version_id AND rrr.semester_id = CAST(:semester_id AS INTEGER))"), {"semester_id": scope_semester}).scalar_one(),
         "version": selected,
         "lecturer_load": [dict(row) for row in load],
-        "attention_groups": [dict(row) for row in db.execute(text("SELECT id, code, status FROM groups WHERE status IN ('D12_CONDITIONAL', 'FAILED', 'DROPPED') ORDER BY id LIMIT 20")).mappings().all()],
+        "attention_groups": [dict(row) for row in db.execute(text("SELECT g.id, g.code, g.status FROM groups g JOIN projects p ON p.id = g.project_id WHERE g.status IN ('D12_CONDITIONAL', 'FAILED', 'DROPPED') AND (CAST(:semester_id AS INTEGER) IS NULL OR p.semester_id = CAST(:semester_id AS INTEGER)) ORDER BY g.id LIMIT 20"), {"semester_id": scope_semester}).mappings().all()],
+        "attention": {"no_leader": int(attention["no_leader"] or 0), "under_four": int(attention["under_four"] or 0), "remediation_overdue": int(remediation_overdue or 0), "unscheduled": int(groups["total"] - groups["scheduled"])},
     }
 
 
 @router.get("/reports/lecturer-load")
-def lecturer_load_report(db: Db, user: User, round_id: int | None = None) -> dict[str, Any]:
+def lecturer_load_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
-    selected = _version_scope(db, round_id)
+    selected = _version_scope(db, round_id, semester_id)
     rows = db.execute(
         text(
             "SELECT l.id AS lecturer_id, l.lecturer_code, a.display_name, COUNT(sr.session_id) AS session_count, "
@@ -93,10 +126,10 @@ def lecturer_load_report(db: Db, user: User, round_id: int | None = None) -> dic
             "FROM lecturers l JOIN accounts a ON a.id = l.account_id "
             "LEFT JOIN session_reviewers sr ON sr.lecturer_id = l.id AND sr.schedule_version_id = :version_id "
             "LEFT JOIN schedule_versions sv ON sv.id = :version_id LEFT JOIN rounds r ON r.id = sv.round_id "
-            "WHERE (CAST(:round_id AS INTEGER) IS NULL OR r.id = CAST(:round_id AS INTEGER)) GROUP BY l.id, l.lecturer_code, a.display_name, r.h12_semester_quota "
+            "WHERE (CAST(:round_id AS INTEGER) IS NULL OR r.id = CAST(:round_id AS INTEGER)) AND (CAST(:semester_id AS INTEGER) IS NULL OR r.semester_id = CAST(:semester_id AS INTEGER)) GROUP BY l.id, l.lecturer_code, a.display_name, r.h12_semester_quota "
             "ORDER BY l.lecturer_code"
         ),
-        {"round_id": round_id, "version_id": selected["version_id"] if selected else None},
+        {"round_id": round_id, "semester_id": semester_id, "version_id": selected["version_id"] if selected else None},
     ).mappings().all()
     return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
 
@@ -121,25 +154,25 @@ def report_provenance(version_id: int, db: Db, user: User) -> dict[str, Any]:
 
 
 @router.get("/reports/quality")
-def group_quality_report(db: Db, user: User) -> dict[str, Any]:
+def group_quality_report(db: Db, user: User, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
-    rows = db.execute(text("SELECT g.id, g.code, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_members, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leaders FROM groups g LEFT JOIN group_memberships gm ON gm.group_id = g.id GROUP BY g.id, g.code HAVING COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') < 4 OR COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') <> 1 ORDER BY g.code")).mappings().all()
-    return {"version": _version_scope(db), "rows": [dict(row) for row in rows]}
+    rows = db.execute(text("SELECT g.id, g.code, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_members, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leaders FROM groups g JOIN projects p ON p.id = g.project_id LEFT JOIN group_memberships gm ON gm.group_id = g.id WHERE (CAST(:semester_id AS INTEGER) IS NULL OR p.semester_id = CAST(:semester_id AS INTEGER)) GROUP BY g.id, g.code HAVING COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') < 4 OR COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') <> 1 ORDER BY g.code"), {"semester_id": semester_id}).mappings().all()
+    return {"version": _version_scope(db, None, semester_id), "rows": [dict(row) for row in rows]}
 
 
 @router.get("/reports/remediation")
-def remediation_report(db: Db, user: User, round_id: int | None = None) -> dict[str, Any]:
+def remediation_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
-    selected = _version_scope(db, round_id)
-    rows = db.execute(text("SELECT rc.id, rc.group_id, g.code AS group_code, rc.due_at, rc.status, rc.verifier_lecturer_id FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id LEFT JOIN session_results sr ON sr.id = rc.session_result_id LEFT JOIN sessions s ON s.id = sr.session_id LEFT JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) ORDER BY rc.due_at"), {"round_id": round_id}).mappings().all()
+    selected = _version_scope(db, round_id, semester_id)
+    rows = db.execute(text("SELECT rc.id, rc.group_id, g.code AS group_code, rc.due_at, rc.status, rc.verifier_lecturer_id FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id JOIN projects p ON p.id = g.project_id LEFT JOIN session_results sr ON sr.id = rc.session_result_id LEFT JOIN sessions s ON s.id = sr.session_id LEFT JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) AND (CAST(:semester_id AS INTEGER) IS NULL OR p.semester_id = CAST(:semester_id AS INTEGER)) ORDER BY rc.due_at"), {"round_id": round_id, "semester_id": semester_id}).mappings().all()
     return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
 
 
 @router.get("/reports/outcomes")
-def outcomes_report(db: Db, user: User, round_id: int | None = None) -> dict[str, Any]:
+def outcomes_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
-    selected = _version_scope(db, round_id)
-    rows = db.execute(text("SELECT r.type, sr.outcome, COUNT(*) AS count FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR r.id = CAST(:round_id AS INTEGER)) GROUP BY r.type, sr.outcome ORDER BY r.type, sr.outcome"), {"round_id": round_id}).mappings().all()
+    selected = _version_scope(db, round_id, semester_id)
+    rows = db.execute(text("SELECT r.type, sr.outcome, COUNT(*) AS count FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR r.id = CAST(:round_id AS INTEGER)) AND (CAST(:semester_id AS INTEGER) IS NULL OR r.semester_id = CAST(:semester_id AS INTEGER)) GROUP BY r.type, sr.outcome ORDER BY r.type, sr.outcome"), {"round_id": round_id, "semester_id": semester_id}).mappings().all()
     return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
 
 

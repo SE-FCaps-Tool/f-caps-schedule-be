@@ -182,14 +182,33 @@ def validate_schedule(
                     group_id,
                 )
             )
+    if context.max_groups_per_timeslot is not None:
+        slot_load: dict[int, int] = defaultdict(int)
+        for current in sessions:
+            slot_load[current.timeslot_id] += 1
+        for timeslot_id, count in slot_load.items():
+            if count > context.max_groups_per_timeslot:
+                violations.append(
+                    _violation(
+                        "H13",
+                        f"Timeslot {timeslot_id} has {count} groups; the configured limit is {context.max_groups_per_timeslot}.",
+                        "Move groups to another timeslot or increase the configured capacity.",
+                        timeslot_id,
+                    )
+                )
 
     part_load: dict[tuple[int, str, str], int] = defaultdict(int)
     day_load: dict[tuple[int, str], int] = defaultdict(int)
+    part_minutes: dict[tuple[int, str, str], int] = defaultdict(int)
+    day_minutes: dict[tuple[int, str], int] = defaultdict(int)
     semester_load: dict[int, int] = defaultdict(int, context.existing_semester_load)
     for current in sessions:
         for reviewer_id in current.reviewer_ids:
             part_load[(reviewer_id, current.day, current.part)] += 1
             day_load[(reviewer_id, current.day)] += 1
+            duration_minutes = max(0, int((current.end_at - current.start_at).total_seconds() // 60))
+            part_minutes[(reviewer_id, current.day, current.part)] += duration_minutes
+            day_minutes[(reviewer_id, current.day)] += duration_minutes
             semester_load[reviewer_id] += 1
     for (reviewer_id, day, part), count in part_load.items():
         if count > context.h12_sessions_per_part:
@@ -223,6 +242,31 @@ def validate_schedule(
                         f"Lecturer {reviewer_id} exceeds the semester session quota.",
                         "Choose another Lecturer or configure a valid semester session quota.",
                         reviewer_id,
+                    )
+                )
+    if context.max_minutes_per_part is not None:
+        for (reviewer_id, day, part), minutes in part_minutes.items():
+            if minutes > context.max_minutes_per_part:
+                violations.append(
+                    _violation(
+                        "H12",
+                        f"Lecturer {reviewer_id} has {minutes} minutes in {part}; the limit is {context.max_minutes_per_part}.",
+                        "Move a session or adjust the configured minute quota.",
+                        reviewer_id,
+                        day,
+                        part,
+                    )
+                )
+    if context.max_minutes_per_day is not None:
+        for (reviewer_id, day), minutes in day_minutes.items():
+            if minutes > context.max_minutes_per_day:
+                violations.append(
+                    _violation(
+                        "H12",
+                        f"Lecturer {reviewer_id} has {minutes} minutes on {day}; the limit is {context.max_minutes_per_day}.",
+                        "Move a session to another day or use another Lecturer.",
+                        reviewer_id,
+                        day,
                     )
                 )
     return ValidationResult(tuple(violations))

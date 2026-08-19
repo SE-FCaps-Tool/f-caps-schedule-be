@@ -159,7 +159,10 @@ def list_remediation_cases(db: Db, user: User) -> list[dict[str, Any]]:
         query += " ORDER BY rc.due_at"
     else:
         query += " ORDER BY rc.due_at"
-    return [dict(row) for row in db.execute(text(query), params).mappings().all()]
+    rows = [dict(row) for row in db.execute(text(query), params).mappings().all()]
+    for row in rows:
+        row["ui_status"] = "PENDING" if row["status"] == "OPEN" else row["status"]
+    return rows
 
 
 @router.post("/sessions/{session_id}/result", status_code=status.HTTP_201_CREATED)

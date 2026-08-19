@@ -57,6 +57,12 @@ def solve_schedule(
         model.add_at_most_one(variables[index] for index in indexes)
 
     _add_resource_overlap_constraints(model, variables, candidates, "room")
+    if context.max_groups_per_timeslot is not None:
+        by_timeslot: dict[int, list[int]] = defaultdict(list)
+        for index, candidate in enumerate(candidates):
+            by_timeslot[candidate.timeslot_id].append(index)
+        for indexes in by_timeslot.values():
+            model.add(sum(variables[index] for index in indexes) <= context.max_groups_per_timeslot)
     for reviewer_id in reviewers:
         _add_resource_overlap_constraints(model, variables, candidates, "reviewer", reviewer_id)
 
@@ -76,6 +82,19 @@ def solve_schedule(
                     sum(variables[index] for index in indexes)
                     <= max(0, context.h12_semester_quota - context.existing_semester_load.get(reviewer_id, 0))
                 )
+        if context.max_minutes_per_part is not None:
+            for day, part in {(candidate.day, candidate.part) for candidate in candidates if reviewer_id in candidate.reviewer_ids}:
+                indexes = [
+                    index for index, candidate in enumerate(candidates)
+                    if reviewer_id in candidate.reviewer_ids and candidate.day == day and candidate.part == part
+                ]
+                if indexes:
+                    model.add(sum(max(0, int((candidates[index].end_at - candidates[index].start_at).total_seconds() // 60)) * variables[index] for index in indexes) <= context.max_minutes_per_part)
+        if context.max_minutes_per_day is not None:
+            for day in {candidate.day for candidate in candidates if reviewer_id in candidate.reviewer_ids}:
+                indexes = [index for index, candidate in enumerate(candidates) if reviewer_id in candidate.reviewer_ids and candidate.day == day]
+                if indexes:
+                    model.add(sum(max(0, int((candidates[index].end_at - candidates[index].start_at).total_seconds() // 60)) * variables[index] for index in indexes) <= context.max_minutes_per_day)
 
     secondary_bound = sum(abs(score) for score in weighted_scores)
     balance_weight = (
@@ -208,7 +227,7 @@ def _add_resource_overlap_constraints(
 
 
 def _empty_soft_scores() -> dict[str, int]:
-    return {f"S{i}": 0 for i in range(1, 9)}
+    return {f"S{i}": 0 for i in range(1, 10)}
 
 
 def _candidate_soft_scores(candidate: object, context: RoundInput, rooms: list[int]) -> dict[str, int]:

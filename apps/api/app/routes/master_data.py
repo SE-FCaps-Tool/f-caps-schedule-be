@@ -77,6 +77,8 @@ class RoundCreate(BaseModel):
     semester_id: int = Field(gt=0)
     type: str
     reviewer_count: int = Field(gt=0)
+    start_date: date | None = None
+    end_date: date | None = None
     result_owner_mode: bool = False
     group_selection_mode: bool = False
     session_duration_minutes: int = Field(gt=0, le=480)
@@ -84,14 +86,17 @@ class RoundCreate(BaseModel):
     h12_sessions_per_part: int = Field(default=4, gt=0)
     h12_sessions_per_day: int = Field(default=8, gt=0)
     h12_semester_quota: int | None = Field(default=None, gt=0)
+    max_groups_per_timeslot: int | None = Field(default=None, gt=0)
+    max_minutes_per_part: int | None = Field(default=None, gt=0)
+    max_minutes_per_day: int | None = Field(default=None, gt=0)
     soft_weights: dict[str, int] = Field(default_factory=dict)
 
     @field_validator("soft_weights")
     @classmethod
     def validate_soft_weights(cls, value: dict[str, int]) -> dict[str, int]:
-        allowed = {f"S{index}" for index in range(1, 9)}
+        allowed = {f"S{index}" for index in range(1, 10)}
         if set(value) - allowed or any(weight < 0 for weight in value.values()):
-            raise ValueError("soft_weights must contain non-negative S1-S8 values")
+            raise ValueError("soft_weights must contain non-negative S1-S9 values")
         return value
 
 
@@ -126,7 +131,7 @@ class InvitationCreate(BaseModel):
 
 
 class InvitationResponsePayload(BaseModel):
-    response: Literal["ACCEPTED", "DECLINED"]
+    response: Literal["ACCEPTED", "DECLINED", "REJECTED"]
     reason: str | None = None
 
 
@@ -208,7 +213,7 @@ def list_semesters(db: Db, user: User) -> list[dict[str, object]]:
 
 @router.get("/accounts")
 def list_accounts(db: Db, user: User) -> list[dict[str, object]]:
-    _require(user, "ADMIN")
+    _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
             "SELECT a.id, a.email, a.display_name, a.status, a.created_at, "
@@ -286,7 +291,7 @@ def list_audit_events(
     entity_type: str | None = None,
     limit: int = 100,
 ) -> list[dict[str, object]]:
-    _require(user, "ADMIN")
+    _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
             "SELECT id, actor_id, action, entity_type, entity_id, reason, before_json, after_json, occurred_at "
@@ -315,17 +320,20 @@ def list_students(db: Db, user: User) -> list[dict[str, object]]:
 
 
 @router.get("/projects")
-def list_projects(db: Db, user: User) -> list[dict[str, object]]:
+def list_projects(db: Db, user: User, semester_id: int | None = None) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
             "SELECT p.id, p.code, p.title, p.status, p.semester_id, sem.code AS semester_code, "
-            "m.code AS major_code, COUNT(ps.lecturer_id) AS supervisor_count "
-            "FROM projects p JOIN semesters sem ON sem.id = p.semester_id "
-            "JOIN majors m ON m.id = p.major_id LEFT JOIN project_supervisors ps ON ps.project_id = p.id "
-            "GROUP BY p.id, sem.code, m.code ORDER BY p.id DESC"
+             "m.code AS major_code, COUNT(ps.lecturer_id) AS supervisor_count, "
+             "COALESCE(jsonb_agg(jsonb_build_object('lecturer_code', sl.lecturer_code, 'display_name', sa.display_name, 'type', ps.supervisor_type)) FILTER (WHERE sl.id IS NOT NULL), '[]'::jsonb) AS supervisors "
+             "FROM projects p JOIN semesters sem ON sem.id = p.semester_id "
+             "JOIN majors m ON m.id = p.major_id LEFT JOIN project_supervisors ps ON ps.project_id = p.id "
+             "LEFT JOIN lecturers sl ON sl.id = ps.lecturer_id LEFT JOIN accounts sa ON sa.id = sl.account_id "
+             "WHERE (CAST(:semester_id AS BIGINT) IS NULL OR p.semester_id = CAST(:semester_id AS BIGINT)) "
+             "GROUP BY p.id, sem.code, m.code ORDER BY p.id DESC"
         )
-    ).mappings().all()
+        , {"semester_id": semester_id}).mappings().all()
     return [dict(row) for row in rows]
 
 
@@ -430,7 +438,7 @@ def create_room(payload: RoomCreate, db: Db, user: User) -> dict[str, object]:
 
 
 @router.get("/groups")
-def list_groups(db: Db, user: User) -> list[dict[str, object]]:
+def list_groups(db: Db, user: User, semester_id: int | None = None) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
@@ -438,14 +446,18 @@ def list_groups(db: Db, user: User) -> list[dict[str, object]]:
             SELECT g.id, g.code, g.status, p.code AS project_code, p.title
                    , COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_member_count
                    , COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_count
-            FROM groups g JOIN projects p ON p.id = g.project_id
-            LEFT JOIN group_memberships gm ON gm.group_id = g.id
-            GROUP BY g.id, g.code, g.status, p.code, p.title
+                   , MAX(a.display_name) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_name
+             FROM groups g JOIN projects p ON p.id = g.project_id
+             LEFT JOIN group_memberships gm ON gm.group_id = g.id
+             LEFT JOIN students st ON st.id = gm.student_id LEFT JOIN accounts a ON a.id = st.account_id
+             WHERE (CAST(:semester_id AS BIGINT) IS NULL OR p.semester_id = CAST(:semester_id AS BIGINT))
+             GROUP BY g.id, g.code, g.status, p.code, p.title
             ORDER BY g.code
             """
         )
-    ).mappings()
-    return [dict(row) for row in rows]
+        , {"semester_id": semester_id}).mappings()
+    status_alias = {"PENDING_D11": "ACTIVE", "ELIGIBLE_D12": "ACTIVE", "D12_CONDITIONAL": "WAITING", "PENDING_D2": "WAITING", "COMPLETED": "COMPLETED", "FAILED": "FAILED", "DROPPED": "DROPPED"}
+    return [{**dict(row), "ui_status": status_alias.get(str(row["status"]), row["status"])} for row in rows]
 
 
 @router.post("/projects", status_code=status.HTTP_201_CREATED)
@@ -740,24 +752,27 @@ def seed_fixture(db: Db, user: User) -> dict[str, object]:
 
 
 @router.get("/rounds")
-def list_rounds(db: Db, user: User) -> list[dict[str, object]]:
+def list_rounds(db: Db, user: User, semester_id: int | None = None) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
             """
-            SELECT id, semester_id, type, status, reviewer_count, result_owner_mode, group_selection_mode,
-                   session_duration_minutes, registration_deadline, h12_sessions_per_part,
-                   h12_sessions_per_day, h12_semester_quota, soft_weights
-            FROM rounds ORDER BY id DESC
+             SELECT id, semester_id, type, status, reviewer_count, result_owner_mode, group_selection_mode,
+                    session_duration_minutes, start_date, end_date, registration_deadline,
+                    h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
+                    max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights
+             FROM rounds WHERE (CAST(:semester_id AS BIGINT) IS NULL OR semester_id = CAST(:semester_id AS BIGINT)) ORDER BY id DESC
             """
         )
-    ).mappings()
+        , {"semester_id": semester_id}).mappings()
     return [dict(row) for row in rows]
 
 
 @router.post("/rounds", status_code=status.HTTP_201_CREATED)
 def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
+    if payload.start_date and payload.end_date and payload.end_date < payload.start_date:
+        raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
     try:
         validate_round_configuration(
             {
@@ -775,16 +790,19 @@ def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
                     """
                     INSERT INTO rounds (
                         semester_id, type, reviewer_count, result_owner_mode, group_selection_mode,
-                        session_duration_minutes, registration_deadline, h12_sessions_per_part,
-                        h12_sessions_per_day, h12_semester_quota, soft_weights, created_by
+                         session_duration_minutes, start_date, end_date, registration_deadline,
+                         h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
+                         max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights, created_by
                     ) VALUES (
                         :semester_id, :type, :reviewer_count, :result_owner_mode, :group_selection_mode,
-                        :session_duration_minutes, :registration_deadline, :h12_sessions_per_part,
-                        :h12_sessions_per_day, :h12_semester_quota, CAST(:soft_weights AS JSONB), :created_by
+                         :session_duration_minutes, :start_date, :end_date, :registration_deadline,
+                         :h12_sessions_per_part, :h12_sessions_per_day, :h12_semester_quota,
+                         :max_groups_per_timeslot, :max_minutes_per_part, :max_minutes_per_day, CAST(:soft_weights AS JSONB), :created_by
                     )
                     RETURNING id, semester_id, type, status, reviewer_count, result_owner_mode,
-                              session_duration_minutes, registration_deadline, h12_sessions_per_part,
-                              h12_sessions_per_day, h12_semester_quota, soft_weights
+                               session_duration_minutes, start_date, end_date, registration_deadline,
+                               h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
+                               max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights
                     """
                 ),
                 {**payload.model_dump(), "soft_weights": _json(payload.soft_weights), "created_by": _actor_id(db, user)},
@@ -932,14 +950,15 @@ def create_round_day(
                     db.execute(
                         text(
                             """
-                            INSERT INTO timeslots (round_day_id, start_at, end_at)
-                            VALUES (:round_day_id, :start_at, :end_at) RETURNING id
+                            INSERT INTO timeslots (round_day_id, start_at, end_at, part)
+                            VALUES (:round_day_id, :start_at, :end_at, :part) RETURNING id
                             """
                         ),
                         {
                             "round_day_id": day_id,
                             "start_at": slot.start_at,
                             "end_at": slot.end_at,
+                            "part": "AM" if slot.start_at.hour < 13 else "PM",
                         },
                     ).scalar_one()
                 )
@@ -1180,8 +1199,9 @@ def respond_to_invitation(
         raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
     deadline = round_row["registration_deadline"]
     try:
+        stored_response = "DECLINED" if payload.response == "REJECTED" else payload.response
         invitation_response(
-            payload.response,
+            stored_response,
             reason=payload.reason,
             deadline_passed=deadline is not None and deadline < datetime.now(UTC),
             actor_role=SystemRole(user.role),
@@ -1195,7 +1215,7 @@ def respond_to_invitation(
                 """
             ),
             {
-                "response": payload.response,
+                "response": stored_response,
                 "reason": payload.reason,
                 "round_id": round_id,
                 "lecturer_id": lecturer_id,
@@ -1203,11 +1223,11 @@ def respond_to_invitation(
         ).rowcount
         if updated == 0:
             raise DomainError("INVITATION_NOT_FOUND", "The invitation does not exist for this round.")
-        db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'INVITATION_RESPONDED', 'round_invitation', :entity_id, :reason, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": f"{round_id}:{lecturer_id}", "reason": payload.reason, "after_json": _json({"response": payload.response})})
+        db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'INVITATION_RESPONDED', 'round_invitation', :entity_id, :reason, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": f"{round_id}:{lecturer_id}", "reason": payload.reason, "after_json": _json({"response": stored_response})})
         db.commit()
     except DomainError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
-    return {"round_id": round_id, "lecturer_id": lecturer_id, "response": payload.response}
+    return {"round_id": round_id, "lecturer_id": lecturer_id, "response": "REJECTED" if stored_response == "DECLINED" else stored_response}
 
 
 @router.get("/rounds/{round_id}/registration")

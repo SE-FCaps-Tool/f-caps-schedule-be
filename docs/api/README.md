@@ -149,6 +149,8 @@ Chi tiết request/response theo nhóm:
 - [ADMIN-only API](admin-api.md)
 - [Auth và current user](auth.md)
 - [Master data và round setup](master-data.md)
+- [Manager FE API flow — request/response theo thứ tự](manager-fe-flow.md)
+- [Manager API tổng hợp và mockdata alignment](manager-api.md)
 - [Scheduler, lịch và vận hành thay đổi](scheduling.md)
 - [Kết quả, remediation, dashboard, reports, notification](results-reports.md)
 - [Request schemas, enum và response shapes dùng chung](schemas.md)

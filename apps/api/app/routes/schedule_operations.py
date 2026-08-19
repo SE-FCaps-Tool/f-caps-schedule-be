@@ -95,7 +95,7 @@ def _round_input(
         db.execute(
             text(
                 "SELECT semester_id, type, reviewer_count, result_owner_mode, group_selection_mode, h12_sessions_per_part, h12_sessions_per_day, "
-            "h12_semester_quota, soft_weights FROM rounds WHERE id = :id"
+                "h12_semester_quota, max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights FROM rounds WHERE id = :id"
             ),
             {"id": round_id},
         )
@@ -140,7 +140,7 @@ def _round_input(
                 "CASE WHEN EXTRACT(HOUR FROM ts.start_at AT TIME ZONE 'Asia/Ho_Chi_Minh') < 13 "
                 "THEN 'AM' ELSE 'PM' END AS part "
                 "FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id "
-                "JOIN rounds r ON r.id = rd.round_id WHERE r.id = :round_id ORDER BY ts.start_at"
+                "JOIN rounds r ON r.id = rd.round_id WHERE r.id = :round_id AND ts.active = TRUE ORDER BY ts.start_at"
             ),
             {"round_id": round_id},
         )
@@ -254,6 +254,9 @@ def _round_input(
         h12_sessions_per_day=round_row["h12_sessions_per_day"],
         h12_semester_quota=round_row["h12_semester_quota"],
         existing_semester_load=existing_semester_load,
+        max_groups_per_timeslot=round_row["max_groups_per_timeslot"],
+        max_minutes_per_part=round_row["max_minutes_per_part"],
+        max_minutes_per_day=round_row["max_minutes_per_day"],
         soft_weights=round_row["soft_weights"] or {},
         h11_waiver_actors={row["group_id"]: "MANAGER" for row in waiver_rows},
         h11_waiver_reasons={row["group_id"]: row["reason"] for row in waiver_rows},
@@ -388,7 +391,7 @@ def list_schedule_versions(round_id: int, db: Db, user: User) -> list[dict[str, 
         .all()
     )
     if user.role in {"ADMIN", "MANAGER"}:
-        return [dict(row) for row in rows]
+        return [_version_ui(row) for row in rows]
     visible = visible_session_ids(db, user)
     visible_versions = {
         row[0]
@@ -397,7 +400,7 @@ def list_schedule_versions(round_id: int, db: Db, user: User) -> list[dict[str, 
             {"ids": list(visible) or [0]},
         ).all()
     }
-    return [dict(row) for row in rows if row["id"] in visible_versions]
+    return [_version_ui(row) for row in rows if row["id"] in visible_versions]
 
 
 @router.get("/schedule/versions/{version_id}")
@@ -419,7 +422,65 @@ def schedule_version_detail(version_id: int, db: Db, user: User) -> dict[str, An
         sessions = [row for row in sessions if row["id"] in visible]
         if not sessions:
             raise HTTPException(status_code=403, detail="Schedule is outside the actor's scope.")
-    return {**dict(version), "sessions": sessions}
+    return {**_version_ui(version), "sessions": sessions}
+
+
+def _version_ui(row: Any) -> dict[str, Any]:
+    payload = dict(row)
+    payload["is_active"] = payload.get("activated_at") is not None and payload.get("status") in {"VALID", "PUBLISHED"}
+    payload["ui_status"] = "ACTIVE" if payload["is_active"] else payload.get("status")
+    return payload
+
+
+@router.get("/schedule/versions/compare/{version_a}/{version_b}")
+def compare_schedule_versions(version_a: int, version_b: int, db: Db, user: User) -> dict[str, Any]:
+    """Return a stable, FE-friendly diff between two versions in one round."""
+    _require(user, "ADMIN", "MANAGER")
+    versions = db.execute(
+        text("SELECT id, round_id, version_no, status, total_score, soft_scores, created_at FROM schedule_versions WHERE id = ANY(:ids)"),
+        {"ids": [version_a, version_b]},
+    ).mappings().all()
+    if len(versions) != 2 or versions[0]["round_id"] != versions[1]["round_id"]:
+        raise HTTPException(status_code=404, detail={"code": "VERSION_COMPARE_INVALID", "message": "Both versions must exist in the same round."})
+    sessions = db.execute(
+        text("SELECT schedule_version_id, group_id, timeslot_id, room_id FROM sessions WHERE schedule_version_id = ANY(:ids)"),
+        {"ids": [version_a, version_b]},
+    ).mappings().all()
+    by_version = {version_a: {}, version_b: {}}
+    for row in sessions:
+        by_version[row["schedule_version_id"]][row["group_id"]] = dict(row)
+    changes = []
+    for group_id in sorted(set(by_version[version_a]) | set(by_version[version_b])):
+        left = by_version[version_a].get(group_id)
+        right = by_version[version_b].get(group_id)
+        if left != right:
+            changes.append({"group_id": group_id, "version_a": left, "version_b": right})
+    return {"version_a": dict(next(item for item in versions if item["id"] == version_a)), "version_b": dict(next(item for item in versions if item["id"] == version_b)), "changed_sessions": changes}
+
+
+@router.delete("/schedule/versions/{version_id}")
+def delete_draft_version(version_id: int, db: Db, user: User) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    with db.begin():
+        row = db.execute(text("SELECT id, status, activated_at FROM schedule_versions WHERE id = :id FOR UPDATE"), {"id": version_id}).mappings().one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+        if row["activated_at"] is not None or row["status"] in {"PUBLISHED", "SUPERSEDED"}:
+            raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_FORBIDDEN", "message": "Only an unused draft/valid version can be deleted."})
+        dependency_count = db.execute(
+            text(
+                "SELECT "
+                "(SELECT COUNT(*) FROM scheduler_jobs WHERE schedule_version_id = :id) + "
+                "(SELECT COUNT(*) FROM schedule_change_records WHERE schedule_version_id = :id) + "
+                "(SELECT COUNT(*) FROM sessions WHERE schedule_version_id = :id) + "
+                "(SELECT COUNT(*) FROM session_reviewers WHERE schedule_version_id = :id)"
+            ),
+            {"id": version_id},
+        ).scalar_one()
+        if dependency_count:
+            raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_HAS_DEPENDENCIES", "message": "Version has dependent schedule or audit records and cannot be deleted."})
+        db.execute(text("DELETE FROM schedule_versions WHERE id = :id"), {"id": version_id})
+    return {"id": version_id, "deleted": True}
 
 
 @router.post("/rounds/{round_id}/schedule/run", status_code=status.HTTP_201_CREATED)

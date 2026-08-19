@@ -8,13 +8,23 @@ _DEFENSE_TYPES = {"DEFENSE_1_1", "DEFENSE_1_2", "DEFENSE_2"}
 
 def validate_round_configuration(config: dict[str, object]) -> bool:
     round_type = str(config.get("type", ""))
-    expected_reviewers = 2 if round_type in _REVIEW_TYPES else 3
+    # The Manager UI mock models the later defense panels with five reviewers,
+    # while Review 1/2 and Defense 1.1 remain on the existing panel sizes.
+    expected_reviewers = {
+        "REVIEW_1": 2,
+        "REVIEW_2": 2,
+        "DEFENSE_1_1": 3,
+        "DEFENSE_1_2": 5,
+        "DEFENSE_2": 5,
+    }.get(round_type)
     if round_type not in _REVIEW_TYPES | _DEFENSE_TYPES:
         raise DomainError("ROUND_TYPE_INVALID", "Round type is not supported in Scheduler-only V1.")
-    if config.get("reviewer_count") != expected_reviewers:
+    if round_type in _REVIEW_TYPES and config.get("reviewer_count") != expected_reviewers:
         raise DomainError("REVIEWER_COUNT_INVALID", f"{round_type} requires {expected_reviewers} Reviewers.")
     if config.get("result_owner_mode") and round_type not in {"DEFENSE_1_1", "DEFENSE_2"}:
         raise DomainError("RESULT_OWNER_NOT_ALLOWED", "Result Owner mode is only available for Defense 1.1 and 2.")
+    if config.get("reviewer_count") != expected_reviewers:
+        raise DomainError("REVIEWER_COUNT_INVALID", f"{round_type} requires {expected_reviewers} Reviewers.")
     for key in ("groups", "timeslots", "rooms"):
         if not config.get(key):
             raise DomainError("ROUND_INPUTS_INCOMPLETE", f"Round requires at least one {key}.")
@@ -40,4 +50,3 @@ def can_enter_scheduling(
         }
     )
     return True
-

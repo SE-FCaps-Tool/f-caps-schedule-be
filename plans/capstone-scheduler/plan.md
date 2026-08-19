@@ -51,7 +51,7 @@ Use the primary approach for V1. Do not add Redis, Kafka, or a separate solver H
 6. A ScheduleVersion is immutable after activation/publish except through a new controlled-change record; old versions and completed session reviewer lists remain queryable.
 7. Audit records are append-only to the application role and contain actor, action, entity, before/after, reason and timestamp where required.
 8. Time comparisons use half-open `[start, end)` intervals in `Asia/Ho_Chi_Minh` at the domain boundary and normalized UTC timestamps in persistence.
-9. H13 and old `max_groups_per_timeslot`, `max_minutes_per_part` and `max_minutes_per_day` fields are not implemented as V1 business rules. H12 is session-count based.
+9. H13 and optional minute-based H12 limits are implemented when explicitly configured by Manager; unset limits preserve the original session-count behavior.
 10. The official source precedence is `spec.md` → PRD Scheduler-only → ERD/schema. Existing documents are design inputs to reconcile, not authoritative implementation contracts.
 
 ## Cross-cutting definitions
@@ -192,7 +192,7 @@ $ck-cook --hard --tdd plans/capstone-scheduler/plan.md
 - Excel import/export is removed from V1; data entry uses Admin/Manager forms and versioned seed fixtures.
 - Local Docker is the only V1 deployment target.
 - Phase 02 keeps system roles to ADMIN, MANAGER, LECTURER and STUDENT; Result Owner, Reviewer, Supervisor and Remediation Verifier remain contextual assignments.
-- H12 is represented by session-count fields (`h12_sessions_per_part`, `h12_sessions_per_day`, optional semester quota); H13 and legacy H12 minute quota fields are absent.
+- H12 supports the original session-count fields and optional mockdata-compatible minute limits; H13 is enforced only when `max_groups_per_timeslot` is configured.
 - Review sessions cannot have a Result Owner; enabled Result Owner mode requires exactly one owner on Defense sessions.
 - Excel/import-batch entities are intentionally absent; remediation, waiver, reschedule, notification, outbox and audit entities are persisted in PostgreSQL.
 - Phase 03 seed fixture is versioned as `seed-v1`, deterministic, atomic and idempotent: 26 lecturers, 74 groups and 296 students across 4 rooms.

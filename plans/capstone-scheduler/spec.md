@@ -108,7 +108,7 @@ Bộ môn KTPM đang xếp khoảng 370 phiên Review/Defense mỗi học kỳ b
 43. **FR-43 — H11 waiver:** Chỉ Manager được miễn H11 cho từng `group + round`, bắt buộc có lý do. Waiver phải là dữ liệu nghiệp vụ có hiệu lực rõ ràng, được scheduler đọc trực tiếp và có audit; không chỉ lưu một dòng log rời.
 44. **FR-44 — H12:** Mỗi Lecturer tối đa 4 session trong một buổi, 8 session trong một ngày và không vượt quota số session của semester do Manager cấu hình riêng. H12 tính theo số session, không tự đổi sang phút.
 45. **FR-45 — Hard-constraint policy:** H1–H12 đều là hard constraint cho auto-scheduling và manual edit. Chỉ H11 có waiver trong V1; không có waiver cho H1–H10 hoặc H12.
-46. **FR-46 — No H13:** V1 không có business rule H13. `max_groups_per_timeslot` trong ERD/schema cũ không phải hard constraint chính thức và phải được bỏ hoặc không được enforce. Sức chứa đồng thời được quyết định bởi số room, Reviewer và các hard constraint thực tế.
+46. **FR-46 — Optional H13:** Manager có thể cấu hình `max_groups_per_timeslot` cho một Round theo mockdata. Khi cấu hình, scheduler và manual edit phải enforce giới hạn này; khi để trống, sức chứa đồng thời được quyết định bởi số room, Reviewer và các hard constraint thực tế.
 47. **FR-47 — Soft constraints:** Scheduler chấm điểm theo thứ tự mặc định:
     1. S1 cân bằng phần trăm quota semester đã dùng, có điều chỉnh theo `LOW/MEDIUM/HIGH`.
     2. S2 ưu tiên giữ cặp Reviewer của Review 1 sang Review 2.

@@ -74,11 +74,11 @@ Quyền truy cập không thay đổi: chỉ `ADMIN` và `MANAGER` được gọ
 ## Code đã cập nhật
 
 - `apps/api/app/routes/master_data.py`
-  - Serialize account roles thành JSON array.
+  - Serialize account role thành string `role`.
   - Join `accounts` khi lấy lecturer.
   - Aggregate conflict theo lecturer.
 - `apps/api/tests/test_phase07_api.py`
-  - Thêm regression test cho `roles: ["MANAGER"]`.
+  - Thêm regression test cho `role: "MANAGER"`.
   - Kiểm tra email, display name, account status và conflicts của lecturer.
 - `docs/api/master-data.md`
   - Cập nhật contract và ví dụ response.
@@ -106,7 +106,7 @@ Hai thư mục này không bị đưa vào commit/push.
 Commit API đã push:
 
 ```text
-6c37b74 fix(api): return JSON roles and lecturer details
+5217ac4 fix(api): return single account role string
 ```
 
 Tài liệu semester lifecycle nằm tại [semester-lifecycle-update.md](semester-lifecycle-update.md).

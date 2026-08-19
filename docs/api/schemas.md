@@ -138,7 +138,9 @@ Role removal dùng query string, không dùng JSON body: `DELETE /accounts/{acco
 {
   "semester_id": 1,
   "type": "DEFENSE_1_1",
-  "reviewer_count": 2,
+  "reviewer_count": 3,
+  "start_date": "2026-08-25",
+  "end_date": "2026-08-27",
   "result_owner_mode": true,
   "group_selection_mode": false,
   "session_duration_minutes": 45,
@@ -146,6 +148,9 @@ Role removal dùng query string, không dùng JSON body: `DELETE /accounts/{acco
   "h12_sessions_per_part": 4,
   "h12_sessions_per_day": 8,
   "h12_semester_quota": 20,
+  "max_groups_per_timeslot": 6,
+  "max_minutes_per_part": 240,
+  "max_minutes_per_day": 480,
   "soft_weights": { "S1": 10, "S2": 5 }
 }
 ```
@@ -153,6 +158,7 @@ Role removal dùng query string, không dùng JSON body: `DELETE /accounts/{acco
 | Field | Rule |
 |---|---|
 | `semester_id` | integer > 0 |
+| `start_date`, `end_date` | optional ISO dates; `end_date` không trước `start_date` |
 | `type` | string, round type theo business rules, ví dụ `DEFENSE_1_1`, `DEFENSE_1_2`, `DEFENSE_2` |
 | `reviewer_count` | integer > 0 |
 | `result_owner_mode` | boolean, default `false`; dùng cho D1.1/D2 khi cần chỉ định Result Owner |
@@ -162,12 +168,14 @@ Role removal dùng query string, không dùng JSON body: `DELETE /accounts/{acco
 | `h12_sessions_per_part` | integer > 0, default 4 |
 | `h12_sessions_per_day` | integer > 0, default 8 |
 | `h12_semester_quota` | integer > 0 hoặc `null` |
-| `soft_weights` | object, key chỉ được `S1`…`S8`, value integer không âm |
+| `max_groups_per_timeslot` | integer > 0 hoặc `null`; áp dụng giới hạn H13 khi cấu hình |
+| `max_minutes_per_part`, `max_minutes_per_day` | integer > 0 hoặc `null`; giới hạn H12 theo phút |
+| `soft_weights` | object, key chỉ được `S1`…`S9`, value integer không âm |
 
 ### `RoundTransitionPayload`
 
 ```json
-{ "target_status": "REGISTRATION", "reason": "Open lecturer registration" }
+{ "target_status": "OPEN_REGISTRATION", "reason": "Open lecturer registration" }
 ```
 
 `target_status` 1–32; `reason` optional, tối đa 1000. Transition hợp lệ phụ thuộc state machine của round.

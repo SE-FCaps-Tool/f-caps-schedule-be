@@ -15,6 +15,7 @@ from .config import get_settings
 from .database import get_engine
 from .routes.auth_routes import router as auth_router
 from .routes.master_data import router as master_data_router
+from .routes.manager_extensions import router as manager_extensions_router
 from .routes.operations import router as operations_router
 from .routes.results import router as results_router
 from .routes.schedule_operations import router as schedule_operations_router
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
     app.include_router(master_data_router)
+    app.include_router(manager_extensions_router)
     app.include_router(schedule_operations_router)
     app.include_router(results_router)
     app.include_router(operations_router)

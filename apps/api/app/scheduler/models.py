@@ -41,6 +41,9 @@ class RoundInput:
     h11_waiver_reasons: dict[int, str] = field(default_factory=dict)
     lecturer_load_preferences: dict[int, str] = field(default_factory=dict)
     group_leader_valid: dict[int, bool] = field(default_factory=dict)
+    max_groups_per_timeslot: int | None = None
+    max_minutes_per_part: int | None = None
+    max_minutes_per_day: int | None = None
 
 
 @dataclass(frozen=True)
