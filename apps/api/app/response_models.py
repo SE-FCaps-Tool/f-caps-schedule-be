@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ResponseModel(BaseModel):
@@ -179,6 +179,20 @@ class RoomResponse(ResponseModel):
     capacity: int
     active: bool = True
     room_type: str = "NORMAL"
+    type: str = "NORMAL"
+    status: str = "ACTIVE"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_fe_contract_aliases(cls, data: Any) -> Any:
+        # FE (rooms-page.tsx) filters on `type`/`status`; the DB and route layer
+        # use `room_type`/`active` (docs/be-checklist-open-questions.md A4).
+        if isinstance(data, dict):
+            data = dict(data)
+            data.setdefault("type", data.get("room_type"))
+            if "status" not in data and "active" in data:
+                data["status"] = "ACTIVE" if data["active"] else "INACTIVE"
+        return data
 
 
 class AvailableRoomResponse(RoomResponse):

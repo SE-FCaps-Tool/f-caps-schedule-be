@@ -186,6 +186,41 @@ def test_manager_can_create_round_day_and_manager_entered_availability(client):
 
 
 @pytest.mark.integration
+def test_semester_projects_lists_scoped_projects_and_rejects_unknown_semester(client):
+    client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
+    headers = {"X-Test-Session": "active-manager"}
+    semesters = client.get("/api/v1/semesters", headers=headers).json()
+    semester_id = next(item["id"] for item in semesters if item["code"] == "SE-2026-2027")
+    major_id = client.get("/api/v1/majors", headers=headers).json()[0]["id"]
+    project = client.post(
+        "/api/v1/projects",
+        json={
+            "semester_id": semester_id,
+            "major_id": major_id,
+            "code": f"P-SEM-{uuid4().hex[:6]}",
+            "title": "Semester-scoped project",
+            "supervisors": ["GV01:MAIN"],
+        },
+        headers=headers,
+    )
+    assert project.status_code == 201, project.text
+
+    listed = client.get(f"/api/v1/semesters/{semester_id}/projects", headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert any(item["id"] == project.json()["id"] for item in listed.json())
+
+    missing = client.get("/api/v1/semesters/999999/projects", headers=headers)
+    assert missing.status_code == 404
+    assert missing.json()["detail"]["code"] == "SEMESTER_NOT_FOUND"
+
+    forbidden = client.get(
+        f"/api/v1/semesters/{semester_id}/projects",
+        headers={"X-Test-Session": "active-lecturer"},
+    )
+    assert forbidden.status_code == 403
+
+
+@pytest.mark.integration
 def test_group_mutation_validates_leader_and_rolls_back_atomically(client):
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     headers = {"X-Test-Session": "active-manager"}

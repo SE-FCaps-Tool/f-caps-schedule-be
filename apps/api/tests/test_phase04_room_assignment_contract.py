@@ -87,6 +87,19 @@ def test_response_models_expose_room_listing_assignment_suggestion_and_readiness
     assert "readiness" in source.lower()
 
 
+def test_room_response_exposes_fe_contract_type_and_status_aliases():
+    from app.response_models import RoomResponse
+
+    row = {"id": 1, "code": "S01", "name": "Seminar 1", "capacity": 20, "active": True, "room_type": "SEMINAR"}
+    body = RoomResponse.model_validate(row).model_dump()
+    assert body["type"] == "SEMINAR"
+    assert body["status"] == "ACTIVE"
+
+    inactive_row = {**row, "active": False}
+    inactive_body = RoomResponse.model_validate(inactive_row).model_dump()
+    assert inactive_body["status"] == "INACTIVE"
+
+
 def test_round_resource_sources_no_longer_write_round_rooms():
     source = _module_source("app.routes.master_data")
     resources_start = source.index("class RoundResources")

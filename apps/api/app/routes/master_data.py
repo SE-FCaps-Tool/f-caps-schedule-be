@@ -441,6 +441,13 @@ def list_projects(db: Db, user: User, semester_id: int | None = None) -> list[di
     return [dict(row) for row in rows]
 
 
+@router.get("/semesters/{semester_id}/projects", response_model=list[ProjectResponse])
+def list_projects_for_semester(semester_id: int, db: Db, user: User) -> list[dict[str, object]]:
+    _require(user, "ADMIN", "MANAGER")
+    semester_or_404(db, semester_id)
+    return list_projects(db, user, semester_id=semester_id)
+
+
 @router.get("/lecturers", response_model=list[LecturerResponse])
 def list_lecturers(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
