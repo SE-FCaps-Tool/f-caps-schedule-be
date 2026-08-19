@@ -7,10 +7,10 @@ Semester đã được mở rộng để lưu thời gian bắt đầu/kết th�
 Trạng thái hợp lệ:
 
 ```text
-UPCOMING → ACTIVE → CLOSED
+ACTIVE → CLOSED
 ```
 
-Semester mới luôn được tạo với trạng thái `UPCOMING`.
+Semester mới luôn được tạo với trạng thái `ACTIVE`.
 
 ## API
 
@@ -26,6 +26,7 @@ Request:
 {
   "code": "SP26",
   "name": "Spring 2026",
+  "note": "Capstone semester",
   "start_date": "2026-05-11",
   "end_date": "2026-08-23"
 }
@@ -38,14 +39,15 @@ Response `201`:
   "id": 1,
   "code": "SP26",
   "name": "Spring 2026",
+  "note": "Capstone semester",
   "start_date": "2026-05-11",
   "end_date": "2026-08-23",
-  "status": "UPCOMING",
+  "status": "ACTIVE",
   "created_at": "2026-08-18T02:00:00Z"
 }
 ```
 
-Client không thể chọn trạng thái khi tạo; backend luôn lưu `UPCOMING`.
+Client không thể chọn trạng thái khi tạo; backend luôn lưu `ACTIVE`.
 
 ### Danh sách semester
 
@@ -53,7 +55,26 @@ Client không thể chọn trạng thái khi tạo; backend luôn lưu `UPCOMING
 GET /api/v1/semesters
 ```
 
-Mỗi phần tử trả về `id`, `code`, `name`, `start_date`, `end_date`, `status` và `created_at`.
+Mỗi phần tử trả về `id`, `code`, `name`, `note`, `start_date`, `end_date`,
+`academic_year`, `status`, `project_count`, `group_count`, `round_count`,
+`created_at`, `created_by`, `updated_at`, `updated_by`.
+
+Có thể lọc bằng:
+
+```http
+GET /api/v1/semesters?search=summer&status=CLOSED&academic_year=2026-2027
+```
+
+### Chi tiết, chỉnh sửa và chọn kỳ hiện tại
+
+```http
+GET   /api/v1/semesters/{semester_id}
+PATCH /api/v1/semesters/{semester_id}
+POST  /api/v1/semesters/{semester_id}/set-current
+```
+
+PATCH nhận `code`, `name`, `note`, `start_date`, `end_date`; không nhận status.
+`set-current` đóng kỳ ACTIVE cũ và mở kỳ đích nguyên tử, đồng thời ghi audit.
 
 ### Chuyển trạng thái
 
@@ -65,8 +86,8 @@ Request:
 
 ```json
 {
-  "target_status": "ACTIVE",
-  "reason": "Open semester"
+  "target_status": "CLOSED",
+  "reason": "Semester completed"
 }
 ```
 
@@ -75,13 +96,12 @@ Response:
 ```json
 {
   "id": 1,
-  "status": "ACTIVE"
+  "status": "CLOSED"
 }
 ```
 
 Chỉ `ADMIN` và `MANAGER` được thực hiện thao tác này. Hệ thống chỉ cho phép:
 
-- `UPCOMING` → `ACTIVE`
 - `ACTIVE` → `CLOSED`
 
 Không cho phép chuyển ngược hoặc bỏ qua trạng thái. Chỉ một semester được `ACTIVE` tại một thời điểm.
@@ -120,10 +140,11 @@ SEMESTER_MAX_DURATION_DAYS=120
 
 ## Database migration
 
-Migration:
+Migrations:
 
 ```text
 apps/api/migrations/versions/0013_semester_lifecycle.py
+apps/api/migrations/versions/0016_semester_active_closed.py
 ```
 
 Migration thực hiện:
@@ -131,8 +152,8 @@ Migration thực hiện:
 - Thêm `start_date DATE` và `end_date DATE` vào bảng `semesters`.
 - Backfill dữ liệu semester cũ.
 - Thêm constraint `end_date >= start_date`.
-- Đổi enum cũ `DRAFT, ACTIVE, CLOSED` thành `UPCOMING, ACTIVE, CLOSED`.
-- Chuyển các row `DRAFT` thành `UPCOMING`.
+- Đổi enum cũ `UPCOMING, ACTIVE, CLOSED` thành `ACTIVE, CLOSED`.
+- Chuyển các row legacy về `ACTIVE` hoặc `CLOSED`, giữ tối đa một row `ACTIVE`.
 - Giữ unique index đảm bảo chỉ có một semester `ACTIVE`.
 
 ## Dữ liệu hiện tại
@@ -143,12 +164,12 @@ Semester Excel hiện tại:
 Code:       SE-2026-2027
 Start date: 2026-05-11
 End date:   2026-08-23
-Status:     UPCOMING
+Status:     ACTIVE
 ```
 
 ## Seed và import
 
-Các nguồn seed/import đã được cập nhật để luôn cung cấp ngày semester và dùng trạng thái `UPCOMING`:
+Các nguồn seed/import đã được cập nhật để luôn cung cấp ngày semester và dùng trạng thái `ACTIVE`:
 
 - `apps/api/app/domain/seed.py`
 - `apps/api/app/services/seed_loader.py`
@@ -161,7 +182,7 @@ Các nguồn seed/import đã được cập nhật để luôn cung cấp ngày
 
 - Migration từ database rỗng đến `0013_semester_lifecycle`.
 - Tạo semester hợp lệ và không hợp lệ.
-- Chuyển trạng thái `UPCOMING → ACTIVE → CLOSED`.
+- Chuyển trạng thái `ACTIVE → CLOSED`.
 - Constraint database và duplicate code.
 - `/health` trả HTTP `200`.
 - `/docs` trả HTTP `200`.

@@ -10,7 +10,7 @@ transition so older response fields remain backward compatible.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,14 +39,28 @@ class PublicMeResponse(ResponseModel):
     status: str
 
 
+class AuditActorResponse(ResponseModel):
+    id: int
+    email: str
+    display_name: str
+
+
 class SemesterResponse(ResponseModel):
     id: int
     code: str
     name: str
+    note: str | None = None
     start_date: date | None = None
     end_date: date | None = None
-    status: str
+    academic_year: str | None = None
+    status: Literal["ACTIVE", "CLOSED"]
+    project_count: int = 0
+    group_count: int = 0
+    round_count: int = 0
     created_at: datetime | None = None
+    created_by: AuditActorResponse | None = None
+    updated_at: datetime | None = None
+    updated_by: AuditActorResponse | None = None
 
 
 class AccountResponse(ResponseModel):

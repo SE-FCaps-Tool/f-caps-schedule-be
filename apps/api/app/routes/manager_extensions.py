@@ -24,7 +24,13 @@ from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.config import get_settings
 from app.domain.errors import DomainError
+from app.domain.master_data import normalize_code
 from app.domain.round_setup import validate_round_configuration
+from app.services.semester_queries import (
+    SEMESTER_LIFECYCLE_LOCK_KEY,
+    academic_year_for_start,
+    semester_or_404,
+)
 from app.response_models import (
     ActionResponse,
     GroupDetailResponse,
@@ -53,6 +59,15 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 def _require(user: CurrentUser, *roles: str) -> None:
     if user.role not in roles:
         raise HTTPException(status_code=403, detail="Insufficient permission")
+
+
+def _actor_id(db: Session, user: CurrentUser) -> int | None:
+    if user.account_id is not None:
+        return user.account_id
+    return db.execute(
+        text("SELECT MIN(account_id) FROM account_roles WHERE role = CAST(:role AS system_role)"),
+        {"role": user.role},
+    ).scalar_one_or_none()
 
 
 def _json(value: Any) -> str:
@@ -101,6 +116,7 @@ class QuotaUpdate(BaseModel):
 class SemesterUpdate(BaseModel):
     code: str | None = Field(default=None, min_length=1, max_length=32)
     name: str | None = Field(default=None, min_length=1, max_length=160)
+    note: str | None = Field(default=None, max_length=1000)
     start_date: date | None = None
     end_date: date | None = None
 
@@ -112,25 +128,89 @@ def _row_with_json(row: Any) -> dict[str, Any]:
 @router.patch("/semesters/{semester_id}", response_model=SemesterResponse)
 def update_semester(semester_id: int, payload: SemesterUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
-    current = db.execute(text("SELECT code, name, start_date, end_date, status FROM semesters WHERE id = :id"), {"id": semester_id}).mappings().one_or_none()
+    current = db.execute(
+        text(
+            "SELECT id, code, name, note, start_date, end_date, academic_year, status, "
+            "created_by, updated_by, created_at, updated_at FROM semesters WHERE id = :id"
+        ),
+        {"id": semester_id},
+    ).mappings().one_or_none()
     db.rollback()
     if current is None:
         raise HTTPException(status_code=404, detail={"code": "SEMESTER_NOT_FOUND", "message": "Semester does not exist."})
-    values = {**dict(current), **payload.model_dump(exclude_unset=True)}
+    incoming = payload.model_dump(exclude_unset=True)
+    values = {**dict(current), **incoming}
+    if "code" in values and values["code"] is not None:
+        values["code"] = normalize_code(values["code"])
+    if "name" in values and values["name"] is not None:
+        values["name"] = values["name"].strip()
+    if "note" in values and values["note"] is not None:
+        values["note"] = values["note"].strip() or None
+    if values["start_date"] is None or values["end_date"] is None:
+        raise HTTPException(status_code=422, detail={"code": "SEMESTER_DATE_INVALID", "message": "Both semester dates are required."})
     if values["end_date"] < values["start_date"]:
         raise HTTPException(status_code=422, detail={"code": "SEMESTER_DATE_INVALID", "message": "end_date must be after start_date."})
     settings = get_settings()
     inclusive_days = (values["end_date"] - values["start_date"]).days + 1
     if not settings.semester_min_duration_days <= inclusive_days <= settings.semester_max_duration_days:
         raise HTTPException(status_code=422, detail={"code": "SEMESTER_DURATION_INVALID", "message": "Semester duration is outside the configured range."})
-    changed = {key: value for key, value in payload.model_dump(exclude_unset=True).items()}
+    changed = {key: values[key] for key in incoming}
     if not changed:
-        return {"id": semester_id, **dict(current)}
-    with db.begin():
-        changed["id"] = semester_id
-        assignments = ", ".join(f"{key} = :{key}" for key in changed if key != "id")
-        db.execute(text(f"UPDATE semesters SET {assignments} WHERE id = :id"), changed)
-    return dict(db.execute(text("SELECT id, code, name, start_date, end_date, status, created_at FROM semesters WHERE id = :id"), {"id": semester_id}).mappings().one())
+        return semester_or_404(db, semester_id)
+    changed["academic_year"] = academic_year_for_start(values["start_date"])
+    try:
+        with db.begin():
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                {"lock_key": SEMESTER_LIFECYCLE_LOCK_KEY},
+            )
+            locked = db.execute(
+                text(
+                    "SELECT code, name, note, start_date, end_date, academic_year, status "
+                    "FROM semesters WHERE id = :id FOR UPDATE"
+                ),
+                {"id": semester_id},
+            ).mappings().one_or_none()
+            if locked is None:
+                raise HTTPException(status_code=404, detail={"code": "SEMESTER_NOT_FOUND", "message": "Semester does not exist."})
+            actor_id = _actor_id(db, user)
+            db.execute(
+                text(
+                    "UPDATE semesters SET code = :code, name = :name, note = :note, "
+                    "start_date = :start_date, end_date = :end_date, academic_year = :academic_year, "
+                    "updated_by = :updated_by, updated_at = now() WHERE id = :id"
+                ),
+                {
+                    "code": values["code"],
+                    "name": values["name"],
+                    "note": values.get("note"),
+                    "start_date": values["start_date"],
+                    "end_date": values["end_date"],
+                    "academic_year": changed["academic_year"],
+                    "id": semester_id,
+                    "updated_by": actor_id,
+                },
+            )
+            db.execute(
+                text(
+                    "INSERT INTO audit_events "
+                    "(actor_id, action, entity_type, entity_id, before_json, after_json) "
+                    "VALUES (:actor_id, 'SEMESTER_UPDATED', 'semester', :entity_id, "
+                    "CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"
+                ),
+                {
+                    "actor_id": actor_id,
+                    "entity_id": str(semester_id),
+                    "before_json": _json(dict(locked)),
+                    "after_json": _json({**dict(locked), **changed}),
+                },
+            )
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "DATA_DUPLICATE", "message": "Semester code already exists."},
+        ) from exc
+    return semester_or_404(db, semester_id)
 
 
 @router.get("/rounds/{round_id}", response_model=RoundDetailResponse)

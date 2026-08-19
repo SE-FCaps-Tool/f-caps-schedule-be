@@ -20,20 +20,54 @@
 ### `SemesterCreate`
 
 ```json
-{ "code": "SP26", "name": "Spring 2026", "start_date": "2026-05-11", "end_date": "2026-08-23" }
+{ "code": "SP26", "name": "Spring 2026", "note": "Capstone semester", "start_date": "2026-05-11", "end_date": "2026-08-23" }
 ```
 
-`code`: 1–32; `name`: 1–160; `start_date` và `end_date`: ISO `YYYY-MM-DD`.
-Semester mới luôn có status `UPCOMING`. Duration inclusive phải nằm trong cấu hình
+`code`: 1–32; `name`: 1–160; `note`: optional, tối đa 1000; `start_date` và `end_date`: ISO `YYYY-MM-DD`.
+Semester mới luôn có status `ACTIVE`. Duration inclusive phải nằm trong cấu hình
 `SEMESTER_MIN_DURATION_DAYS` (default 105) và `SEMESTER_MAX_DURATION_DAYS` (default 120).
+
+### `SemesterUpdate`
+
+```json
+{ "name": "Spring 2026 - Updated", "note": "Updated note" }
+```
+
+Tất cả field đều optional trong PATCH: `code`, `name`, `note`, `start_date`,
+`end_date`. Không được gửi `status` hoặc `academic_year`.
+
+### `SemesterResponse`
+
+```json
+{
+  "id": 1,
+  "code": "SP26",
+  "name": "Spring 2026",
+  "note": null,
+  "start_date": "2026-05-11",
+  "end_date": "2026-08-23",
+  "academic_year": "2026-2027",
+  "status": "ACTIVE",
+  "project_count": 74,
+  "group_count": 74,
+  "round_count": 5,
+  "created_at": "2026-08-18T02:00:00Z",
+  "created_by": null,
+  "updated_at": "2026-08-18T02:00:00Z",
+  "updated_by": null
+}
+```
+
+`created_by` và `updated_by` là `{ id, email, display_name }` hoặc `null` với
+dữ liệu legacy/import không có actor đáng tin cậy.
 
 ### `SemesterTransitionPayload`
 
 ```json
-{ "target_status": "ACTIVE", "reason": "Open semester" }
+{ "target_status": "CLOSED", "reason": "Semester completed" }
 ```
 
-Chỉ cho phép `UPCOMING → ACTIVE` và `ACTIVE → CLOSED`; `reason` dài 1–1000 ký tự.
+Chỉ cho phép `ACTIVE → CLOSED`; `reason` dài 1–1000 ký tự.
 
 ### `AccountCreate`
 

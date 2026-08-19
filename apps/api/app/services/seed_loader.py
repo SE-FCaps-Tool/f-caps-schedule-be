@@ -20,15 +20,25 @@ def load_seed_fixture(
         semester_id = _id(
             session,
             """
-            INSERT INTO semesters (code, name, start_date, end_date)
-            VALUES (:code, :name, :start_date, :end_date)
+            INSERT INTO semesters
+                (code, name, note, start_date, end_date, academic_year,
+                 created_by, updated_by, updated_at)
+            VALUES
+                (:code, :name, :note, :start_date, :end_date,
+                 CONCAT(EXTRACT(YEAR FROM CAST(:start_date AS DATE))::int, '-',
+                        (EXTRACT(YEAR FROM CAST(:start_date AS DATE))::int + 1)),
+                 :actor_id, :actor_id, now())
             ON CONFLICT (code) DO UPDATE SET
                 name = EXCLUDED.name,
+                note = EXCLUDED.note,
                 start_date = EXCLUDED.start_date,
-                end_date = EXCLUDED.end_date
+                end_date = EXCLUDED.end_date,
+                academic_year = EXCLUDED.academic_year,
+                updated_by = COALESCE(EXCLUDED.updated_by, semesters.updated_by),
+                updated_at = now()
             RETURNING id
             """,
-            semester_data,
+            {**semester_data, "note": semester_data.get("note"), "actor_id": actor_id},
         )
         major_id = _id(
             session,

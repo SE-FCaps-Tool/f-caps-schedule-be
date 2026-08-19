@@ -34,27 +34,46 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 ### `GET /semesters`
 
 - **Role:** `ADMIN`, `MANAGER`.
-- **Response `200`:** `[{ id, code, name, status, created_at }]`, `status`: `UPCOMING | ACTIVE | CLOSED`.
+- **Query:** `search`, `status=ACTIVE|CLOSED`, `academic_year=YYYY-YYYY` (optional, AND semantics).
+- **Response `200`:** `[{ id, code, name, note, start_date, end_date, academic_year, status, project_count, group_count, round_count, created_at, created_by, updated_at, updated_by }]`.
+
+### `GET /semesters/{semester_id}`
+
+- **Role:** `ADMIN`, `MANAGER`.
+- **Response `200`:** cùng shape đầy đủ với một phần tử list.
+- **`404 SEMESTER_NOT_FOUND`** nếu không tồn tại.
 
 ### `POST /semesters`
 
 - **Role:** `ADMIN`, `MANAGER`.
-- **Body [`SemesterCreate`](schemas.md#semestercreate):** `{ code, name, start_date, end_date }`.
-- Backend luôn tạo với `status = UPCOMING`; client không chọn được trạng thái khởi tạo.
+- **Body [`SemesterCreate`](schemas.md#semestercreate):** `{ code, name, note?, start_date, end_date }`.
+- Backend luôn tạo với `status = ACTIVE`; client không chọn được trạng thái khởi tạo.
 - Thời lượng `end_date - start_date + 1` phải trong khoảng `SEMESTER_MIN_DURATION_DAYS`–`SEMESTER_MAX_DURATION_DAYS`
   (mặc định 105–120 ngày).
 - **`201`:** semester đầy đủ.
 - **`409 DATA_DUPLICATE`:** code trùng.
 - **`422 SEMESTER_DURATION_INVALID`:** sai khoảng ngày.
 
+### `PATCH /semesters/{id}`
+
+- **Body:** các field tùy chọn `code`, `name`, `note`, `start_date`, `end_date`.
+- Không sửa trực tiếp `status` hoặc `academic_year`.
+- **`200`:** semester object đầy đủ và metadata `updated_by`/`updated_at`.
+
+### `POST /semesters/{id}/set-current`
+
+- **Role:** `ADMIN`, `MANAGER`.
+- Đóng semester ACTIVE hiện tại và mở semester đích trong một transaction.
+- Gọi lại với semester đang ACTIVE là idempotent.
+- **`200`:** semester object đầy đủ của semester đích.
+
 ### `POST /semesters/{id}/transition`
 
 - **Role:** `ADMIN`, `MANAGER`.
-- **Body:** `{ target_status: "ACTIVE" | "CLOSED", reason }`.
-- Chỉ đi tiếp `UPCOMING → ACTIVE → CLOSED`, không lùi/nhảy bước (BR-SEM-02: chỉ 1 semester `ACTIVE` cùng lúc).
+- **Body:** `{ target_status: "CLOSED", reason }`.
+- Chỉ cho phép `ACTIVE → CLOSED`; không mở lại semester đã đóng (BR-SEM-02: chỉ 1 semester `ACTIVE` cùng lúc).
 - **`200`:** `{ id, status }`.
 - **`403`:** không phải ADMIN/MANAGER.
-- **`409`:** đã có semester `ACTIVE` khác.
 - **`422`:** transition không hợp lệ.
 
 ---
@@ -434,7 +453,7 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 
 Các màn hình mockdata hiện có API tương ứng:
 
-- `PATCH /semesters/{id}`: sửa code/name/ngày, giữ nguyên lifecycle `UPCOMING | ACTIVE | CLOSED`.
+- `PATCH /semesters/{id}`: sửa code/name/ngày, giữ nguyên lifecycle `ACTIVE | CLOSED`.
 - `GET/PATCH /projects/{id}`, `GET/PATCH /groups/{id}` và `POST /projects/import`, `POST /groups/import`.
 - `GET/PATCH /rounds/{id}`, `GET /rounds/{id}/invitations`, `POST /rounds/{id}/invitations/{lecturer_id}/resend`, `GET /rounds/{id}/groups`.
 - `PATCH/DELETE /timeslots/{id}` để sửa hoặc disable slot.

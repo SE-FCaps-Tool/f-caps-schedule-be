@@ -3,8 +3,30 @@ from uuid import uuid4
 import pytest
 
 
+def _close_current_semester(client, headers):
+    rows = client.get("/api/v1/semesters", headers=headers).json()
+    active = next(row for row in rows if row["status"] == "ACTIVE")
+    response = client.post(
+        f"/api/v1/semesters/{active['id']}/transition",
+        json={"target_status": "CLOSED", "reason": "Prepare isolated API test"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    return active["id"]
+
+
+def _restore_current_semester(client, semester_id, headers):
+    response = client.post(
+        f"/api/v1/semesters/{semester_id}/set-current",
+        headers=headers,
+    )
+    assert response.status_code == 200
+
+
 @pytest.mark.integration
 def test_manager_can_create_semester_and_duplicate_code_is_rejected(client):
+    headers = {"X-Test-Session": "active-manager"}
+    original_active_id = _close_current_semester(client, headers)
     code = f"API-{uuid4().hex[:8]}"
     payload = {
         "code": code,
@@ -12,18 +34,19 @@ def test_manager_can_create_semester_and_duplicate_code_is_rejected(client):
         "start_date": "2030-01-01",
         "end_date": "2030-04-15",
     }
-    created = client.post("/api/v1/semesters", json=payload, headers={"X-Test-Session": "active-manager"})
-    assert created.status_code == 201
-    assert created.json()["code"] == code.upper()
-    assert created.json()["status"] == "UPCOMING"
-    assert created.json()["start_date"] == "2030-01-01"
-    assert created.json()["end_date"] == "2030-04-15"
+    try:
+        created = client.post("/api/v1/semesters", json=payload, headers=headers)
+        assert created.status_code == 201
+        assert created.json()["code"] == code.upper()
+        assert created.json()["status"] == "ACTIVE"
+        assert created.json()["start_date"] == "2030-01-01"
+        assert created.json()["end_date"] == "2030-04-15"
 
-    duplicate = client.post(
-        "/api/v1/semesters", json=payload, headers={"X-Test-Session": "active-manager"}
-    )
-    assert duplicate.status_code == 409
-    assert duplicate.json()["detail"]["code"] == "DATA_DUPLICATE"
+        duplicate = client.post("/api/v1/semesters", json=payload, headers=headers)
+        assert duplicate.status_code == 409
+        assert duplicate.json()["detail"]["code"] == "DATA_DUPLICATE"
+    finally:
+        _restore_current_semester(client, original_active_id, headers)
 
 
 @pytest.mark.integration
@@ -50,34 +73,30 @@ def test_invalid_semester_payload_is_rejected_before_database_access(client):
 @pytest.mark.integration
 def test_semester_duration_and_status_transitions(client):
     headers = {"X-Test-Session": "active-manager"}
-    created = client.post(
-        "/api/v1/semesters",
-        json={
-            "code": f"DURATION-{uuid4().hex[:8]}",
-            "name": "Duration Test Semester",
-            "start_date": "2030-01-01",
-            "end_date": "2030-04-15",
-        },
-        headers=headers,
-    )
-    assert created.status_code == 201
-    semester_id = created.json()["id"]
+    original_active_id = _close_current_semester(client, headers)
+    try:
+        created = client.post(
+            "/api/v1/semesters",
+            json={
+                "code": f"DURATION-{uuid4().hex[:8]}",
+                "name": "Duration Test Semester",
+                "start_date": "2030-01-01",
+                "end_date": "2030-04-15",
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201
+        semester_id = created.json()["id"]
 
-    activated = client.post(
-        f"/api/v1/semesters/{semester_id}/transition",
-        json={"target_status": "ACTIVE", "reason": "Open semester"},
-        headers=headers,
-    )
-    assert activated.status_code == 200
-    assert activated.json() == {"id": semester_id, "status": "ACTIVE"}
-
-    closed = client.post(
-        f"/api/v1/semesters/{semester_id}/transition",
-        json={"target_status": "CLOSED", "reason": "Semester completed"},
-        headers=headers,
-    )
-    assert closed.status_code == 200
-    assert closed.json() == {"id": semester_id, "status": "CLOSED"}
+        closed = client.post(
+            f"/api/v1/semesters/{semester_id}/transition",
+            json={"target_status": "CLOSED", "reason": "Semester completed"},
+            headers=headers,
+        )
+        assert closed.status_code == 200
+        assert closed.json() == {"id": semester_id, "status": "CLOSED"}
+    finally:
+        _restore_current_semester(client, original_active_id, headers)
 
 
 @pytest.mark.parametrize(

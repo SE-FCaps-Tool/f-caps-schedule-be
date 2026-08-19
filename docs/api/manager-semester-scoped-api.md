@@ -330,7 +330,7 @@ Response `201`:
   "name": "Semester 2027-2028",
   "start_date": "2027-08-01",
   "end_date": "2027-11-29",
-  "status": "UPCOMING",
+  "status": "ACTIVE",
   "created_at": "2027-07-20T08:00:00Z"
 }
 ```

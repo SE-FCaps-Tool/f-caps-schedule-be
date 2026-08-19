@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 
 from argon2 import PasswordHasher
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -29,6 +29,12 @@ from app.services.access import (
     student_id_for_account,
 )
 from app.services.seed_loader import load_seed_fixture
+from app.services.semester_queries import (
+    SEMESTER_LIFECYCLE_LOCK_KEY,
+    academic_year_for_start,
+    semester_or_404,
+    semester_rows,
+)
 from app.response_models import (
     AccountResponse,
     AccountRoleResponse,
@@ -84,6 +90,7 @@ def _actor_id(db: Session, user: CurrentUser) -> int | None:
 class SemesterCreate(BaseModel):
     code: str = Field(min_length=1, max_length=32)
     name: str = Field(min_length=1, max_length=160)
+    note: str | None = Field(default=None, max_length=1000)
     start_date: date
     end_date: date
 
@@ -97,9 +104,14 @@ class SemesterCreate(BaseModel):
     def normalize_name(cls, value: str) -> str:
         return value.strip()
 
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None and value.strip() else None
+
 
 class SemesterTransitionPayload(BaseModel):
-    target_status: Literal["ACTIVE", "CLOSED"]
+    target_status: Literal["CLOSED"]
     reason: str = Field(min_length=1, max_length=1000)
 
 
@@ -261,12 +273,26 @@ class LeaderPayload(BaseModel):
 
 
 @router.get("/semesters", response_model=list[SemesterResponse])
-def list_semesters(db: Db, user: User) -> list[dict[str, object]]:
+def list_semesters(
+    db: Db,
+    user: User,
+    search: str | None = None,
+    status_filter: Literal["ACTIVE", "CLOSED"] | None = Query(default=None, alias="status"),
+    academic_year: str | None = None,
+) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
-    rows = db.execute(
-        text("SELECT id, code, name, start_date, end_date, status, created_at FROM semesters ORDER BY code")
-    ).mappings()
-    return [dict(row) for row in rows]
+    return semester_rows(
+        db,
+        search=search,
+        status=status_filter,
+        academic_year=academic_year,
+    )
+
+
+@router.get("/semesters/{semester_id}", response_model=SemesterResponse)
+def get_semester(semester_id: int, db: Db, user: User) -> dict[str, object]:
+    _require(user, "ADMIN", "MANAGER")
+    return semester_or_404(db, semester_id)
 
 
 @router.get("/accounts", response_model=list[AccountResponse])
@@ -705,32 +731,49 @@ def create_semester(
                 ),
             },
         )
+    academic_year = academic_year_for_start(payload.start_date)
     try:
         with db.begin():
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                {"lock_key": SEMESTER_LIFECYCLE_LOCK_KEY},
+            )
+            actor_id = _actor_id(db, user)
             row = db.execute(
                 text(
                     """
-                    INSERT INTO semesters (code, name, start_date, end_date, status)
-                    VALUES (:code, :name, :start_date, :end_date, 'UPCOMING')
-                    RETURNING id, code, name, start_date, end_date, status, created_at
+                    INSERT INTO semesters
+                        (code, name, note, start_date, end_date, academic_year,
+                         status, created_by, updated_by, updated_at)
+                    VALUES
+                        (:code, :name, :note, :start_date, :end_date, :academic_year,
+                         'ACTIVE', :actor_id, :actor_id, now())
+                    RETURNING id, code, name, note, start_date, end_date,
+                              academic_year, status, created_at, updated_at,
+                              created_by, updated_by
                     """
                 ),
-                payload.model_dump(),
+                {
+                    **payload.model_dump(),
+                    "academic_year": academic_year,
+                    "actor_id": actor_id,
+                },
             ).mappings().one()
             db.execute(
                 text(
                     """
                     INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json)
-                    VALUES (:actor_id, 'MASTER_DATA_CREATED', 'semester', :entity_id, CAST(:after_json AS JSONB))
+                    VALUES (:actor_id, 'SEMESTER_CREATED', 'semester', :entity_id, CAST(:after_json AS JSONB))
                     """
                 ),
                 {
-                    "actor_id": _actor_id(db, user),
+                    "actor_id": actor_id,
                     "entity_id": str(row["id"]),
                     "after_json": _json(
                         {
                             **payload.model_dump(mode="json"),
-                            "status": "UPCOMING",
+                            "academic_year": academic_year,
+                            "status": "ACTIVE",
                         }
                     ),
                 },
@@ -738,11 +781,20 @@ def create_semester(
     except DomainError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
     except IntegrityError as exc:
+        constraint = str(getattr(exc, "orig", exc))
+        if "uq_active_semester" in constraint:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "ACTIVE_SEMESTER_EXISTS",
+                    "message": "Only one semester may be ACTIVE.",
+                },
+            ) from exc
         raise HTTPException(
             status_code=409,
             detail={"code": "DATA_DUPLICATE", "message": "Semester code already exists."},
         ) from exc
-    return dict(row)
+    return semester_or_404(db, int(row["id"]))
 
 
 @router.post("/semesters/{semester_id}/transition", response_model=ActionResponse, response_model_exclude_none=True)
@@ -755,6 +807,10 @@ def transition_semester(
     _require(user, "ADMIN", "MANAGER")
     try:
         with db.begin():
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                {"lock_key": SEMESTER_LIFECYCLE_LOCK_KEY},
+            )
             row = db.execute(
                 text("SELECT id, status FROM semesters WHERE id = :id FOR UPDATE"),
                 {"id": semester_id},
@@ -763,31 +819,19 @@ def transition_semester(
                 raise DomainError("SEMESTER_NOT_FOUND", "Semester does not exist.")
 
             current_status = str(row["status"])
-            allowed = {
-                "UPCOMING": "ACTIVE",
-                "ACTIVE": "CLOSED",
-            }
+            allowed = {"ACTIVE": "CLOSED"}
             if allowed.get(current_status) != payload.target_status:
                 raise DomainError(
                     "SEMESTER_STATUS_INVALID",
                     f"Invalid semester transition: {current_status} -> {payload.target_status}.",
                 )
-            if payload.target_status == "ACTIVE":
-                active = db.execute(
-                    text(
-                        "SELECT id FROM semesters "
-                        "WHERE status = 'ACTIVE' AND id <> :id LIMIT 1 FOR UPDATE"
-                    ),
-                    {"id": semester_id},
-                ).scalar_one_or_none()
-                if active is not None:
-                    raise DomainError(
-                        "ACTIVE_SEMESTER_EXISTS",
-                        "Only one semester may be ACTIVE.",
-                    )
+            actor_id = _actor_id(db, user)
             db.execute(
-                text("UPDATE semesters SET status = CAST(:status AS semester_status) WHERE id = :id"),
-                {"status": payload.target_status, "id": semester_id},
+                text(
+                    "UPDATE semesters SET status = CAST(:status AS semester_status), "
+                    "updated_by = :actor_id, updated_at = now() WHERE id = :id"
+                ),
+                {"status": payload.target_status, "id": semester_id, "actor_id": actor_id},
             )
             db.execute(
                 text(
@@ -797,7 +841,7 @@ def transition_semester(
                     "CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"
                 ),
                 {
-                    "actor_id": _actor_id(db, user),
+                    "actor_id": actor_id,
                     "entity_id": str(semester_id),
                     "reason": payload.reason.strip(),
                     "before_json": _json({"status": current_status}),
@@ -815,6 +859,82 @@ def transition_semester(
             detail={"code": "ACTIVE_SEMESTER_EXISTS", "message": "Only one semester may be ACTIVE."},
         ) from exc
     return {"id": semester_id, "status": payload.target_status}
+
+
+@router.post("/semesters/{semester_id}/set-current", response_model=SemesterResponse)
+def set_current_semester(semester_id: int, db: Db, user: User) -> dict[str, object]:
+    _require(user, "ADMIN", "MANAGER")
+    try:
+        with db.begin():
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                {"lock_key": SEMESTER_LIFECYCLE_LOCK_KEY},
+            )
+            locked = db.execute(
+                text(
+                    "SELECT id, status FROM semesters "
+                    "WHERE status = 'ACTIVE' OR id = :target_id "
+                    "ORDER BY id FOR UPDATE"
+                ),
+                {"target_id": semester_id},
+            ).mappings().all()
+            target = next((row for row in locked if row["id"] == semester_id), None)
+            if target is None:
+                raise DomainError("SEMESTER_NOT_FOUND", "Semester does not exist.")
+            if str(target["status"]) == "ACTIVE":
+                return semester_or_404(db, semester_id)
+
+            active = next((row for row in locked if str(row["status"]) == "ACTIVE"), None)
+            actor_id = _actor_id(db, user)
+            if active is not None:
+                db.execute(
+                    text(
+                        "UPDATE semesters SET status = 'CLOSED', updated_by = :actor_id, "
+                        "updated_at = now() WHERE id = :id"
+                    ),
+                    {"id": active["id"], "actor_id": actor_id},
+                )
+                db.execute(
+                    text(
+                        "INSERT INTO audit_events "
+                        "(actor_id, action, entity_type, entity_id, before_json, after_json) "
+                        "VALUES (:actor_id, 'SEMESTER_SET_CURRENT', 'semester', :entity_id, "
+                        "CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"
+                    ),
+                    {
+                        "actor_id": actor_id,
+                        "entity_id": str(active["id"]),
+                        "before_json": _json({"status": str(active["status"])}),
+                        "after_json": _json({"status": "CLOSED"}),
+                    },
+                )
+            db.execute(
+                text(
+                    "UPDATE semesters SET status = 'ACTIVE', updated_by = :actor_id, "
+                    "updated_at = now() WHERE id = :id"
+                ),
+                {"id": semester_id, "actor_id": actor_id},
+            )
+            db.execute(
+                text(
+                    "INSERT INTO audit_events "
+                    "(actor_id, action, entity_type, entity_id, before_json, after_json) "
+                    "VALUES (:actor_id, 'SEMESTER_SET_CURRENT', 'semester', :entity_id, "
+                    "CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"
+                ),
+                {
+                    "actor_id": actor_id,
+                    "entity_id": str(semester_id),
+                    "before_json": _json({"status": str(target["status"])}),
+                    "after_json": _json({"status": "ACTIVE"}),
+                },
+            )
+    except DomainError as exc:
+        raise HTTPException(
+            status_code=404 if exc.code == "SEMESTER_NOT_FOUND" else 422,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+    return semester_or_404(db, semester_id)
 
 
 @router.post("/admin/seed-fixture", status_code=status.HTTP_201_CREATED, response_model=SeedFixtureResponse)

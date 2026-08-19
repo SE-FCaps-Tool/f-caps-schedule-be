@@ -25,8 +25,8 @@ def test_database_rejects_overlapping_room_sessions_in_one_schedule_version():
         )
         account_id = cursor.fetchone()[0]
         cursor.execute(
-            "INSERT INTO semesters (code, name, start_date, end_date) "
-            "VALUES (%s, %s, DATE '2030-01-01', DATE '2030-04-15') RETURNING id",
+            "INSERT INTO semesters (code, name, start_date, end_date, status) "
+            "VALUES (%s, %s, DATE '2030-01-01', DATE '2030-04-15', 'CLOSED') RETURNING id",
             (f"TEST-{suffix}", "Constraint Test"),
         )
         semester_id = cursor.fetchone()[0]

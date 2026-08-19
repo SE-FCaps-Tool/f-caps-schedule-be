@@ -21,7 +21,10 @@ POST /auth/login
   ↓
 GET /auth/me hoặc GET /me
   ↓
-GET /semesters, /majors, /lecturers, /rooms, /projects, /groups
+GET /semesters?status=ACTIVE
+GET /majors, /lecturers, /rooms
+GET /projects?semester_id={semesterId}
+GET /groups?semester_id={semesterId}
   ↓
 POST /rounds
   ↓
@@ -127,11 +130,20 @@ Response:
     "name": "Spring 2026",
     "start_date": "2026-05-11",
     "end_date": "2026-08-23",
-    "status": "UPCOMING",
+  "status": "ACTIVE",
     "created_at": "2026-08-18T02:00:00Z"
   }
 ]
 ```
+
+#### `GET /api/v1/semesters`
+
+FE khởi tạo Semester Context bằng API này. Có thể truyền `search`, `status` và
+`academic_year`; response trả counts và audit actors.
+
+#### `GET /api/v1/semesters/{semester_id}`
+
+Dùng cho màn hình detail/edit; shape giống một item trong list.
 
 #### `POST /api/v1/semesters`
 
@@ -141,13 +153,19 @@ Request:
 {
   "code": "SP26",
   "name": "Spring 2026",
+  "note": "Capstone semester",
   "start_date": "2026-05-11",
   "end_date": "2026-08-23"
 }
 ```
 
-Response `201`: semester object như trên, luôn có `status: "UPCOMING"`.
+Response `201`: semester object như trên, luôn có `status: "ACTIVE"`.
 Thời lượng inclusive phải nằm trong cấu hình 105–120 ngày.
+
+#### `PATCH /api/v1/semesters/{semester_id}`
+
+Body gồm một hoặc nhiều field `code`, `name`, `note`, `start_date`, `end_date`.
+Không gửi `status` hoặc `academic_year`.
 
 #### `POST /api/v1/semesters/{semester_id}/transition`
 
@@ -155,18 +173,24 @@ Request:
 
 ```json
 {
-  "target_status": "ACTIVE",
-  "reason": "Open semester"
+  "target_status": "CLOSED",
+  "reason": "Semester completed"
 }
 ```
 
 Response:
 
 ```json
-{ "id": 1, "status": "ACTIVE" }
+{ "id": 1, "status": "CLOSED" }
 ```
 
-Chỉ cho phép `UPCOMING → ACTIVE → CLOSED`; chỉ có một semester `ACTIVE`.
+Chỉ cho phép `ACTIVE → CLOSED`; chỉ có một semester `ACTIVE`.
+
+#### `POST /api/v1/semesters/{semester_id}/set-current`
+
+Không có request body. Backend đóng semester ACTIVE hiện tại và mở semester
+được chọn trong một transaction. Response là semester object đầy đủ; gọi lại
+với semester đang ACTIVE là idempotent.
 
 ### Lookup data
 

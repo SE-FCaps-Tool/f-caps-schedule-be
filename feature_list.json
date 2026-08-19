@@ -49,6 +49,76 @@
       "evidence": "Phases 00–07: source file hashes match baseline; source/target read-only snapshots match all baseline counts and Alembic head; old API/worker/Postgres containers and source volume were removed only after parity; target runs on f_caps_schedule_be_postgres_data; retained dump SHA256 e2cee9a9893504dfe5e9d362fa82aa234424004aa415490a8630b718fada3762.",
       "notes": "Source repository không bị xóa/sửa; old DB volume đã được xóa có chủ đích sau parity/cutover. Rollback dump vẫn giữ ngoài repository.",
       "priority": "P1"
+    },
+    {
+      "id": "semester-list-counts",
+      "title": "Hiển thị danh sách học kỳ với thống kê",
+      "user_visible_behavior": "Manager xem được số project, group và round của từng học kỳ.",
+      "verification_command": "GET /api/v1/semesters trả project_count, group_count và round_count đúng theo semester_id.",
+      "status": "passing",
+      "evidence": "Semester API integration test passes; shared grouped query returns project_count, group_count and round_count per semester.",
+      "notes": "Verified with docker compose exec -T api pytest -q.",
+      "priority": "P1"
+    },
+    {
+      "id": "semester-list-filters",
+      "title": "Lọc và tìm kiếm học kỳ",
+      "user_visible_behavior": "Manager tìm học kỳ theo search, status và academic year.",
+      "verification_command": "GET /api/v1/semesters?search=&status=&academic_year= chỉ trả các row khớp tất cả filter.",
+      "status": "passing",
+      "evidence": "Integration test verifies status and academic_year filters; shared query combines search/status/academic_year with AND semantics.",
+      "notes": "OpenAPI exposes search, status and academic_year query parameters.",
+      "priority": "P1"
+    },
+    {
+      "id": "semester-detail",
+      "title": "Xem chi tiết học kỳ",
+      "user_visible_behavior": "Manager mở một học kỳ và nhận đầy đủ thông tin, counts và audit fields.",
+      "verification_command": "GET /api/v1/semesters/{id} trả complete semester shape hoặc 404 SEMESTER_NOT_FOUND.",
+      "status": "passing",
+      "evidence": "GET detail returns the same complete SemesterResponse shape and typed SEMESTER_NOT_FOUND for missing rows.",
+      "notes": "Covered by test_semester_manager_api.py and full pytest run.",
+      "priority": "P1"
+    },
+    {
+      "id": "semester-create-update-audit",
+      "title": "Tạo và chỉnh sửa học kỳ có audit metadata",
+      "user_visible_behavior": "Semester mới ACTIVE và các thay đổi lưu người tạo, người sửa cùng timestamp.",
+      "verification_command": "POST/PATCH /api/v1/semesters lưu created_by/updated_by/updated_at và audit event.",
+      "status": "passing",
+      "evidence": "POST/PATCH persist note, academic_year, created_by/updated_by and updated_at; duplicate and active conflicts are typed; audit events are written.",
+      "notes": "Duration uses configured inclusive day bounds and create defaults ACTIVE.",
+      "priority": "P1"
+    },
+    {
+      "id": "semester-close",
+      "title": "Khóa học kỳ",
+      "user_visible_behavior": "Manager chuyển học kỳ ACTIVE thành CLOSED bằng action khóa.",
+      "verification_command": "POST /api/v1/semesters/{id}/transition với target_status=CLOSED cập nhật status và audit.",
+      "status": "passing",
+      "evidence": "Transition endpoint accepts ACTIVE to CLOSED, updates audit metadata, and writes SEMESTER_STATUS_CHANGED.",
+      "notes": "Legacy transition response remains {id,status} for compatibility.",
+      "priority": "P1"
+    },
+    {
+      "id": "semester-set-current",
+      "title": "Chọn học kỳ hiện tại",
+      "user_visible_behavior": "Manager chọn một kỳ CLOSED làm hiện tại; kỳ ACTIVE cũ tự đóng trong cùng transaction.",
+      "verification_command": "POST /api/v1/semesters/{id}/set-current giữ đúng một row ACTIVE dưới concurrent requests.",
+      "status": "passing",
+      "evidence": "set-current uses PostgreSQL advisory transaction lock plus deterministic row locks; switching and idempotent calls pass integration tests while preserving one ACTIVE row.",
+      "notes": "Previous active is closed before target activation and both changes are audited.",
+      "priority": "P1"
+    },
+    {
+      "id": "semester-actor-display",
+      "title": "Hiển thị actor audit của học kỳ",
+      "user_visible_behavior": "Manager xem được email và display name của người tạo/cập nhật khi có dữ liệu actor.",
+      "verification_command": "Semester response chứa created_by và updated_by dạng actor object hoặc null cho legacy rows.",
+      "status": "passing",
+      "evidence": "SemesterResponse exposes created_by and updated_by actor objects with id/email/display_name, or null for legacy rows.",
+      "notes": "Actor fields are populated from account joins when ownership is known.",
+      "priority": "P2"
     }
   ]
 }
