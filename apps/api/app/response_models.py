@@ -330,6 +330,39 @@ class RoundDetailResponse(RoundResponse):
     days: list[RoundDayResponse] = Field(default_factory=list)
 
 
+class RoundDetailSlotContractResponse(ResponseModel):
+    id: str
+    start_time: str = Field(alias="startTime")
+    end_time: str = Field(alias="endTime")
+
+
+class RoundDetailDayContractResponse(ResponseModel):
+    date: date
+    slots: list[RoundDetailSlotContractResponse] = Field(default_factory=list)
+
+
+class RoundDetailContractResponse(ResponseModel):
+    id: str
+    semester_id: str = Field(alias="semesterId")
+    name: str | None = None
+    type: str
+    status: str
+    description: str | None = None
+    duration_minutes: int = Field(alias="durationMinutes")
+    reviewer_count: int = Field(alias="reviewerCount")
+    max_groups_per_timeslot: int | None = Field(default=None, alias="maxGroupsPerTimeslot")
+    registration_deadline: datetime | None = Field(default=None, alias="registrationDeadline")
+    group_selection_mode: bool = Field(alias="groupSelectionMode")
+    group_preference_deadline: datetime | None = Field(default=None, alias="groupPreferenceDeadline")
+    result_owner_mode: bool = Field(alias="resultOwnerMode")
+    room_types: list[str] = Field(default_factory=list, alias="roomTypes")
+    days: list[RoundDetailDayContractResponse] = Field(default_factory=list)
+
+
+class RoundDetailEnvelopeResponse(ResponseModel):
+    data: RoundDetailContractResponse
+
+
 class TimeslotResponse(ResponseModel):
     id: int
     round_day_id: int

@@ -7,10 +7,11 @@ schedule state machine remains unchanged.
 
 from __future__ import annotations
 
-from datetime import date, datetime
-from io import BytesIO
 import re
+from datetime import UTC, date, datetime
+from io import BytesIO
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -20,19 +21,13 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api_contract import success_payload
 from app.auth import CurrentUser, get_current_user
-from app.database import get_db
 from app.config import get_settings
+from app.database import get_db
 from app.domain.errors import DomainError
 from app.domain.master_data import normalize_code
 from app.domain.round_setup import validate_round_configuration
-from app.services.semester_queries import (
-    SEMESTER_LIFECYCLE_LOCK_KEY,
-    academic_year_for_start,
-    ensure_round_semester_writable,
-    ensure_semester_writable,
-    semester_or_404,
-)
 from app.response_models import (
     ActionResponse,
     GroupDetailResponse,
@@ -42,15 +37,22 @@ from app.response_models import (
     InvitationResponse,
     ProjectDetailResponse,
     ProjectMutationResponse,
-    ProjectResponse,
     QuotaResponse,
     RescheduleRequestResponse,
     ResultResponse,
-    RoundGroupResponse,
+    RoundDetailEnvelopeResponse,
     RoundDetailResponse,
-    SessionResponse,
+    RoundGroupResponse,
     SemesterResponse,
+    SessionResponse,
     TimeslotResponse,
+)
+from app.services.semester_queries import (
+    SEMESTER_LIFECYCLE_LOCK_KEY,
+    academic_year_for_start,
+    ensure_round_semester_writable,
+    ensure_semester_writable,
+    semester_or_404,
 )
 
 _PHASE3_PROVENANCE_TABLE = "schedule_assignments"
@@ -222,9 +224,7 @@ def update_semester(semester_id: int, payload: SemesterUpdate, db: Db, user: Use
     return semester_or_404(db, semester_id)
 
 
-@router.get("/rounds/{round_id}", response_model=RoundDetailResponse)
-def get_round_detail(round_id: int, db: Db, user: User) -> dict[str, Any]:
-    _require(user, "ADMIN", "MANAGER")
+def _load_round_detail(round_id: int, db: Session) -> dict[str, Any]:
     row = db.execute(
         text(
             """
@@ -255,12 +255,63 @@ def get_round_detail(round_id: int, db: Db, user: User) -> dict[str, Any]:
     return {**dict(row), "days": [dict(item) for item in days]}
 
 
+_ROUND_DETAIL_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def _local_time(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(_ROUND_DETAIL_TIMEZONE).strftime("%H:%M")
+
+
+def _round_detail_payload(raw: dict[str, Any]) -> dict[str, Any]:
+    days_by_date: dict[date, dict[str, Any]] = {}
+    for item in raw["days"]:
+        day_date = item["day_date"]
+        day = days_by_date.setdefault(day_date, {"date": day_date, "slots": []})
+        if item["timeslot_id"] is None or not item["active"]:
+            continue
+        day["slots"].append(
+            {
+                "id": str(item["timeslot_id"]),
+                "start_time": _local_time(item["start_at"]),
+                "end_time": _local_time(item["end_at"]),
+            }
+        )
+
+    return success_payload(
+        {
+            "id": str(raw["id"]),
+            "semester_id": str(raw["semester_id"]),
+            "name": raw["name"],
+            "type": str(raw["type"]),
+            "status": str(raw["status"]),
+            "description": raw["description"],
+            "duration_minutes": raw["session_duration_minutes"],
+            "reviewer_count": raw["reviewer_count"],
+            "max_groups_per_timeslot": raw["max_groups_per_timeslot"],
+            "registration_deadline": raw["registration_deadline"],
+            "group_selection_mode": raw["group_selection_mode"],
+            "group_preference_deadline": raw["group_preference_deadline"],
+            "result_owner_mode": raw["result_owner_mode"],
+            "room_types": raw["room_types"],
+            "days": list(days_by_date.values()),
+        }
+    )
+
+
+@router.get("/rounds/{round_id}", response_model=RoundDetailEnvelopeResponse)
+def get_round_detail(round_id: int, db: Db, user: User) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    return _round_detail_payload(_load_round_detail(round_id, db))
+
+
 @router.patch("/rounds/{round_id}", response_model=RoundDetailResponse)
 def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     values = payload.model_dump(exclude_unset=True)
     if not values:
-        return get_round_detail(round_id, db, user)
+        return _load_round_detail(round_id, db)
     if values.get("start_date") and values.get("end_date") and values["end_date"] < values["start_date"]:
         raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
     columns = {"start_date", "end_date", "session_duration_minutes", "reviewer_count", "result_owner_mode", "group_selection_mode", "registration_deadline", "h12_sessions_per_part", "h12_sessions_per_day", "h12_semester_quota", "max_groups_per_timeslot", "max_minutes_per_part", "max_minutes_per_day"}
@@ -294,7 +345,7 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
             db.execute(text("DELETE FROM round_room_types WHERE round_id = :id"), {"id": round_id})
             for room_type in sorted(set(room_types)):
                 db.execute(text("INSERT INTO round_room_types (round_id, room_type) VALUES (:round_id, CAST(:room_type AS room_type))"), {"round_id": round_id, "room_type": room_type})
-    return get_round_detail(round_id, db, user)
+    return _load_round_detail(round_id, db)
 
 
 @router.patch("/projects/{project_id}", response_model=ProjectMutationResponse)
