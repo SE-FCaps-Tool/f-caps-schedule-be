@@ -11,6 +11,11 @@ Scheduler-only V1 for managing assessment rounds, availability, schedule version
 - Same-codebase worker for scheduler jobs and notification outbox delivery
 - Docker Compose for local development
 
+## Tài liệu nguồn
+
+- [PRD, ERD và Business Rules](docs/project-reference/README.md)
+- [Tài liệu API](docs/api/README.md)
+
 ## Run locally
 
 From the repository root:
@@ -26,9 +31,10 @@ Services:
 - Health: http://localhost:8000/health
 - PostgreSQL: localhost:5432, database `scheduler`
 
-The one-shot `db-init` service runs Alembic and imports
+The one-shot `db-init` service runs Alembic, imports
 `SE_CapstoneProject_SP26_ReviewDefense_New.xlsx` when a new database has no application
-data. Restarts skip the import, so existing data is not replaced. Do not edit the old
+data, then loads the deterministic `seed-v1` demo fixture. Restarts skip the Excel
+import and re-apply the idempotent fixture, so existing data is not replaced. Do not edit the old
 `schema.sql` as an operational migration; Alembic migrations are the database source of
 truth.
 

@@ -508,4 +508,4 @@ lý. Nếu nghiệp vụ này được model bằng chính flow `postpone` + `co
 - [`results-reports.md`](results-reports.md) — result, remediation, dashboard, reports, notification, calendar export.
 - [`schemas.md`](schemas.md) — schema chính xác cho mọi request body.
 - [`role-api-matrix.md`](role-api-matrix.md) — bảng endpoint theo role (nguồn cho phần phân quyền ở trên).
-- [`schedule-rule/BusinessRules_CapstoneScheduler_v1.0.md`](schedule-rule/BusinessRules_CapstoneScheduler_v1.0.md) — mã `BR-*`/`H*`/`S*` được trích dẫn trong tài liệu này.
+- [`project-reference/BusinessRules_CapstoneScheduler_v1.0.md`](../project-reference/BusinessRules_CapstoneScheduler_v1.0.md) — mã `BR-*`/`H*`/`S*` được trích dẫn trong tài liệu này.

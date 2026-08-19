@@ -33,7 +33,8 @@ services:
       sh -c "alembic upgrade head &&
       python /app/tools/import_excel_database.py
       /app/SE_CapstoneProject_SP26_ReviewDefense_New.xlsx
-      --skip-if-imported"
+      --skip-if-imported &&
+      python /app/tools/seed_versioned_fixture.py"
 
   api:
     build:
