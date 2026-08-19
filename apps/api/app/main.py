@@ -10,17 +10,26 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from .api_contract import legacy_contract_headers
 from .auth import CurrentUser, get_current_user
 from .config import get_settings
 from .database import get_engine
 from .response_models import HealthResponse, PublicMeResponse
 from .routes.auth_routes import router as auth_router
-from .routes.master_data import router as master_data_router
 from .routes.manager_extensions import router as manager_extensions_router
+from .routes.master_data import router as master_data_router
 from .routes.operations import router as operations_router
 from .routes.results import router as results_router
 from .routes.room_assignment import router as room_assignment_router
 from .routes.schedule_operations import router as schedule_operations_router
+from .routes.target_group_project import router as target_group_project_router
+from .routes.target_operations import router as target_operations_router
+from .routes.target_portals import router as target_portals_router
+from .routes.target_results_remediation import router as target_results_remediation_router
+from .routes.target_room_publish import router as target_room_publish_router
+from .routes.target_round_contract import router as target_round_contract_router
+from .routes.target_schedule_contract import router as target_schedule_contract_router
+from .services.route_telemetry import record_route_usage
 
 
 def create_app() -> FastAPI:
@@ -82,9 +91,24 @@ def create_app() -> FastAPI:
         if settings.app_env not in {"development", "test"}:
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
+
+    @app.middleware("http")
+    async def legacy_contract_headers_middleware(request: Request, call_next):
+        response = await call_next(request)
+        record_route_usage(request.method, request.url.path)
+        for key, value in legacy_contract_headers(request.url.path).items():
+            response.headers.setdefault(key, value)
+        return response
     app.include_router(master_data_router)
     app.include_router(manager_extensions_router)
     app.include_router(schedule_operations_router)
+    app.include_router(target_group_project_router)
+    app.include_router(target_round_contract_router)
+    app.include_router(target_schedule_contract_router)
+    app.include_router(target_room_publish_router)
+    app.include_router(target_operations_router)
+    app.include_router(target_results_remediation_router)
+    app.include_router(target_portals_router)
     app.include_router(results_router)
     app.include_router(room_assignment_router)
     app.include_router(operations_router)

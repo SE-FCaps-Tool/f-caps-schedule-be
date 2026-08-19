@@ -1,5 +1,6 @@
 import pytest
 
+from app.api_contract import ApiDataEnvelope, ApiErrorEnvelope, PaginationMeta
 from app.domain.status_compat import (
     GroupTargetStatus,
     InvitationTargetStatus,
@@ -10,7 +11,6 @@ from app.domain.status_compat import (
     invitation_from_legacy,
     project_from_legacy,
 )
-from app.response_models import ApiDataEnvelope, ApiErrorEnvelope, PaginationMeta
 
 
 @pytest.mark.parametrize(

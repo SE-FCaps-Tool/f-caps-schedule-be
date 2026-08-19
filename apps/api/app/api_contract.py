@@ -11,7 +11,12 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+EnvelopeDataT = TypeVar("EnvelopeDataT")
 
 
 @dataclass(frozen=True)
@@ -125,6 +130,34 @@ def success_payload(data: Any, *, meta: Mapping[str, Any] | None = None) -> dict
     if meta is not None:
         payload["meta"] = dict(meta)
     return payload
+
+
+class PaginationMeta(BaseModel):
+    page: int = 1
+    page_size: int = Field(default=20, alias="pageSize")
+    total: int = 0
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+
+class ApiDataEnvelope(BaseModel, Generic[EnvelopeDataT]):
+    data: EnvelopeDataT
+    meta: PaginationMeta | None = None
+
+
+class ApiErrorBody(BaseModel):
+    code: str
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ApiErrorEnvelope(BaseModel):
+    error: ApiErrorBody
+
+    def __init__(self, *, code: str | None = None, message: str | None = None, details: dict[str, Any] | None = None, **data: Any):
+        if code is not None or message is not None:
+            data["error"] = ApiErrorBody(code=code or "UNKNOWN_ERROR", message=message or "Request failed.", details=details or {})
+        super().__init__(**data)
 
 
 def error_payload(code: str, message: str, *, details: Mapping[str, Any] | None = None) -> dict[str, Any]:
