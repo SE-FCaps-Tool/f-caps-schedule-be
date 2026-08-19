@@ -122,7 +122,7 @@ def list_available_rooms(
             "SELECT r.id, r.code, r.name, r.capacity, r.active, r.room_type "
             "FROM rooms r WHERE r.active = TRUE "
             "AND EXISTS (SELECT 1 FROM round_room_types rrt WHERE rrt.round_id = :round_id AND rrt.room_type = r.room_type) "
-            "AND (:room_type IS NULL OR r.room_type = CAST(:room_type AS room_type))" + interval + " ORDER BY r.code, r.id"
+            "AND (CAST(:room_type AS room_type) IS NULL OR r.room_type = CAST(:room_type AS room_type))" + interval + " ORDER BY r.code, r.id"
         ),
         params,
     ).mappings().all()

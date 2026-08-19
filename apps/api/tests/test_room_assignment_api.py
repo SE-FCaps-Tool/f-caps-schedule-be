@@ -41,6 +41,12 @@ def test_available_rooms_filters_active_allowed_and_true_interval_conflicts(clie
     seeded = client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     assert seeded.status_code in {200, 201}, seeded.text
 
+    without_type = client.get(
+        "/api/v1/rounds/1/rooms/available",
+        headers={"X-Test-Session": "active-manager"},
+    )
+    assert without_type.status_code == 200, without_type.text
+
     response = client.get(
         "/api/v1/rounds/1/rooms/available",
         params={"timeslot_id": 1, "room_type": "NORMAL"},
@@ -112,4 +118,3 @@ def test_apply_rejects_stale_or_global_conflicting_batch_without_partial_updates
             "ROOM_SUGGESTION_STALE",
             "ROOM_ASSIGNMENT_STATE_INVALID",
         }
-

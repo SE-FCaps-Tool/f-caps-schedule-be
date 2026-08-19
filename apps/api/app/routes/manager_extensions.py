@@ -666,7 +666,9 @@ def list_sessions(db: Db, user: User, round_id: int | None = None, version_id: i
             "FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN groups g ON g.id = s.group_id JOIN schedule_assignments sa ON sa.schedule_version_id=s.schedule_version_id AND sa.group_id=s.group_id JOIN projects p ON p.id = sa.project_id "
             "LEFT JOIN rooms rm ON rm.id = s.room_id LEFT JOIN council_members cm ON cm.council_id = s.council_id LEFT JOIN lecturers l ON l.id = cm.lecturer_id LEFT JOIN accounts a ON a.id = l.account_id "
             "WHERE (CAST(:round_id AS BIGINT) IS NULL OR sv.round_id = CAST(:round_id AS BIGINT)) AND (CAST(:version_id AS BIGINT) IS NULL OR s.schedule_version_id = CAST(:version_id AS BIGINT)) AND (CAST(:status_filter AS TEXT) IS NULL OR s.status::text = CAST(:status_filter AS TEXT)) "
-            "GROUP BY s.id, sv.round_id, g.code, p.code, rm.code ORDER BY s.start_at, s.id"
+            "GROUP BY s.id, sa.id, s.schedule_version_id, sv.round_id, s.group_id, g.code, p.code, "
+            "s.timeslot_id, s.room_id, rm.code, s.start_at, s.end_at, s.status "
+            "ORDER BY s.start_at, s.id"
         ),
         {"round_id": round_id, "version_id": version_id, "status_filter": status_filter},
     ).mappings().all()
