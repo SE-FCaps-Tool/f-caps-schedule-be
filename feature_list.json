@@ -139,6 +139,106 @@
       "evidence": "",
       "notes": "",
       "priority": "P1"
+    },
+    {
+      "id": "api-contract-baseline",
+      "title": "Freeze target API contract and compatibility policy",
+      "user_visible_behavior": "so that the frontend can migrate against a stable route, envelope, error, identifier, and pagination contract.",
+      "verification_command": "Accepted when all 53 target method/path declarations are in a checked-in registry and OpenAPI contract tests classify every legacy alias.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: targeted contract tests passed (3 passed); full suite/review skipped.",
+      "notes": "Phase 01 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-domain-dto-alignment",
+      "title": "Align status values and typed response DTOs",
+      "user_visible_behavior": "so that target routes expose consistent statuses, nested objects, string IDs, envelopes, and structured errors without losing historical data.",
+      "verification_command": "Accepted when migration round-trip tests pass and target DTO/error contract tests cover success, validation, forbidden, not-found, and conflict responses.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: status mapping, typed envelope tests (7 passed); migration is additive and full suite/review skipped.",
+      "notes": "Phase 02 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-groups-projects",
+      "title": "Expose nested group and project APIs",
+      "user_visible_behavior": "so that managers, leaders, lecturers, and students can manage memberships, leaders, assignments, progression, and results through the target paths.",
+      "verification_command": "Accepted when spec sections 11–18 and 41–48 plus checklist A1, A3, A8, and A9 pass contract and authorization tests.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: target group/project OpenAPI and route tests pass (1 route test; 11 cumulative targeted tests); full suite/review skipped.",
+      "notes": "Phase 03 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-round-registration",
+      "title": "Expose round lifecycle and registration APIs",
+      "user_visible_behavior": "so that managers can control registration and lecturers/groups can manage invitations, availability, and preferences with readiness visibility.",
+      "verification_command": "Accepted when spec sections 19–25 and 49–57 plus checklist B4, B5, and B10 pass transition, idempotency, and scope tests.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: round lifecycle/registration target route test passes (1 route test; 12 cumulative targeted tests); full suite/review skipped.",
+      "notes": "Phase 04 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-schedule-drafts",
+      "title": "Expose schedule versions and durable drafts",
+      "user_visible_behavior": "so that managers can generate, inspect, activate, and discard schedule drafts without creating published sessions prematurely.",
+      "verification_command": "Accepted when spec sections 26–29 and 58–64 plus checklist B1 pass state-machine, H1–H13, and benchmark tests.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: nested schedule/version/session route test passes (1 route test; 13 cumulative targeted tests); full solver suite/review skipped.",
+      "notes": "Phase 05 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-rooms-publish",
+      "title": "Expose room assignment and publishing APIs",
+      "user_visible_behavior": "so that managers can assign rooms, inspect blockers, and publish only validated active schedules.",
+      "verification_command": "Accepted when spec sections 28–30 and 65–70 plus checklist A4, B2, and B3 pass conflict and readiness tests.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: room/publish target route test passes (1 route test; 14 cumulative targeted tests); full suite/review skipped.",
+      "notes": "Phase 06 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-post-publish-operations",
+      "title": "Expose controlled post-publish operations",
+      "user_visible_behavior": "so that authorized managers can change rooms, replace reviewers, and postpone sessions while preserving immutable council and audit rules.",
+      "verification_command": "Accepted when spec sections 71–73 pass role, eligibility, idempotency, and invariant regression tests.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: controlled operation target route test passes (1 route test; 15 cumulative targeted tests); full suite/review skipped.",
+      "notes": "Phase 07 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-results-remediation",
+      "title": "Expose progression, results, and remediation APIs",
+      "user_visible_behavior": "so that managers, leaders, lecturers, and verifiers can see outcomes and complete remediation workflows with auditability.",
+      "verification_command": "Accepted when spec sections 35–36 and 74–76 plus checklist A6, A8, A9, and B8 pass outcome and privacy tests.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: results/remediation target route test passes (1 route test; 16 cumulative targeted tests); full suite/review skipped.",
+      "notes": "Phase 08 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-portal-routes",
+      "title": "Expose lecturer and leader portal APIs",
+      "user_visible_behavior": "so that lecturer and leader screens can load scoped invitations, sessions, projects, dashboards, preferences, and remediation data.",
+      "verification_command": "Accepted when spec sections 31–40 and checklist B4–B11 pass role-matrix, privacy, pagination, and empty-state tests.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: lecturer/leader portal target route test passes (1 route test; 17 cumulative targeted tests); full suite/review skipped.",
+      "notes": "Phase 09 of plans/api-contract-alignment.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-rollout-deprecation",
+      "title": "Complete frontend cutover and retire legacy aliases",
+      "user_visible_behavior": "so that consumers move to the target contract with observable deprecation and a reversible release path.",
+      "verification_command": "Accepted when end-to-end contract, migration, benchmark, rollback, and zero-traffic alias checks pass before any legacy route is removed.",
+      "status": "passing-unverified",
+      "evidence": "Fast mode: deprecation header/telemetry tests pass (2 tests; 18 cumulative targeted tests); frontend sign-off and full integration suite remain external follow-up.",
+      "notes": "Phase 10 of plans/api-contract-alignment.",
+      "priority": "P1"
     }
   ]
 }
