@@ -15,7 +15,6 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 EnvelopeDataT = TypeVar("EnvelopeDataT")
 
 
