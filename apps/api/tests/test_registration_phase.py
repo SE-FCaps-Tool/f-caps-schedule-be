@@ -47,6 +47,20 @@ def test_registration_phases_are_sequential_at_deadline_boundaries():
     ) is RegistrationPhase.CLOSED
 
 
+def test_manual_lecturer_handoff_opens_group_phase_before_deadline():
+    lecturer_deadline = datetime(2030, 1, 10, tzinfo=UTC)
+    group_deadline = datetime(2030, 1, 12, tzinfo=UTC)
+    now = datetime(2030, 1, 5, tzinfo=UTC)
+
+    assert resolve_registration_phase(
+        round_status="OPEN_REGISTRATION",
+        registration_deadline=lecturer_deadline,
+        group_preference_deadline=group_deadline,
+        lecturer_registration_closed_at=now,
+        now=now,
+    ) is RegistrationPhase.GROUP
+
+
 def test_round_create_requires_group_deadline_after_lecturer_deadline():
     with pytest.raises(ValueError, match="groupPreferenceDeadline must be after registrationDeadline"):
         TargetRoundCreate.model_validate(
@@ -78,6 +92,46 @@ def test_legacy_round_create_enforces_sequential_deadlines():
                 "room_types": ["NORMAL"],
             }
         )
+
+
+@pytest.mark.integration
+def test_manager_can_handoff_open_round_to_group_registration(client):
+    assert client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"}).status_code == 201
+    engine = get_engine(get_settings().database_url)
+    now = datetime.now(UTC)
+    with Session(engine) as db, db.begin():
+        semester_id = db.execute(text("SELECT id FROM semesters WHERE status = 'ACTIVE' ORDER BY id LIMIT 1")).scalar_one()
+        round_id = db.execute(
+            text(
+                "INSERT INTO rounds (semester_id, type, status, reviewer_count, session_duration_minutes, "
+                "group_selection_mode, registration_deadline, group_preference_deadline) "
+                "VALUES (:semester_id, CAST('REVIEW_1' AS round_type), CAST('OPEN_REGISTRATION' AS round_status), "
+                "2, 60, TRUE, :registration_deadline, :group_deadline) RETURNING id"
+            ),
+            {"semester_id": semester_id, "registration_deadline": now + timedelta(hours=2), "group_deadline": now + timedelta(hours=4)},
+        ).scalar_one()
+    try:
+        response = client.post(
+            f"/api/v1/rounds/{round_id}/actions/open-group-registration",
+            headers={"X-Test-Session": "active-manager"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["data"]["registrationPhase"] == "GROUP"
+        detail = client.get(f"/api/v1/rounds/{round_id}", headers={"X-Test-Session": "active-manager"})
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["data"]["registrationPhase"] == "GROUP"
+        closed = client.post(
+            f"/api/v1/rounds/{round_id}/actions/close-registration",
+            headers={"X-Test-Session": "active-manager"},
+        )
+        assert closed.status_code == 200, closed.text
+        assert closed.json()["data"]["status"] == "REGISTRATION_CLOSED"
+        with Session(engine) as db:
+            closed_at = db.execute(text("SELECT lecturer_registration_closed_at FROM rounds WHERE id = :round_id"), {"round_id": round_id}).scalar_one()
+        assert closed_at is not None
+    finally:
+        with Session(engine) as db, db.begin():
+            db.execute(text("DELETE FROM rounds WHERE id = :round_id"), {"round_id": round_id})
 
 
 def test_round_create_rejects_mixed_timezone_deadlines_as_validation_error():

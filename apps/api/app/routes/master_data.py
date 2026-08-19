@@ -78,7 +78,8 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 def registration_phase_for_round(db: Session, round_id: int) -> tuple[dict[str, object], RegistrationPhase]:
     row = db.execute(
         text(
-            "SELECT status::text AS status, registration_deadline, group_preference_deadline, group_selection_mode "
+            "SELECT status::text AS status, registration_deadline, group_preference_deadline, "
+            "group_selection_mode, lecturer_registration_closed_at "
             "FROM rounds WHERE id = :round_id"
         ),
         {"round_id": round_id},
@@ -89,6 +90,7 @@ def registration_phase_for_round(db: Session, round_id: int) -> tuple[dict[str, 
         round_status=row["status"],
         registration_deadline=row["registration_deadline"],
         group_preference_deadline=row["group_preference_deadline"],
+        lecturer_registration_closed_at=row["lecturer_registration_closed_at"],
         now=datetime.now(UTC),
     )
     return dict(row), phase
@@ -510,7 +512,15 @@ def list_semester_projects(
     offset = (page - 1) * page_size
     rows = db.execute(
         text(
-            "SELECT p.id, p.code, p.title, p.status::text AS status, g.id AS group_id, "
+            "SELECT p.id, p.code, p.title, p.status::text AS status, g.id AS group_id, g.code AS group_code, "
+            "(SELECT jsonb_build_object('id', l.id, 'code', l.lecturer_code, 'fullName', a.display_name) "
+            " FROM project_supervisors ps JOIN lecturers l ON l.id = ps.lecturer_id "
+            " JOIN accounts a ON a.id = l.account_id "
+            " WHERE ps.project_id = p.id AND ps.supervisor_type = 'MAIN' LIMIT 1) AS main_supervisor, "
+            "(SELECT jsonb_build_object('id', l.id, 'code', l.lecturer_code, 'fullName', a.display_name) "
+            " FROM project_supervisors ps JOIN lecturers l ON l.id = ps.lecturer_id "
+            " JOIN accounts a ON a.id = l.account_id "
+            " WHERE ps.project_id = p.id AND ps.supervisor_type = 'CO' LIMIT 1) AS co_supervisor, "
             "COUNT(*) OVER() AS total_count "
             "FROM projects p LEFT JOIN groups g ON g.project_id = p.id "
             "WHERE p.semester_id = :semester_id "
@@ -518,7 +528,7 @@ def list_semester_projects(
             "AND (CAST(:status AS text) IS NULL OR p.status::text = CAST(:status AS text)) "
             "AND (CAST(:has_group AS boolean) IS NULL OR (g.id IS NOT NULL) = CAST(:has_group AS boolean)) "
             "AND (CAST(:supervisor_id AS BIGINT) IS NULL OR EXISTS (SELECT 1 FROM project_supervisors ps WHERE ps.project_id = p.id AND ps.lecturer_id = CAST(:supervisor_id AS BIGINT))) "
-            "GROUP BY p.id, g.id ORDER BY p.code LIMIT :limit OFFSET :offset"
+            "GROUP BY p.id, g.id, g.code ORDER BY p.code LIMIT :limit OFFSET :offset"
         ),
         {
             "semester_id": semester_id, "search": search, "status": status_filter,
@@ -532,7 +542,20 @@ def list_semester_projects(
             "id": external_id(row["id"], "prj"),
             "code": row["code"],
             "name": row["title"],
+            "nameVi": row["title"],
             "status": project_from_legacy(row["status"], has_group=row["group_id"] is not None).value,
+            "mainSupervisor": (
+                {**dict(row["main_supervisor"]), "id": external_id(row["main_supervisor"]["id"], "lec")}
+                if row["main_supervisor"] is not None else None
+            ),
+            "coSupervisor": (
+                {**dict(row["co_supervisor"]), "id": external_id(row["co_supervisor"]["id"], "lec")}
+                if row["co_supervisor"] is not None else None
+            ),
+            "group": (
+                {"id": external_id(row["group_id"], "grp"), "code": row["group_code"]}
+                if row["group_id"] is not None else None
+            ),
         }
         for row in rows
     ]
@@ -1238,7 +1261,14 @@ def transition_round_status(round_id: int, payload: RoundTransitionPayload, db: 
                 reviewer_count = counts["accepted_reviewers"] or counts["available_reviewers"]
                 if not counts["groups"] or not counts["timeslots"] or reviewer_count < row["reviewer_count"]:
                     raise DomainError("ROUND_INPUTS_INCOMPLETE", "Round needs groups, timeslots and enough available Reviewers before scheduling.")
-            db.execute(text("UPDATE rounds SET status = CAST(:status AS round_status) WHERE id = :round_id"), {"status": after.value, "round_id": round_id})
+            db.execute(
+                text(
+                    "UPDATE rounds SET status = CAST(:status AS round_status), "
+                    "lecturer_registration_closed_at = CASE WHEN :status = 'OPEN_REGISTRATION' "
+                    "THEN NULL ELSE lecturer_registration_closed_at END WHERE id = :round_id"
+                ),
+                {"status": after.value, "round_id": round_id},
+            )
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, before_json, after_json) VALUES (:actor_id, 'ROUND_TRANSITION', 'round', :entity_id, :reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(round_id), "reason": payload.reason, "before_json": _json({"status": before.value}), "after_json": _json({"status": after.value})})
     except (DomainError, ValueError) as exc:
         code = getattr(exc, "code", "ROUND_STATUS_INVALID")

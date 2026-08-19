@@ -337,9 +337,10 @@ gửi `{"timeslotIds": []}` sẽ xóa toàn bộ lựa chọn. Chỉ ID của ti
 `active=true` và thuộc Round được chấp nhận; gửi ID ngoài tập này trả
 `422 AVAILABILITY_SLOT_INVALID` và không lưu một phần request.
 
-Trong thay đổi hiện tại, BE chưa lọc slot theo supervisor, COI hoặc số reviewer
-khả dụng. FE hiển thị danh sách timeslot BE trả về và không tự tính các điều kiện
-này.
+Khi đọc preference với tư cách Student, BE loại các slot mà supervisor chính hoặc
+đồng hướng dẫn của chính nhóm đã chọn `AVAILABLE`. BE chưa lọc thêm theo COI hoặc
+số reviewer khả dụng. FE hiển thị danh sách timeslot còn lại BE trả về và không tự
+tính các điều kiện này. Manager/Admin vẫn có thể xem toàn bộ slot để quản trị.
 
 ## 7. Lecturer Invitations
 

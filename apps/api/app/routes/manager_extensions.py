@@ -16,18 +16,19 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api_contract import success_payload
+from app.api_contract import parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
 from app.database import get_db
 from app.domain.errors import DomainError
 from app.domain.master_data import normalize_code
 from app.domain.round_setup import validate_round_configuration
+from app.domain.registration_phase import resolve_registration_phase
 from app.response_models import (
     ActionResponse,
     GroupDetailResponse,
@@ -82,8 +83,13 @@ def _json(value: Any) -> str:
 
 
 class ProjectUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     code: str | None = Field(default=None, min_length=1, max_length=64)
     title: str | None = Field(default=None, min_length=1, max_length=255)
+    name_vi: str | None = Field(default=None, alias="nameVi", min_length=1, max_length=255)
+    name_en: str | None = Field(default=None, alias="nameEn", max_length=255)
+    main_supervisor_id: str | int | None = Field(default=None, alias="mainSupervisorId")
+    co_supervisor_id: str | int | None = Field(default=None, alias="coSupervisorId")
     supervisors: list[str] | None = None
 
 
@@ -279,6 +285,14 @@ def _round_detail_payload(raw: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
+    registration_phase = resolve_registration_phase(
+        round_status=str(raw["status"]),
+        registration_deadline=raw["registration_deadline"],
+        group_preference_deadline=raw["group_preference_deadline"],
+        lecturer_registration_closed_at=raw.get("lecturer_registration_closed_at"),
+        now=datetime.now(UTC),
+    )
+
     return success_payload(
         {
             "id": str(raw["id"]),
@@ -293,6 +307,7 @@ def _round_detail_payload(raw: dict[str, Any]) -> dict[str, Any]:
             "registration_deadline": raw["registration_deadline"],
             "group_selection_mode": raw["group_selection_mode"],
             "group_preference_deadline": raw["group_preference_deadline"],
+            "registration_phase": registration_phase.value,
             "result_owner_mode": raw["result_owner_mode"],
             "room_types": raw["room_types"],
             "days": list(days_by_date.values()),
@@ -349,9 +364,36 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
 
 
 @router.patch("/projects/{project_id}", response_model=ProjectMutationResponse)
-def update_project(project_id: int, payload: ProjectUpdate, db: Db, user: User) -> dict[str, Any]:
+def update_project(project_id: str, payload: ProjectUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
+    try:
+        project_id = parse_external_id(project_id, prefix="prj")
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "VALIDATION_ERROR", "message": "project_id must be a valid project identifier."},
+        ) from exc
     values = payload.model_dump(exclude_unset=True)
+    target_supervisor_update = "main_supervisor_id" in values or "co_supervisor_id" in values
+    target_supervisors: list[tuple[int, str]] | None = None
+    if target_supervisor_update:
+        main_id = values.pop("main_supervisor_id", None)
+        co_id = values.pop("co_supervisor_id", None)
+        if main_id is None:
+            raise HTTPException(status_code=422, detail={"code": "SUPERVISOR_INVALID", "message": "mainSupervisorId is required."})
+        try:
+            main_db_id = parse_external_id(main_id, prefix="lec")
+            co_db_id = parse_external_id(co_id, prefix="lec") if co_id is not None else None
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail={"code": "SUPERVISOR_INVALID", "message": "Supervisor identifier is invalid."}) from exc
+        if co_db_id is not None and co_db_id == main_db_id:
+            raise HTTPException(status_code=422, detail={"code": "SUPERVISOR_INVALID", "message": "mainSupervisorId and coSupervisorId must differ."})
+        target_supervisors = [(main_db_id, "MAIN")]
+        if co_db_id is not None:
+            target_supervisors.append((co_db_id, "CO"))
+    if "name_vi" in values:
+        values["title"] = values.pop("name_vi")
+    values.pop("name_en", None)
     try:
         with db.begin():
             row = db.execute(text("SELECT id, code, title, semester_id FROM projects WHERE id = :id FOR UPDATE"), {"id": project_id}).mappings().one_or_none()
@@ -363,13 +405,25 @@ def update_project(project_id: int, payload: ProjectUpdate, db: Db, user: User) 
                 assignments = ", ".join(f"{key} = :{key}" for key in scalar)
                 scalar["id"] = project_id
                 db.execute(text(f"UPDATE projects SET {assignments} WHERE id = :id"), scalar)
-            if "supervisors" in values:
+            if target_supervisor_update or "supervisors" in values:
                 db.execute(text("DELETE FROM project_supervisors WHERE project_id = :id"), {"id": project_id})
-                for assignment in values["supervisors"] or []:
-                    code, _, supervisor_type = assignment.partition(":")
-                    lecturer_id = db.execute(text("SELECT id FROM lecturers WHERE lecturer_code = :code"), {"code": code.strip().upper()}).scalar_one_or_none()
-                    if lecturer_id is None or supervisor_type not in {"MAIN", "CO"}:
-                        raise HTTPException(status_code=422, detail={"code": "SUPERVISOR_INVALID", "message": "Supervisor code/type is invalid."})
+                if target_supervisor_update:
+                    assignments = target_supervisors or []
+                else:
+                    assignments = []
+                    for assignment in values["supervisors"] or []:
+                        code, _, supervisor_type = assignment.partition(":")
+                        lecturer_id = db.execute(text("SELECT id FROM lecturers WHERE lecturer_code = :code"), {"code": code.strip().upper()}).scalar_one_or_none()
+                        if lecturer_id is None or supervisor_type.strip().upper() not in {"MAIN", "CO"}:
+                            raise HTTPException(status_code=422, detail={"code": "SUPERVISOR_INVALID", "message": "Supervisor code/type is invalid."})
+                        assignments.append((lecturer_id, supervisor_type.strip().upper()))
+                existing_lecturers = db.execute(
+                    text("SELECT id FROM lecturers WHERE id = ANY(:ids)"),
+                    {"ids": [lecturer_id for lecturer_id, _ in assignments]},
+                ).scalars().all()
+                if set(existing_lecturers) != {lecturer_id for lecturer_id, _ in assignments}:
+                    raise HTTPException(status_code=422, detail={"code": "SUPERVISOR_INVALID", "message": "One or more supervisors do not exist."})
+                for lecturer_id, supervisor_type in assignments:
                     db.execute(text("INSERT INTO project_supervisors (project_id, lecturer_id, supervisor_type) VALUES (:project_id, :lecturer_id, CAST(:type AS supervisor_type))"), {"project_id": project_id, "lecturer_id": lecturer_id, "type": supervisor_type})
     except IntegrityError as exc:
         db.rollback()

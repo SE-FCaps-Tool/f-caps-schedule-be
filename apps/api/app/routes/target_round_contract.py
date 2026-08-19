@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.api_contract import external_id, parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
-from app.domain.registration_phase import RegistrationPhase
+from app.domain.registration_phase import RegistrationPhase, resolve_registration_phase
 from app.routes.manager_extensions import resend_invitation
 from app.routes.master_data import (
     AvailabilitySubmit,
@@ -299,19 +299,63 @@ def scheduling_readiness(round_id: int, db: Db, user: User) -> dict[str, Any]:
     return success_payload({"ready": not blockers, "blockers": blockers, **dict(row)})
 
 
-def _transition(round_id: int, target_status: str, payload: RegistrationAction, db: Session, user: CurrentUser) -> dict[str, Any]:
+def _transition(
+    round_id: int,
+    target_status: str,
+    payload: RegistrationAction | None,
+    db: Session,
+    user: CurrentUser,
+) -> dict[str, Any]:
     _manager(user)
-    transition = RoundTransitionPayload(target_status=target_status, reason=payload.reason)
+    transition = RoundTransitionPayload(target_status=target_status, reason=payload.reason if payload else None)
     return success_payload(transition_round_status(round_id, transition, db, user))
 
 
 @router.post("/rounds/{round_id}/actions/open-registration")
-def open_registration(round_id: int, payload: RegistrationAction, db: Db, user: User) -> dict[str, Any]:
+def open_registration(round_id: int, db: Db, user: User, payload: RegistrationAction | None = None) -> dict[str, Any]:
     return _transition(round_id, "OPEN_REGISTRATION", payload, db, user)
 
 
+@router.post("/rounds/{round_id}/actions/open-group-registration")
+def open_group_registration(round_id: int, db: Db, user: User) -> dict[str, Any]:
+    """Manually hand the open round from lecturer availability to student preferences."""
+
+    _manager(user)
+    with db.begin():
+        row = db.execute(
+            text(
+                "SELECT status::text AS status, group_selection_mode, registration_deadline, "
+                "group_preference_deadline, lecturer_registration_closed_at "
+                "FROM rounds WHERE id = :round_id FOR UPDATE"
+            ),
+            {"round_id": round_id},
+        ).mappings().one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
+        if row["status"] != "OPEN_REGISTRATION":
+            raise HTTPException(status_code=409, detail={"code": "ROUND_STATUS_INVALID", "message": "Round must be OPEN_REGISTRATION."})
+        if not row["group_selection_mode"]:
+            raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
+        if row["group_preference_deadline"] is None:
+            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "groupPreferenceDeadline is required."})
+        phase = resolve_registration_phase(
+            round_status=row["status"],
+            registration_deadline=row["registration_deadline"],
+            group_preference_deadline=row["group_preference_deadline"],
+            lecturer_registration_closed_at=row["lecturer_registration_closed_at"],
+            now=datetime.now(ZoneInfo("UTC")),
+        )
+        if phase is RegistrationPhase.CLOSED:
+            raise HTTPException(status_code=409, detail={"code": "REGISTRATION_CLOSED", "message": "The group preference deadline has passed."})
+        db.execute(
+            text("UPDATE rounds SET lecturer_registration_closed_at = COALESCE(lecturer_registration_closed_at, now()) WHERE id = :round_id"),
+            {"round_id": round_id},
+        )
+    return success_payload({"roundId": external_id(round_id, "rnd"), "status": "OPEN_REGISTRATION", "registrationPhase": "GROUP"})
+
+
 @router.post("/rounds/{round_id}/actions/close-registration")
-def close_registration(round_id: int, payload: RegistrationAction, db: Db, user: User) -> dict[str, Any]:
+def close_registration(round_id: int, db: Db, user: User, payload: RegistrationAction | None = None) -> dict[str, Any]:
     return _transition(round_id, "REGISTRATION_CLOSED", payload, db, user)
 
 
@@ -379,12 +423,27 @@ def get_group_preferences(round_id: int, group_id: int, db: Db, user: User) -> d
         round_row = require_registration_phase(db, round_id, RegistrationPhase.GROUP)
         if not round_row["group_selection_mode"]:
             raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
+    supervisor_slot_filter = ""
+    if user.role == "STUDENT":
+        supervisor_slot_filter = (
+            " AND NOT EXISTS ("
+            "SELECT 1 FROM groups supervisor_group "
+            "JOIN project_supervisors ps ON ps.project_id = supervisor_group.project_id "
+            "JOIN lecturer_availabilities la ON la.lecturer_id = ps.lecturer_id "
+            " AND la.round_id = :round_id AND la.timeslot_id = ts.id "
+            " AND la.state = 'AVAILABLE' "
+            "WHERE supervisor_group.id = :group_id "
+            " AND ps.supervisor_type IN ('MAIN', 'CO')"
+            ")"
+        )
     rows = db.execute(
         text(
             "SELECT ts.id AS timeslot_id, ts.start_at, ts.end_at, gsp.selected, gsp.source "
             "FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id "
             "LEFT JOIN group_slot_preferences gsp ON gsp.timeslot_id = ts.id AND gsp.round_id = :round_id AND gsp.group_id = :group_id "
-            "WHERE rd.round_id = :round_id AND ts.active = TRUE ORDER BY ts.start_at"
+            "WHERE rd.round_id = :round_id AND ts.active = TRUE"
+            + supervisor_slot_filter
+            + " ORDER BY ts.start_at"
         ),
         {"round_id": round_id, "group_id": group_id},
     ).mappings().all()

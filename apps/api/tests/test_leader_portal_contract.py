@@ -10,11 +10,13 @@ from app.config import get_settings
 from app.database import get_engine
 from app.routes.master_data import submit_group_availability
 from app.routes.target_portals import leader_dashboard
+from app.routes.target_round_contract import get_group_preferences
 
 
 def test_leader_contract_queries_lock_replacement_and_ignore_cancelled_sessions():
     dashboard_source = getsource(leader_dashboard)
     preference_source = getsource(submit_group_availability)
+    group_preferences_source = getsource(get_group_preferences)
 
     assert "(sem.status::text = 'ACTIVE') DESC NULLS LAST" in dashboard_source
     assert "r.status::text = 'OPEN_REGISTRATION'" in dashboard_source
@@ -22,6 +24,8 @@ def test_leader_contract_queries_lock_replacement_and_ignore_cancelled_sessions(
     assert "FROM round_groups" in preference_source
     assert "FOR UPDATE" in preference_source
     assert preference_source.index("FOR UPDATE") < preference_source.index("DELETE FROM group_slot_preferences")
+    assert "lecturer_availabilities" in group_preferences_source
+    assert "supervisor_type IN ('MAIN', 'CO')" in group_preferences_source
 
 
 @pytest.mark.integration
@@ -100,7 +104,7 @@ def test_leader_dashboard_uses_singular_nullable_fe_contract(client):
                 "VALUES (:semester_id, 'Portal Review', 'REVIEW_1', 'OPEN_REGISTRATION', 2, 60, TRUE, "
                 ":lecturer_deadline, :group_deadline) RETURNING id"
             ),
-            {"semester_id": semester_id, "lecturer_deadline": deadline - timedelta(days=1), "group_deadline": deadline},
+            {"semester_id": semester_id, "lecturer_deadline": datetime.now(UTC) - timedelta(minutes=1), "group_deadline": deadline},
         ).scalar_one()
         db.execute(
             text("INSERT INTO round_groups (round_id, group_id) VALUES (:round_id, :group_id)"),
@@ -117,6 +121,13 @@ def test_leader_dashboard_uses_singular_nullable_fe_contract(client):
             ),
             {"day_id": day_id, "start": deadline + timedelta(days=1), "end": deadline + timedelta(days=1, hours=1)},
         ).scalar_one()
+        db.execute(
+            text(
+                "INSERT INTO lecturer_availabilities (round_id, lecturer_id, timeslot_id, state) "
+                "VALUES (:round_id, :lecturer_id, :timeslot_id, 'AVAILABLE')"
+            ),
+            {"round_id": round_id, "lecturer_id": lecturer_id, "timeslot_id": preference_slot_id},
+        )
 
     try:
         empty = client.get(
@@ -171,6 +182,13 @@ def test_leader_dashboard_uses_singular_nullable_fe_contract(client):
         }
         assert data["preferenceStatus"] == "PENDING"
         assert data["deadline"] == deadline.isoformat().replace("+00:00", "Z")
+
+        preferences = client.get(
+            f"/api/v1/rounds/{round_id}/groups/{group_id}/preferences",
+            headers={"X-Test-Session": f"active-student:{leader_account_id}"},
+        )
+        assert preferences.status_code == 200, preferences.text
+        assert preferences.json()["data"]["timeslots"] == []
 
         with Session(engine) as db, db.begin():
             db.execute(
