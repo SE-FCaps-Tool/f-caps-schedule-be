@@ -64,7 +64,7 @@ backend contract hoàn chỉnh, đủ để FE tích hợp ngay sau khi API đư
 - [ ] Search/status/academic-year filters return only matching rows and can be combined.
 - [ ] Detail, create, patch, close, and set-current endpoints have passing API tests for success, 404, validation, permission, duplicate, and concurrent-active cases.
 - [ ] Database migration leaves enum values exactly `ACTIVE,CLOSED` and at most one active semester.
-- [ ] `docker compose up --build` completes `db-init` and seed data without any `UPCOMING` rows.
+- [ ] `docker compose up --build` completes the API/worker bootstrap and seed data without any `UPCOMING` rows.
 
 ## Out of Scope
 

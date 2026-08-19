@@ -17,25 +17,6 @@ services:
       timeout: 5s
       retries: 10
 
-  db-init:
-    build:
-      context: .
-      dockerfile: infra/docker/api.Dockerfile
-    environment:
-      APP_ENV: development
-      DATABASE_URL: postgresql+psycopg://scheduler:scheduler@postgres:5432/scheduler
-    volumes:
-      - ./apps/api:/app/apps/api
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: >-
-      sh -c "alembic upgrade head &&
-      python /app/tools/import_excel_database.py
-      /app/SE_CapstoneProject_SP26_ReviewDefense_New.xlsx
-      --skip-if-imported &&
-      python /app/tools/seed_versioned_fixture.py"
-
   api:
     build:
       context: .
@@ -48,9 +29,11 @@ services:
     volumes:
       - ./apps/api:/app/apps/api
     depends_on:
-      db-init:
-        condition: service_completed_successfully
-    command: sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      postgres:
+        condition: service_healthy
+    command: >-
+      sh -c "python /app/tools/bootstrap_database.py &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   worker:
     build:
@@ -62,9 +45,11 @@ services:
     volumes:
       - ./apps/api:/app/apps/api
     depends_on:
-      db-init:
-        condition: service_completed_successfully
-    command: sh -c "python -m app.worker"
+      postgres:
+        condition: service_healthy
+    command: >-
+      sh -c "python /app/tools/bootstrap_database.py &&
+      python -m app.worker"
 
 volumes:
   postgres_data:

@@ -275,8 +275,8 @@ Response `201 Created`:
 
 Nếu fixture không hợp lệ, trả `422 SEED_INVALID`.
 
-Trong Docker bootstrap, dữ liệu Excel được nạp bởi `db-init`; endpoint này là fixture
-API riêng và không thay thế quy trình import Excel.
+Trong Docker bootstrap, dữ liệu Excel được nạp bởi script bootstrap dùng chung của
+API/worker; endpoint này là fixture API riêng và không thay thế quy trình import Excel.
 
 ## 5. Tạo lecturer
 

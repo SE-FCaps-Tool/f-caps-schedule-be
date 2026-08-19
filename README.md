@@ -31,7 +31,7 @@ Services:
 - Health: http://localhost:8000/health
 - PostgreSQL: localhost:5432, database `scheduler`
 
-The one-shot `db-init` service runs Alembic, imports
+API and worker startup run a locked bootstrap that applies Alembic, imports
 `SE_CapstoneProject_SP26_ReviewDefense_New.xlsx` when a new database has no application
 data, then loads the deterministic `seed-v1` demo fixture. Restarts skip the Excel
 import and re-apply the idempotent fixture, so existing data is not replaced. Do not edit the old

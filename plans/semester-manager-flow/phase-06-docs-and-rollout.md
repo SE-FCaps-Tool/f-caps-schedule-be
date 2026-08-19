@@ -6,8 +6,8 @@
   `manager-fe-flow.md`, `semester-lifecycle-update.md`, and seed documentation.
 - Document response counts, actor objects, filters, academic-year derivation,
   active-create conflict, close, and set-current behavior.
-- Build the image and run `db-init` so migration and both Excel/seed-v1 sources
-  complete without `UPCOMING` data.
+- Build the image and start API/worker bootstrap so migration and both
+  Excel/seed-v1 sources complete without `UPCOMING` data.
 
 ## Acceptance
 
