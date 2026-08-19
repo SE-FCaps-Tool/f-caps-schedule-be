@@ -2,7 +2,9 @@ import hashlib
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -10,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .api_contract import legacy_contract_headers
+from .api_contract import error_payload, legacy_contract_headers
 from .auth import CurrentUser, get_current_user
 from .config import get_settings
 from .database import get_engine
@@ -30,6 +32,19 @@ from .routes.target_room_publish import router as target_room_publish_router
 from .routes.target_round_contract import router as target_round_contract_router
 from .routes.target_schedule_contract import router as target_schedule_contract_router
 from .services.route_telemetry import record_route_usage
+
+
+def _is_target_route(request: Request) -> bool:
+    """True when the matched route belongs to a ``target_*`` contract router.
+
+    Legacy routes keep their existing ``{"detail": ...}`` error shape during
+    the migration (see plan.md's compatibility policy); only routes tagged
+    ``target-*`` switch to the spec's ``{"error": {...}}`` envelope.
+    """
+
+    route = request.scope.get("route")
+    tags = getattr(route, "tags", None) or []
+    return any(str(tag).startswith("target-") for tag in tags)
 
 
 def create_app() -> FastAPI:
@@ -113,6 +128,39 @@ def create_app() -> FastAPI:
     app.include_router(room_assignment_router)
     app.include_router(operations_router)
     app.include_router(auth_router)
+
+    @app.exception_handler(HTTPException)
+    async def _target_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        if not _is_target_route(request):
+            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
+        detail = exc.detail
+        if isinstance(detail, dict):
+            code = str(detail.get("code", "HTTP_ERROR"))
+            message = str(detail.get("message", code))
+            raw_details = detail.get("details")
+            details = raw_details if isinstance(raw_details, dict) else {}
+        else:
+            code = "HTTP_ERROR"
+            message = str(detail)
+            details = {}
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=error_payload(code, message, details=details),
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def _target_validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        if not _is_target_route(request):
+            return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
+        return JSONResponse(
+            status_code=422,
+            content=error_payload(
+                "VALIDATION_ERROR",
+                "Request validation failed.",
+                details={"errors": jsonable_encoder(exc.errors())},
+            ),
+        )
 
     @app.get("/health", tags=["system"], response_model=HealthResponse)
     def health() -> dict[str, str]:

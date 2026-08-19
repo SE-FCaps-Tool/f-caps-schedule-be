@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api_contract import external_id, parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
 from app.database import get_db
@@ -22,7 +23,37 @@ from app.domain.master_data import (
 )
 from app.domain.round_setup import validate_round_configuration
 from app.domain.seed import seed_fixture_v1
+from app.domain.status_compat import project_from_legacy
 from app.domain.transitions import transition_round
+from app.response_models import (
+    AccountResponse,
+    AccountRoleResponse,
+    ActionResponse,
+    AuditResponse,
+    AvailabilityWriteResponse,
+    ConflictResponse,
+    DropoutResponse,
+    GroupMutationResponse,
+    GroupResponse,
+    InvitationActionResponse,
+    InvitationCreateResponse,
+    LeaderChangeResponse,
+    LecturerResponse,
+    MajorResponse,
+    MyAvailabilityResponse,
+    MyInvitationResponse,
+    MyRoundResponse,
+    ProjectMutationResponse,
+    ProjectResponse,
+    RegistrationResponse,
+    RoomResponse,
+    RoundDayCreateResponse,
+    RoundResourceResponse,
+    RoundResponse,
+    SeedFixtureResponse,
+    SemesterResponse,
+    StudentResponse,
+)
 from app.services.access import (
     is_active_group_leader,
     lecturer_id_for_account,
@@ -36,36 +67,6 @@ from app.services.semester_queries import (
     ensure_semester_writable,
     semester_or_404,
     semester_rows,
-)
-from app.response_models import (
-    AccountResponse,
-    AccountRoleResponse,
-    ActionResponse,
-    AuditResponse,
-    AvailabilityResponse,
-    AvailabilityWriteResponse,
-    ConflictResponse,
-    DropoutResponse,
-    GroupMutationResponse,
-    GroupResponse,
-    InvitationActionResponse,
-    InvitationCreateResponse,
-    LeaderChangeResponse,
-    LecturerResponse,
-    MajorResponse,
-    MyInvitationResponse,
-    MyAvailabilityResponse,
-    MyRoundResponse,
-    ProjectMutationResponse,
-    RegistrationResponse,
-    RoundDayCreateResponse,
-    ProjectResponse,
-    RoomResponse,
-    RoundResourceResponse,
-    RoundResponse,
-    SemesterResponse,
-    SeedFixtureResponse,
-    StudentResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["management"])
@@ -444,11 +445,51 @@ def list_projects(db: Db, user: User, semester_id: int | None = None) -> list[di
     return [dict(row) for row in rows]
 
 
-@router.get("/semesters/{semester_id}/projects", response_model=list[ProjectResponse])
-def list_projects_for_semester(semester_id: int, db: Db, user: User) -> list[dict[str, object]]:
+@router.get("/semesters/{semester_id}/projects", tags=["target-groups-projects"])
+def list_semester_projects(
+    semester_id: int,
+    db: Db,
+    user: User,
+    search: str | None = None,
+    status_filter: str | None = Query(default=None, alias="status"),
+    supervisor_id: str | int | None = Query(default=None, alias="supervisorId"),
+    has_group: bool | None = Query(default=None, alias="hasGroup"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
+) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     semester_or_404(db, semester_id)
-    return list_projects(db, user, semester_id=semester_id)
+    supervisor_db_id = parse_external_id(supervisor_id, prefix="lec") if supervisor_id is not None else None
+    offset = (page - 1) * page_size
+    rows = db.execute(
+        text(
+            "SELECT p.id, p.code, p.title, p.status::text AS status, g.id AS group_id, "
+            "COUNT(*) OVER() AS total_count "
+            "FROM projects p LEFT JOIN groups g ON g.project_id = p.id "
+            "WHERE p.semester_id = :semester_id "
+            "AND (CAST(:search AS text) IS NULL OR p.code ILIKE '%' || CAST(:search AS text) || '%' OR p.title ILIKE '%' || CAST(:search AS text) || '%') "
+            "AND (CAST(:status AS text) IS NULL OR p.status::text = CAST(:status AS text)) "
+            "AND (CAST(:has_group AS boolean) IS NULL OR (g.id IS NOT NULL) = CAST(:has_group AS boolean)) "
+            "AND (CAST(:supervisor_id AS BIGINT) IS NULL OR EXISTS (SELECT 1 FROM project_supervisors ps WHERE ps.project_id = p.id AND ps.lecturer_id = CAST(:supervisor_id AS BIGINT))) "
+            "GROUP BY p.id, g.id ORDER BY p.code LIMIT :limit OFFSET :offset"
+        ),
+        {
+            "semester_id": semester_id, "search": search, "status": status_filter,
+            "has_group": has_group, "supervisor_id": supervisor_db_id,
+            "limit": page_size, "offset": offset,
+        },
+    ).mappings().all()
+    total = rows[0]["total_count"] if rows else 0
+    items = [
+        {
+            "id": external_id(row["id"], "prj"),
+            "code": row["code"],
+            "name": row["title"],
+            "status": project_from_legacy(row["status"], has_group=row["group_id"] is not None).value,
+        }
+        for row in rows
+    ]
+    return success_payload(items, meta={"page": page, "pageSize": page_size, "total": total})
 
 
 @router.get("/lecturers", response_model=list[LecturerResponse])

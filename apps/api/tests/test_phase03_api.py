@@ -207,11 +207,11 @@ def test_semester_projects_lists_scoped_projects_and_rejects_unknown_semester(cl
 
     listed = client.get(f"/api/v1/semesters/{semester_id}/projects", headers=headers)
     assert listed.status_code == 200, listed.text
-    assert any(item["id"] == project.json()["id"] for item in listed.json())
+    assert any(item["id"] == f"prj_{project.json()['id']}" for item in listed.json()["data"])
 
     missing = client.get("/api/v1/semesters/999999/projects", headers=headers)
     assert missing.status_code == 404
-    assert missing.json()["detail"]["code"] == "SEMESTER_NOT_FOUND"
+    assert missing.json()["error"]["code"] == "SEMESTER_NOT_FOUND"
 
     forbidden = client.get(
         f"/api/v1/semesters/{semester_id}/projects",

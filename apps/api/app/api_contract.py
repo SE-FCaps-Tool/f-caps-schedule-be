@@ -174,12 +174,37 @@ CHECKLIST_OPERATIONS: tuple[ApiOperation, ...] = (
 )
 
 
-def success_payload(data: Any, *, meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """Return the target success envelope without mutating ``data`` or ``meta``."""
+def _camel_case_key(key: str) -> str:
+    if "_" not in key:
+        return key
+    head, *rest = key.split("_")
+    return head + "".join(word[:1].upper() + word[1:] for word in rest if word)
 
-    payload: dict[str, Any] = {"data": data}
+
+def camelize(value: Any) -> Any:
+    """Recursively convert snake_case dict keys to camelCase.
+
+    Target routes build response bodies from legacy snake_case SQL rows and
+    domain dicts; this is the single conversion point so individual routes
+    don't have to hand-rename every field to match the spec's camelCase
+    convention.
+    """
+
+    if isinstance(value, Mapping):
+        return {_camel_case_key(k) if isinstance(k, str) else k: camelize(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [camelize(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(camelize(item) for item in value)
+    return value
+
+
+def success_payload(data: Any, *, meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Return the target success envelope with camelCase field names."""
+
+    payload: dict[str, Any] = {"data": camelize(data)}
     if meta is not None:
-        payload["meta"] = dict(meta)
+        payload["meta"] = camelize(dict(meta))
     return payload
 
 

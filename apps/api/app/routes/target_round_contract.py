@@ -31,11 +31,15 @@ from app.routes.master_data import (
     submit_lecturer_availability,
     transition_round_status,
 )
+from app.scheduler.validator import _eligible
 from app.services.access import lecturer_id_for_account
 
 router = APIRouter(prefix="/api/v1", tags=["target-rounds"])
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
+
+# BR-STU-03: a group under this size only produces a warning, never a block.
+MIN_RECOMMENDED_MEMBERS = 4
 
 
 class RegistrationAction(BaseModel):
@@ -205,17 +209,57 @@ def create_semester_round(semester_id: int, payload: TargetRoundCreate, db: Db, 
 @router.get("/rounds/{round_id}/eligible-projects")
 def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
     _manager(user)
+    round_row = db.execute(text("SELECT type::text AS type FROM rounds WHERE id = :id"), {"id": round_id}).mappings().one_or_none()
+    if round_row is None:
+        raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
     rows = db.execute(
         text(
-            "SELECT p.id, p.code, p.title, p.status::text AS status, p.semester_id "
+            "SELECT p.id AS project_id, g.id AS group_id, g.status::text AS group_status, "
+            "EXISTS (SELECT 1 FROM group_memberships gm WHERE gm.group_id = g.id AND gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS has_active_leader, "
+            "EXISTS (SELECT 1 FROM project_supervisors ps WHERE ps.project_id = p.id AND ps.supervisor_type = 'MAIN') AS has_main_supervisor, "
+            "(SELECT COUNT(*) FROM group_memberships gm WHERE gm.group_id = g.id AND gm.status = 'ACTIVE') AS active_member_count "
             "FROM projects p JOIN rounds r ON r.semester_id = p.semester_id "
+            "LEFT JOIN groups g ON g.project_id = p.id "
             "WHERE r.id = :round_id AND p.status::text <> 'ARCHIVED' "
-            "AND NOT EXISTS (SELECT 1 FROM round_groups rg JOIN groups g ON g.id = rg.group_id WHERE rg.round_id = :round_id AND g.project_id = p.id) "
+            "AND NOT EXISTS (SELECT 1 FROM round_groups rg WHERE rg.round_id = :round_id AND rg.group_id = g.id) "
             "ORDER BY p.code"
         ),
         {"round_id": round_id},
     ).mappings().all()
-    return success_payload([dict(row) for row in rows], meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
+    round_type = round_row["type"]
+    items = []
+    for row in rows:
+        has_group = row["group_id"] is not None
+        has_active_leader = bool(row["has_active_leader"]) if has_group else False
+        has_main_supervisor = bool(row["has_main_supervisor"])
+        progression_allowed = has_group and _eligible(round_type, row["group_status"] or "")
+        eligible = has_group and has_active_leader and has_main_supervisor and progression_allowed
+        blocking_reasons = []
+        if not has_group:
+            blocking_reasons.append("No Group")
+        if has_group and not has_active_leader:
+            blocking_reasons.append("No Active Leader")
+        if not has_main_supervisor:
+            blocking_reasons.append("No Main Supervisor")
+        if has_group and not progression_allowed:
+            blocking_reasons.append("Progression incompatible")
+        warnings = []
+        if has_group and (row["active_member_count"] or 0) < MIN_RECOMMENDED_MEMBERS:
+            warnings.append({"code": "MEMBER_COUNT_BELOW_MIN", "message": "Group has fewer than recommended members."})
+        items.append({
+            "projectId": external_id(row["project_id"], "prj"),
+            "groupId": external_id(row["group_id"], "grp") if has_group else None,
+            "eligible": eligible,
+            "checks": {
+                "hasGroup": has_group,
+                "hasActiveLeader": has_active_leader,
+                "hasMainSupervisor": has_main_supervisor,
+                "progressionAllowed": progression_allowed,
+            },
+            "blockingReasons": blocking_reasons,
+            "warnings": warnings,
+        })
+    return success_payload(items, meta={"page": 1, "pageSize": len(items), "total": len(items)})
 
 
 @router.get("/rounds/{round_id}/registration-summary")
