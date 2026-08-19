@@ -17,7 +17,11 @@ def test_manager_operations_and_report_surfaces_have_provenance(client):
 
     dashboard = client.get("/api/v1/dashboard", headers=headers)
     assert dashboard.status_code == 200, dashboard.text
-    assert {"availability", "groups", "lecturer_load", "attention_groups"}.issubset(dashboard.json())
+    assert {"current_semester", "availability", "groups", "lecturer_load", "attention_groups"}.issubset(dashboard.json())
+    current_semester = dashboard.json()["current_semester"]
+    assert current_semester is not None
+    assert current_semester["status"] == "ACTIVE"
+    assert {"id", "code", "name", "status"} <= current_semester.keys()
 
     for path in ("/api/v1/reports/lecturer-load", "/api/v1/reports/quality", "/api/v1/reports/remediation", "/api/v1/reports/outcomes"):
         response = client.get(path, headers=headers)
@@ -74,6 +78,7 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
             "semester_id": semester_id,
             "type": "DEFENSE_1_1",
             "reviewer_count": 3,
+            "room_types": ["NORMAL"],
             "result_owner_mode": True,
             "group_selection_mode": True,
             "session_duration_minutes": 30,
@@ -158,7 +163,7 @@ def test_worker_creates_availability_reminder_from_shared_event_source(client):
     deadline = (datetime.now(UTC) + timedelta(hours=12)).isoformat()
     round_response = client.post(
         "/api/v1/rounds",
-        json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "session_duration_minutes": 30, "registration_deadline": deadline},
+        json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "room_types": ["NORMAL"], "session_duration_minutes": 30, "registration_deadline": deadline},
         headers=manager_headers,
     )
     assert round_response.status_code == 201, round_response.text

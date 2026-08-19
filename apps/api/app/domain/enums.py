@@ -13,6 +13,13 @@ class SystemRole(DomainEnum):
     STUDENT = "STUDENT"
 
 
+class SemesterStatus(DomainEnum):
+    PLANNING = "PLANNING"
+    ACTIVE = "ACTIVE"
+    CLOSED = "CLOSED"
+    ARCHIVED = "ARCHIVED"
+
+
 class AssignmentRole(DomainEnum):
     SUPERVISOR = "SUPERVISOR"
     REVIEWER = "REVIEWER"

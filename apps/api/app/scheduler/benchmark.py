@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from app.scheduler.models import RoundInput
 
 
-def build_target_fixture() -> tuple[RoundInput, list[int], list[tuple[int, datetime, datetime, str, str]], list[int], list[int]]:
+def build_target_fixture() -> tuple[RoundInput, list[int], list[tuple[int, datetime, datetime, str, str]], list[int]]:
     """Build the deterministic CI fixture named by the Phase 04 exit criteria."""
     reviewers = list(range(1, 27))
     groups = list(range(1, 75))
@@ -37,4 +37,4 @@ def build_target_fixture() -> tuple[RoundInput, list[int], list[tuple[int, datet
         h12_semester_quota=None,
         existing_semester_load={},
     )
-    return context, groups, timeslots, [1, 2, 3, 4], reviewers
+    return context, groups, timeslots, reviewers

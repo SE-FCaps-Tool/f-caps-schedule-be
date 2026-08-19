@@ -12,7 +12,7 @@ def test_manager_can_record_defense_result_and_advance_group(client):
     )
     round_response = client.post(
         "/api/v1/rounds",
-        json={"semester_id": semester_id, "type": "DEFENSE_1_1", "reviewer_count": 3, "session_duration_minutes": 30},
+        json={"semester_id": semester_id, "type": "DEFENSE_1_1", "reviewer_count": 3, "room_types": ["NORMAL"], "session_duration_minutes": 30},
         headers=headers,
     )
     assert round_response.status_code == 201

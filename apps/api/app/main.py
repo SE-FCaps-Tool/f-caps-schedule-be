@@ -19,6 +19,7 @@ from .routes.master_data import router as master_data_router
 from .routes.manager_extensions import router as manager_extensions_router
 from .routes.operations import router as operations_router
 from .routes.results import router as results_router
+from .routes.room_assignment import router as room_assignment_router
 from .routes.schedule_operations import router as schedule_operations_router
 
 
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(manager_extensions_router)
     app.include_router(schedule_operations_router)
     app.include_router(results_router)
+    app.include_router(room_assignment_router)
     app.include_router(operations_router)
     app.include_router(auth_router)
 

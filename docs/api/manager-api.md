@@ -71,7 +71,7 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 
 - **Role:** `ADMIN`, `MANAGER`.
 - **Body:** `{ target_status: "CLOSED", reason }`.
-- Chỉ cho phép `ACTIVE → CLOSED`; không mở lại semester đã đóng (BR-SEM-02: chỉ 1 semester `ACTIVE` cùng lúc).
+- Chỉ cho phép transition kế tiếp `PLANNING → ACTIVE → CLOSED → ARCHIVED`; `ARCHIVED` chỉ đọc (BR-SEM-02: chỉ 1 semester `ACTIVE` cùng lúc).
 - **`200`:** `{ id, status }`.
 - **`403`:** không phải ADMIN/MANAGER.
 - **`422`:** transition không hợp lệ.
@@ -187,7 +187,7 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 - **Role:** `ADMIN`, `MANAGER`.
 - **Body [`RoundTransitionPayload`](schemas.md):** `{ target_status, reason? }`.
 - Vòng đời (BR-RND §5.1): `DRAFT → OPEN_REGISTRATION → REGISTRATION_CLOSED → SCHEDULING → SCHEDULED → PUBLISHED → ONGOING → COMPLETED → LOCKED`.
-- Transition sang `SCHEDULING` sẽ kiểm tra đã có group/timeslot/room/reviewer availability đầy đủ.
+- Transition sang `SCHEDULING` sẽ kiểm tra đã có group/timeslot và đủ reviewer availability; room inventory không còn là điều kiện để bắt đầu scheduler.
 - Từ `PUBLISHED` trở đi mọi sửa lịch phải qua controlled-change (BR-RND-05); `LOCKED` chỉ đọc, chỉ Admin unlock được (BR-RND-06).
 - **`200`:** `{ round_id, status }`.
 - **`422 ROUND_INPUTS_INCOMPLETE` / `ROUND_STATUS_INVALID`.**
@@ -270,7 +270,7 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 - Có thể chạy **nhiều lần**, mỗi lần tạo 1 `ScheduleVersion` mới kèm điểm số để so sánh (BR-SCH-01). Không cho double-click; disable nút khi đang chạy.
 - Khi không tìm được lời giải đầy đủ vẫn trả kết quả một phần kèm lý do cụ thể từng nhóm chưa xếp được (BR-SCH-02) và đề xuất phương án gỡ (BR-SCH-03).
 - **`201`:** `{ version_id, status, scheduled_count, unscheduled: [...], soft_scores: { "S1": 4, ... } }`.
-- **`422 ROUND_INPUTS_INCOMPLETE`** (thiếu group/timeslot/room/reviewer availability).
+- **`422 ROUND_INPUTS_INCOMPLETE`** (thiếu group/timeslot hoặc reviewer availability; room inventory không bắt buộc để chạy solver).
 - **`422 SCHEDULE_RERUN_FORBIDDEN`** (round đã publish/ongoing/terminal — dùng controlled-change thay vì run lại).
 - **`422 ROUND_POSTPONED`** (phải reopen round trước).
 - **`409 SCHEDULE_PERSIST_FAILED`.**

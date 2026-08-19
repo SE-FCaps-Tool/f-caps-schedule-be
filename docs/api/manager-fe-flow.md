@@ -184,7 +184,7 @@ Response:
 { "id": 1, "status": "CLOSED" }
 ```
 
-Chỉ cho phép `ACTIVE → CLOSED`; chỉ có một semester `ACTIVE`.
+Cho phép transition kế tiếp `PLANNING → ACTIVE → CLOSED → ARCHIVED`; `ARCHIVED` chỉ đọc và chỉ có một semester `ACTIVE`.
 
 #### `POST /api/v1/semesters/{semester_id}/set-current`
 
@@ -430,7 +430,7 @@ Response:
 { "round_id": 4, "status": "OPEN_REGISTRATION" }
 ```
 
-Round transition tới `SCHEDULING` chỉ thành công khi đã có group, timeslot, room và availability hợp lệ.
+Round transition tới `SCHEDULING` chỉ thành công khi đã có group, timeslot và availability reviewer hợp lệ; room inventory không còn bắt buộc cho solver.
 
 ### `GET /api/v1/rounds/{round_id}/registration`
 

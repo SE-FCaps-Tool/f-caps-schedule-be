@@ -10,7 +10,6 @@ def generate_candidates(
     *,
     groups: list[int],
     timeslots: list[tuple[object, ...]],
-    rooms: list[int],
     reviewers: list[int],
 ) -> list[Candidate]:
     candidates: list[Candidate] = []
@@ -42,19 +41,17 @@ def generate_candidates(
                 continuity.update(context.remediation_verifier_ids.get(group_id, set()))
                 available = [reviewer_id for reviewer_id in available if reviewer_id in continuity]
             for reviewer_ids in combinations(available, context.expected_reviewer_count):
-                for room_id in sorted(rooms):
-                    candidates.append(
-                        Candidate(
-                            group_id=group_id,
-                            timeslot_id=timeslot_id,
-                            room_id=room_id,
-                            start_at=start_at,
-                            end_at=end_at,
-                            day=day,
-                            part=part,
-                            reviewer_ids=reviewer_ids,
-                        )
+                candidates.append(
+                    Candidate(
+                        group_id=group_id,
+                        timeslot_id=timeslot_id,
+                        start_at=start_at,
+                        end_at=end_at,
+                        day=day,
+                        part=part,
+                        reviewer_ids=reviewer_ids,
                     )
+                )
     return candidates
 
 
@@ -75,7 +72,6 @@ def reason_for_unscheduled(
     *,
     reviewers: list[int],
     timeslots: list[int],
-    rooms: list[int],
 ) -> UnscheduledReason:
     project_id = context.group_project.get(group_id)
     if not reviewers:
@@ -137,14 +133,8 @@ def reason_for_unscheduled(
                 "No available Reviewer satisfies Defense 1.2 continuity.",
                 "Assign a prior Reviewer, the Verifier, or record an approved H11 waiver.",
             )
-    if not rooms:
-        return UnscheduledReason(
-            "NO_ROOM",
-            "The round has no usable room for this group.",
-            "Add an active room to the round.",
-        )
     return UnscheduledReason(
         "NO_TIMESLOT",
         "No combination of hard constraints produced a candidate session.",
-        "Add availability, timeslots or rooms, then run the scheduler again.",
+        "Add availability or timeslots, then run the scheduler again.",
     )

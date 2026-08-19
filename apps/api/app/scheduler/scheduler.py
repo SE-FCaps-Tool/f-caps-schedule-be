@@ -18,7 +18,6 @@ def solve_schedule(
     *,
     groups: list[int],
     timeslots: list[tuple[int, datetime, datetime, str, str]],
-    rooms: list[int],
     reviewers: list[int],
     time_limit_seconds: float = 10,
     random_seed: int = 0,
@@ -27,7 +26,6 @@ def solve_schedule(
         context,
         groups=groups,
         timeslots=timeslots,
-        rooms=rooms,
         reviewers=reviewers,
     )
     if not candidates:
@@ -37,7 +35,6 @@ def solve_schedule(
                 context,
                 reviewers=reviewers,
                 timeslots=[timeslot[0] for timeslot in timeslots],
-                rooms=rooms,
             )
             for group_id in sorted(groups)
         )
@@ -45,7 +42,7 @@ def solve_schedule(
 
     model = cp_model.CpModel()
     variables = [model.new_bool_var(f"candidate_{index}") for index in range(len(candidates))]
-    candidate_soft_scores = [_candidate_soft_scores(candidate, context, rooms) for candidate in candidates]
+    candidate_soft_scores = [_candidate_soft_scores(candidate, context) for candidate in candidates]
     weighted_scores = [
         sum(context.soft_weights.get(rule, 0) * score for rule, score in scores.items())
         for scores in candidate_soft_scores
@@ -56,7 +53,6 @@ def solve_schedule(
     for indexes in by_group.values():
         model.add_at_most_one(variables[index] for index in indexes)
 
-    _add_resource_overlap_constraints(model, variables, candidates, "room")
     if context.max_groups_per_timeslot is not None:
         by_timeslot: dict[int, list[int]] = defaultdict(list)
         for index, candidate in enumerate(candidates):
@@ -138,16 +134,16 @@ def solve_schedule(
     selected = [candidate for index, candidate in enumerate(candidates) if solver.value(variables[index])]
     sessions = tuple(
         ScheduledSession(
-            session_id=candidate.group_id,
-            group_id=candidate.group_id,
-            project_id=context.group_project[candidate.group_id],
-            timeslot_id=candidate.timeslot_id,
-            room_id=candidate.room_id,
-            start_at=candidate.start_at,
-            end_at=candidate.end_at,
-            reviewer_ids=candidate.reviewer_ids,
-            day=candidate.day,
-            part=candidate.part,
+            candidate.group_id,
+            candidate.group_id,
+            context.group_project[candidate.group_id],
+            candidate.timeslot_id,
+            None,
+            candidate.start_at,
+            candidate.end_at,
+            candidate.reviewer_ids,
+            candidate.day,
+            candidate.part,
         )
         for candidate in sorted(selected, key=lambda item: item.group_id)
     )
@@ -164,7 +160,6 @@ def solve_schedule(
             context,
             reviewers=reviewers,
             timeslots=[timeslot[0] for timeslot in timeslots],
-            rooms=rooms,
         )
         for group_id in sorted(groups)
         if group_id not in scheduled_groups
@@ -199,9 +194,7 @@ def _add_resource_overlap_constraints(
 ) -> None:
     buckets: dict[int, list[int]] = defaultdict(list)
     for index, candidate in enumerate(candidates):
-        if resource == "room":
-            key = candidate.room_id
-        elif resource == "reviewer" and resource_id in candidate.reviewer_ids:
+        if resource == "reviewer" and resource_id in candidate.reviewer_ids:
             key = resource_id
         else:
             continue
@@ -230,7 +223,7 @@ def _empty_soft_scores() -> dict[str, int]:
     return {f"S{i}": 0 for i in range(1, 10)}
 
 
-def _candidate_soft_scores(candidate: object, context: RoundInput, rooms: list[int]) -> dict[str, int]:
+def _candidate_soft_scores(candidate: object, context: RoundInput) -> dict[str, int]:
     scores = _empty_soft_scores()
     quota = context.h12_semester_quota
     if quota is not None:
@@ -246,8 +239,6 @@ def _candidate_soft_scores(candidate: object, context: RoundInput, rooms: list[i
         scores["S2"] = 1
     if context.round_type == "DEFENSE_1_2":
         scores["S3"] = len(set(candidate.reviewer_ids).intersection(prior))
-    if rooms and candidate.room_id == min(rooms):
-        scores["S8"] = 1
     return scores
 
 
@@ -257,12 +248,12 @@ def _aggregate_soft_scores(
     selected: list[object],
 ) -> dict[str, int]:
     selected_keys = {
-        (candidate.group_id, candidate.timeslot_id, candidate.room_id, candidate.reviewer_ids)
+        (candidate.group_id, candidate.timeslot_id, candidate.reviewer_ids)
         for candidate in selected
     }
     totals = _empty_soft_scores()
     for candidate, scores in zip(candidates, score_maps):
-        key = (candidate.group_id, candidate.timeslot_id, candidate.room_id, candidate.reviewer_ids)
+        key = (candidate.group_id, candidate.timeslot_id, candidate.reviewer_ids)
         if key in selected_keys:
             for rule, score in scores.items():
                 totals[rule] += score

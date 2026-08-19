@@ -8,12 +8,12 @@ from app.domain.schedule_operations import (
 )
 
 
-def test_publish_requires_valid_version_and_validation():
-    assert ensure_publishable("VALID", True) is True
+def test_publish_requires_active_version_and_validation():
+    assert ensure_publishable("ACTIVE", True) is True
     with pytest.raises(DomainError, match="VERSION_NOT_VALID"):
         ensure_publishable("DRAFT", True)
     with pytest.raises(DomainError, match="SCHEDULE_HAS_VIOLATIONS"):
-        ensure_publishable("VALID", False)
+        ensure_publishable("ACTIVE", False)
 
 
 def test_manual_and_post_publish_changes_require_a_reason():

@@ -102,7 +102,7 @@ erDiagram
 | `lecturers` | Hồ sơ giảng viên | `lecturer_code` UNIQUE — khoá dùng trong mọi liên kết lịch, giải quyết vấn đề 2 định danh trong dữ liệu SU26 |
 | `students` | Hồ sơ sinh viên | |
 | `rooms` | Phòng | Có `is_online` cho buổi trên MS Teams |
-| `semesters` | Học kỳ | Partial unique đảm bảo **đúng 1 kỳ ACTIVE** |
+| `semesters` | Học kỳ (`PLANNING`/`ACTIVE`/`CLOSED`/`ARCHIVED`) | Partial unique đảm bảo **đúng 1 kỳ ACTIVE**; `ARCHIVED` chỉ đọc |
 | `lecturer_semester_quotas` | Hạn mức phiên/kỳ từng GV | Gốc của mục tiêu cân bằng tải S1 — thuật toán cân bằng theo **% hạn mức đã dùng**, không theo số tuyệt đối |
 
 ### 3.2. Đề tài — Nhóm — Sinh viên (5 bảng)

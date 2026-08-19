@@ -1,4 +1,4 @@
-"""Run migrations and idempotent seed sources before an app process starts.
+"""Run migrations and the idempotent seed fixture before an app process starts.
 
 The Compose stack intentionally has no dedicated db-init container.  API and
 worker processes call this script themselves; a PostgreSQL advisory lock makes
@@ -18,7 +18,6 @@ import psycopg
 LOCK_KEY = 617283945
 ROOT = Path("/app")
 API_ROOT = ROOT / "apps" / "api"
-WORKBOOK = ROOT / "SE_CapstoneProject_SP26_ReviewDefense_New.xlsx"
 
 
 def _dsn(value: str) -> str:
@@ -44,12 +43,6 @@ def main() -> None:
     try:
         commands = [
             ["alembic", "upgrade", "head"],
-            [
-                "python",
-                "/app/tools/import_excel_database.py",
-                str(WORKBOOK),
-                "--skip-if-imported",
-            ],
             ["python", "/app/tools/seed_versioned_fixture.py"],
         ]
         for command in commands:

@@ -36,10 +36,11 @@ def visible_session_ids(db: Session, user: CurrentUser, *, version_id: int | Non
             text(
                 "SELECT DISTINCT s.id FROM sessions s "
                 "JOIN groups g ON g.id = s.group_id "
-                "LEFT JOIN project_supervisors ps ON ps.project_id = g.project_id "
+                "JOIN schedule_assignments sa ON sa.schedule_version_id=s.schedule_version_id AND sa.group_id=s.group_id "
+                "LEFT JOIN project_supervisors ps ON ps.project_id = sa.project_id "
                 "LEFT JOIN lecturers own_l ON own_l.id = ps.lecturer_id "
-                "LEFT JOIN session_reviewers sr ON sr.session_id = s.id "
-                "LEFT JOIN lecturers reviewer_l ON reviewer_l.id = sr.lecturer_id "
+                "LEFT JOIN council_members cm ON cm.council_id = s.council_id "
+                "LEFT JOIN lecturers reviewer_l ON reviewer_l.id = cm.lecturer_id "
                 "WHERE (:version_id IS NULL OR s.schedule_version_id = :version_id) "
                 "AND (own_l.account_id = :account_id OR reviewer_l.account_id = :account_id)"
             ),
@@ -104,10 +105,12 @@ def affected_schedule_recipients(db: Session, version_id: int) -> set[int]:
     rows = db.execute(
         text(
             "SELECT DISTINCT a.id FROM accounts a WHERE a.id IN ("
-            "SELECT la.account_id FROM session_reviewers sr "
-            "JOIN lecturers la ON la.id = sr.lecturer_id WHERE sr.schedule_version_id = :version_id "
+            "SELECT la.account_id FROM council_members cm "
+            "JOIN sessions s ON s.council_id = cm.council_id "
+            "JOIN lecturers la ON la.id = cm.lecturer_id WHERE s.schedule_version_id = :version_id "
             "UNION SELECT sa.account_id FROM sessions s JOIN groups g ON g.id = s.group_id "
-            "JOIN project_supervisors ps ON ps.project_id = g.project_id "
+            "JOIN schedule_assignments assn ON assn.schedule_version_id=s.schedule_version_id AND assn.group_id=s.group_id "
+            "JOIN project_supervisors ps ON ps.project_id = assn.project_id "
             "JOIN lecturers sa ON sa.id = ps.lecturer_id WHERE s.schedule_version_id = :version_id "
             "UNION SELECT st.account_id FROM sessions s JOIN group_memberships gm ON gm.group_id = s.group_id "
             "JOIN students st ON st.id = gm.student_id WHERE s.schedule_version_id = :version_id "
@@ -118,7 +121,24 @@ def affected_schedule_recipients(db: Session, version_id: int) -> set[int]:
     return {int(row[0]) for row in rows if row[0] is not None}
 
 
-def affected_group_recipients(db: Session, group_id: int) -> set[int]:
+def affected_group_recipients(
+    db: Session, group_id: int, *, schedule_version_id: int | None = None
+) -> set[int]:
+    if schedule_version_id is not None:
+        rows = db.execute(
+            text(
+                "SELECT DISTINCT a.id FROM accounts a WHERE a.id IN ("
+                "SELECT l.account_id FROM schedule_assignments assn "
+                "JOIN project_supervisors ps ON ps.project_id = assn.project_id "
+                "JOIN lecturers l ON l.id = ps.lecturer_id "
+                "WHERE assn.schedule_version_id = :version_id AND assn.group_id = :group_id "
+                "UNION SELECT st.account_id FROM group_memberships gm JOIN students st ON st.id = gm.student_id "
+                "WHERE gm.group_id = :group_id AND gm.status = 'ACTIVE'"
+                ")"
+            ),
+            {"group_id": group_id, "version_id": schedule_version_id},
+        ).all()
+        return {int(row[0]) for row in rows if row[0] is not None}
     rows = db.execute(
         text(
             "SELECT DISTINCT a.id FROM accounts a WHERE a.id IN ("
@@ -136,3 +156,6 @@ def affected_group_recipients(db: Session, group_id: int) -> set[int]:
 def public_session_projection(row: dict[str, Any]) -> dict[str, Any]:
     """Keep private schedule details out of Student-facing list responses."""
     return row
+
+
+_PHASE3_PROVENANCE_TABLE = "schedule_assignments"

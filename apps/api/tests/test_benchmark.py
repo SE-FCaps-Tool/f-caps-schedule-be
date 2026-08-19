@@ -6,13 +6,12 @@ from app.scheduler.validator import validate_schedule
 
 
 def test_target_fixture_is_repeatable_and_finishes_within_sixty_seconds():
-    context, groups, timeslots, rooms, reviewers = build_target_fixture()
+    context, groups, timeslots, reviewers = build_target_fixture()
     started = perf_counter()
     result = solve_schedule(
         context,
         groups=groups,
         timeslots=timeslots,
-        rooms=rooms,
         reviewers=reviewers,
         time_limit_seconds=5,
         random_seed=17,

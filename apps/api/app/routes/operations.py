@@ -22,6 +22,7 @@ from app.response_models import (
     VersionSummaryResponse,
 )
 
+_PHASE3_PROVENANCE_TABLE = "schedule_assignments"
 router = APIRouter(prefix="/api/v1", tags=["operations"])
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
@@ -41,7 +42,7 @@ def _version_scope(db: Session, round_id: int | None = None, semester_id: int | 
             "JOIN semesters s ON s.id = r.semester_id "
             "WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) "
             "AND (CAST(:semester_id AS INTEGER) IS NULL OR r.semester_id = CAST(:semester_id AS INTEGER)) "
-            "AND sv.status IN ('PUBLISHED', 'VALID') ORDER BY "
+            "AND sv.status IN ('PUBLISHED', 'ACTIVE') ORDER BY "
             "CASE WHEN sv.status = 'PUBLISHED' THEN 0 ELSE 1 END, sv.activated_at DESC NULLS LAST, sv.id DESC LIMIT 1"
         ),
         {"round_id": round_id, "semester_id": semester_id},
@@ -78,10 +79,10 @@ def manager_dashboard(db: Db, user: User, round_id: int | None = None, semester_
         groups = {"total": 0, "scheduled": 0}
     load = db.execute(
         text(
-            "SELECT l.id, l.lecturer_code, a.display_name, COUNT(sr.session_id) AS session_count "
-            "FROM lecturers l JOIN accounts a ON a.id = l.account_id LEFT JOIN session_reviewers sr ON sr.lecturer_id = l.id "
-            "AND (:version_id IS NULL OR sr.schedule_version_id = :version_id) "
-            "LEFT JOIN schedule_versions lsv ON lsv.id = sr.schedule_version_id LEFT JOIN rounds lr ON lr.id = lsv.round_id "
+            "SELECT l.id, l.lecturer_code, a.display_name, COUNT(ls.id) AS session_count "
+            "FROM lecturers l JOIN accounts a ON a.id = l.account_id LEFT JOIN council_members cm ON cm.lecturer_id = l.id "
+            "LEFT JOIN sessions ls ON ls.council_id = cm.council_id AND (:version_id IS NULL OR ls.schedule_version_id = :version_id) "
+            "LEFT JOIN schedule_versions lsv ON lsv.id = ls.schedule_version_id LEFT JOIN rounds lr ON lr.id = lsv.round_id "
             "WHERE (CAST(:semester_id AS INTEGER) IS NULL OR lr.semester_id = CAST(:semester_id AS INTEGER)) "
             "GROUP BY l.id, l.lecturer_code, a.display_name ORDER BY session_count DESC, l.lecturer_code LIMIT 10"
         ),
@@ -113,8 +114,13 @@ def manager_dashboard(db: Db, user: User, round_id: int | None = None, semester_
         ),
         {"semester_id": scope_semester},
     ).mappings().one()
-    remediation_overdue = db.execute(text("SELECT COUNT(*) FROM remediation_cases rc JOIN groups rg ON rg.id = rc.group_id JOIN projects rp ON rp.id = rg.project_id WHERE (rc.status = 'OVERDUE' OR (rc.status = 'OPEN' AND rc.due_at < now())) AND (CAST(:semester_id AS INTEGER) IS NULL OR rp.semester_id = CAST(:semester_id AS INTEGER))"), {"semester_id": scope_semester}).scalar_one()
+    remediation_overdue = db.execute(text("SELECT COUNT(*) FROM remediation_cases rc JOIN session_results rs ON rs.id = rc.session_result_id JOIN sessions s ON s.id = rs.session_id JOIN schedule_assignments sa ON sa.schedule_version_id = s.schedule_version_id AND sa.group_id = s.group_id JOIN projects rp ON rp.id = sa.project_id WHERE (rc.status = 'OVERDUE' OR (rc.status = 'OPEN' AND rc.due_at < now())) AND (CAST(:semester_id AS INTEGER) IS NULL OR rp.semester_id = CAST(:semester_id AS INTEGER))"), {"semester_id": scope_semester}).scalar_one()
+    current_semester = db.execute(
+        text("SELECT id, code, name, status FROM semesters WHERE id = :id"),
+        {"id": scope_semester},
+    ).mappings().one_or_none()
     return {
+        "current_semester": dict(current_semester) if current_semester else None,
         "totals": {key: int(value or 0) for key, value in totals.items()},
         "availability": {"invited": availability["invited"], "responded": availability["responded"]},
         "groups": {"total": groups["total"], "scheduled": groups["scheduled"], "unscheduled": groups["total"] - groups["scheduled"]},
@@ -133,10 +139,11 @@ def lecturer_load_report(db: Db, user: User, round_id: int | None = None, semest
     selected = _version_scope(db, round_id, semester_id)
     rows = db.execute(
         text(
-            "SELECT l.id AS lecturer_id, l.lecturer_code, a.display_name, COUNT(sr.session_id) AS session_count, "
-            "r.h12_semester_quota AS quota, CASE WHEN r.h12_semester_quota > 0 THEN ROUND(COUNT(sr.session_id)::numeric * 100 / r.h12_semester_quota, 1) ELSE NULL END AS quota_percent "
+            "SELECT l.id AS lecturer_id, l.lecturer_code, a.display_name, COUNT(ls.id) AS session_count, "
+            "r.h12_semester_quota AS quota, CASE WHEN r.h12_semester_quota > 0 THEN ROUND(COUNT(ls.id)::numeric * 100 / r.h12_semester_quota, 1) ELSE NULL END AS quota_percent "
             "FROM lecturers l JOIN accounts a ON a.id = l.account_id "
-            "LEFT JOIN session_reviewers sr ON sr.lecturer_id = l.id AND sr.schedule_version_id = :version_id "
+            "LEFT JOIN council_members cm ON cm.lecturer_id = l.id "
+            "LEFT JOIN sessions ls ON ls.council_id = cm.council_id AND ls.schedule_version_id = :version_id "
             "LEFT JOIN schedule_versions sv ON sv.id = :version_id LEFT JOIN rounds r ON r.id = sv.round_id "
             "WHERE (CAST(:round_id AS INTEGER) IS NULL OR r.id = CAST(:round_id AS INTEGER)) AND (CAST(:semester_id AS INTEGER) IS NULL OR r.semester_id = CAST(:semester_id AS INTEGER)) GROUP BY l.id, l.lecturer_code, a.display_name, r.h12_semester_quota "
             "ORDER BY l.lecturer_code"
@@ -176,7 +183,7 @@ def group_quality_report(db: Db, user: User, semester_id: int | None = None) -> 
 def remediation_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     selected = _version_scope(db, round_id, semester_id)
-    rows = db.execute(text("SELECT rc.id, rc.group_id, g.code AS group_code, rc.due_at, rc.status, rc.verifier_lecturer_id FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id JOIN projects p ON p.id = g.project_id LEFT JOIN session_results sr ON sr.id = rc.session_result_id LEFT JOIN sessions s ON s.id = sr.session_id LEFT JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) AND (CAST(:semester_id AS INTEGER) IS NULL OR p.semester_id = CAST(:semester_id AS INTEGER)) ORDER BY rc.due_at"), {"round_id": round_id, "semester_id": semester_id}).mappings().all()
+    rows = db.execute(text("SELECT rc.id, rc.group_id, g.code AS group_code, rc.due_at, rc.status, rc.verifier_lecturer_id FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id LEFT JOIN session_results sr ON sr.id = rc.session_result_id LEFT JOIN sessions s ON s.id = sr.session_id LEFT JOIN schedule_assignments sa ON sa.schedule_version_id=s.schedule_version_id AND sa.group_id=s.group_id LEFT JOIN projects p ON p.id = sa.project_id LEFT JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) AND (CAST(:semester_id AS INTEGER) IS NULL OR p.semester_id = CAST(:semester_id AS INTEGER)) ORDER BY rc.due_at"), {"round_id": round_id, "semester_id": semester_id}).mappings().all()
     return {"round_id": round_id, "version": selected, "rows": [dict(row) for row in rows]}
 
 
@@ -214,7 +221,7 @@ def calendar_export(version_id: int, db: Db, user: User) -> Response:
         raise HTTPException(status_code=403, detail="Calendar is outside the actor's scope.")
     session_ids = visible_session_ids(db, user, version_id=version_id)
     scope = "" if user.role in {"ADMIN", "MANAGER"} else "AND s.id = ANY(:session_ids)"
-    rows = db.execute(text(f"SELECT s.id, g.code AS group_code, rm.code AS room_code, s.start_at, s.end_at FROM sessions s JOIN groups g ON g.id = s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id WHERE s.schedule_version_id = :version_id {scope} ORDER BY s.start_at"), {"version_id": version_id, "session_ids": list(session_ids) or [0]}).mappings().all()
+    rows = db.execute(text(f"SELECT s.id, g.code AS group_code, rm.code AS room_code, s.start_at, s.end_at FROM sessions s JOIN groups g ON g.id = s.group_id JOIN schedule_assignments sa ON sa.schedule_version_id=s.schedule_version_id AND sa.group_id=s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id WHERE s.schedule_version_id = :version_id {scope} ORDER BY s.start_at"), {"version_id": version_id, "session_ids": list(session_ids) or [0]}).mappings().all()
     if not rows:
         exists = db.execute(text("SELECT 1 FROM schedule_versions WHERE id = :id"), {"id": version_id}).scalar_one_or_none()
         if exists is None:
@@ -246,8 +253,8 @@ def personal_schedule(
         return {"version": selected, "generated_at": datetime.now(UTC), "sessions": []}
     rows = db.execute(
         text(
-            "SELECT s.id, s.group_id, g.code AS group_code, g.project_id, s.start_at, s.end_at, s.room_id, rm.code AS room_code, s.status "
-            "FROM sessions s JOIN groups g ON g.id = s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id "
+            "SELECT s.id, s.group_id, g.code AS group_code, sa.project_id, s.start_at, s.end_at, s.room_id, rm.code AS room_code, s.status "
+            "FROM sessions s JOIN groups g ON g.id = s.group_id JOIN schedule_assignments sa ON sa.schedule_version_id=s.schedule_version_id AND sa.group_id=s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id "
             "WHERE s.schedule_version_id = :version_id AND s.id = ANY(:session_ids) "
             "AND (CAST(:from_at AS TIMESTAMPTZ) IS NULL OR s.end_at > CAST(:from_at AS TIMESTAMPTZ)) "
             "AND (CAST(:to_at AS TIMESTAMPTZ) IS NULL OR s.start_at < CAST(:to_at AS TIMESTAMPTZ)) ORDER BY s.start_at, s.id"

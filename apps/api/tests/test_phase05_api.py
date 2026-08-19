@@ -16,6 +16,7 @@ def test_manager_can_run_activate_and_publish_a_schedule_version(client):
             "semester_id": semester_id,
             "type": "DEFENSE_1_1",
             "reviewer_count": 3,
+            "room_types": ["NORMAL"],
             "session_duration_minutes": 30,
         },
         headers=headers,
@@ -74,7 +75,7 @@ def test_controlled_change_creates_a_new_version_without_rewriting_source(client
     headers = {"X-Test-Session": "active-manager"}
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=headers).json() if item["code"] == "SE-2026-2027")
-    round_id = client.post("/api/v1/rounds", json={"semester_id": semester_id, "type": "DEFENSE_1_1", "reviewer_count": 3, "session_duration_minutes": 30}, headers=headers).json()["id"]
+    round_id = client.post("/api/v1/rounds", json={"semester_id": semester_id, "type": "DEFENSE_1_1", "reviewer_count": 3, "room_types": ["NORMAL"], "session_duration_minutes": 30}, headers=headers).json()["id"]
     day = client.post(f"/api/v1/rounds/{round_id}/days", json={"day_date": "2033-03-01", "slots": [{"start_at": "2033-03-01T09:00:00+07:00", "end_at": "2033-03-01T09:30:00+07:00"}]}, headers=headers).json()
     group = next(item for item in client.get("/api/v1/groups", headers=headers).json() if item["status"] == "PENDING_D11" and item["leader_count"] == 1)
     room = client.get("/api/v1/rooms", headers=headers).json()[0]

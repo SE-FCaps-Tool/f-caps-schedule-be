@@ -1,55 +1,35 @@
-FIXTURE_VERSION = "seed-v1"
+FIXTURE_VERSION = "seed-v2"
+
+DEMO_PASSWORD = "12345@Abc"
 
 
 def seed_fixture_v1() -> dict[str, object]:
-    lecturers = [
+    accounts = [
+        {"email": "admin@gmail.com", "display_name": "Admin", "role": "ADMIN"},
+        {"email": "manager@gmail.com", "display_name": "Manager", "role": "MANAGER"},
         {
-            "lecturer_code": f"GV{i:02d}",
-            "email": f"lecturer{i}@gmail.com" if i <= 2 else f"gv{i:02d}@scheduler.test",
-            "display_name": f"Giảng viên {i:02d}",
+            "email": "lecturer@gmail.com",
+            "display_name": "Lecturer",
+            "role": "LECTURER",
+            "lecturer_code": "GV01",
+        },
+    ] + [
+        {
+            "email": f"student{i}@gmail.com",
+            "display_name": f"Student {i}",
+            "role": "STUDENT",
+            "student_code": f"SV{i:03d}",
         }
-        for i in range(1, 27)
+        for i in range(1, 6)
     ]
     rooms = [
-        {"code": f"R{i:02d}", "name": f"Phòng Defense {i:02d}", "capacity": 12}
-        for i in range(1, 5)
+        {"code": f"{room_type[:1]}{i:02d}", "name": f"{room_type.title()} Room {i}", "capacity": 12, "room_type": room_type}
+        for room_type in ("NORMAL", "SEMINAR", "LAB")
+        for i in range(1, 3)
     ]
-    students = []
-    groups = []
-    for group_number in range(1, 75):
-        members = []
-        for member_number in range(1, 5):
-            student_number = (group_number - 1) * 4 + member_number
-            student_code = f"SV{student_number:03d}"
-            students.append(
-                {
-                    "student_code": student_code,
-                    "email": (
-                        f"student{student_number}@gmail.com"
-                        if student_number <= 2
-                        else f"{student_code.lower()}@scheduler.test"
-                    ),
-                    "display_name": f"Sinh viên {student_number:03d}",
-                }
-            )
-            members.append(
-                {
-                    "student_code": student_code,
-                    "role": "LEADER" if member_number == 1 else "MEMBER",
-                }
-            )
-        supervisor_number = ((group_number - 1) % 26) + 1
-        groups.append(
-            {
-                "code": f"G{group_number:03d}",
-                "project_code": f"P{group_number:03d}",
-                "title": f"Capstone Project {group_number:03d}",
-                "supervisors": [f"GV{supervisor_number:02d}:MAIN"],
-                "members": members,
-            }
-        )
     return {
         "version": FIXTURE_VERSION,
+        "password": DEMO_PASSWORD,
         "semester": {
             "code": "SE-2026-2027",
             "name": "Software Engineering 2026–2027",
@@ -57,8 +37,6 @@ def seed_fixture_v1() -> dict[str, object]:
             "end_date": "2026-08-23",
         },
         "major": {"code": "SE", "name": "Software Engineering"},
-        "lecturers": lecturers,
+        "accounts": accounts,
         "rooms": rooms,
-        "students": students,
-        "groups": groups,
     }

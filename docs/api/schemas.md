@@ -64,10 +64,10 @@ dữ liệu legacy/import không có actor đáng tin cậy.
 ### `SemesterTransitionPayload`
 
 ```json
-{ "target_status": "CLOSED", "reason": "Semester completed" }
+{ "target_status": "ARCHIVED", "reason": "Semester completed" }
 ```
 
-Chỉ cho phép `ACTIVE → CLOSED`; `reason` dài 1–1000 ký tự.
+Chỉ cho phép transition kế tiếp `PLANNING → ACTIVE → CLOSED → ARCHIVED`; `reason` dài 1–1000 ký tự.
 
 ### `AccountCreate`
 
@@ -385,9 +385,9 @@ Result owner lecturer ID: integer > 0; lecturer phải nằm trong Reviewer củ
 
 ### Schedule version
 
-List item thường có: `id`, `round_id`, `version_no`, `status`, `solver_status`, `total_score`, `soft_scores`, `random_seed`, `created_at`, `activated_at`.
+List item thường có: `id`, `round_id`, `version_no`, `status`, `solver_status`, `total_score`, `soft_scores`, `random_seed`, `created_at`, `activated_at`. Status lifecycle là `DRAFT → ACTIVE → PUBLISHED`; các version bị thay thế chuyển thành `DISCARDED`.
 
-Detail thêm `sessions`. Session thường có `id`, `group_id`, `group_code`, `project_id`, `timeslot_id`, `room_id`, `start_at`, `end_at`, `status`, reviewer snapshot và result-owner information.
+Detail có `assignments` và `sessions`. Một generated `DRAFT` chỉ có durable `assignments`/reviewer snapshots và `sessions: []`; assignment có `assignment_id`, `group_id`, `project_id` (provenance snapshot), `timeslot_id`, `start_at`, `end_at`, `room_id: null`, `reviewer_ids`, `result_owner_ids`, `reviewer_names`. Activation materializes đúng một Session cho mỗi assignment với `status: "PLANNED"`, sau đó publish chuyển Session sang `SCHEDULED`. Session đã materialize có thêm `id` và `assignment_id`; downstream reads dùng `assignment_id.project_id` snapshot thay vì mutable `groups.project_id`.
 
 ### Personal schedule
 

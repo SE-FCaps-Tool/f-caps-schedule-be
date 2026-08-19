@@ -7,10 +7,10 @@ Semester đã được mở rộng để lưu thời gian bắt đầu/kết th�
 Trạng thái hợp lệ:
 
 ```text
-ACTIVE → CLOSED
+PLANNING → ACTIVE → CLOSED → ARCHIVED
 ```
 
-Semester mới luôn được tạo với trạng thái `ACTIVE`.
+Semester mới mặc định `ACTIVE` để tương thích; có thể tạo `PLANNING`. `ARCHIVED` là read-only.
 
 ## API
 

@@ -9,9 +9,41 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-
 SEMESTER_LIFECYCLE_LOCK_KEY = 918273645
 _ACADEMIC_YEAR_RE = re.compile(r"^(\d{4})-(\d{4})$")
+
+
+def ensure_semester_writable(db: Session, semester_id: int) -> str:
+    """Lock a Semester and reject mutations once it is archived."""
+    status = db.execute(
+        text("SELECT status FROM semesters WHERE id = :semester_id FOR UPDATE"),
+        {"semester_id": semester_id},
+    ).scalar_one_or_none()
+    if status is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "SEMESTER_NOT_FOUND", "message": "Semester does not exist."},
+        )
+    if str(status) == "ARCHIVED":
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "SEMESTER_ARCHIVED", "message": "An archived semester is read-only."},
+        )
+    return str(status)
+
+
+def ensure_round_semester_writable(db: Session, round_id: int) -> str:
+    """Lock a round's parent semester and reject writes for archived rounds."""
+    semester_id = db.execute(
+        text("SELECT semester_id FROM rounds WHERE id = :round_id FOR UPDATE"),
+        {"round_id": round_id},
+    ).scalar_one_or_none()
+    if semester_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."},
+        )
+    return ensure_semester_writable(db, int(semester_id))
 
 
 def academic_year_for_start(start_date: Any) -> str:

@@ -67,7 +67,10 @@ Bộ môn KTPM đang xếp khoảng 370 phiên Review/Defense mỗi học kỳ b
 
 ### B. Dữ liệu nền và nhập liệu
 
-11. **FR-11 — Semester:** Một thời điểm chỉ có một học kỳ `ACTIVE`; học kỳ cũ ở chế độ chỉ đọc, trừ khi Admin mở khóa có lý do.
+11. **FR-11 — Semester:** Semester có bốn trạng thái `PLANNING`, `ACTIVE`, `CLOSED`,
+    `ARCHIVED`. Chỉ một học kỳ được `ACTIVE` tại một thời điểm; `PLANNING` dành cho chuẩn bị
+    enrollment/group/project và chưa được tạo Round, `CLOSED` kết thúc nghiệp vụ, còn `ARCHIVED`
+    là chỉ đọc.
 12. **FR-12 — Project and supervisor:** Mỗi project thuộc đúng một semester và một major, có mã duy nhất trong semester, 1–2 Supervisor và đúng một `MAIN`.
 13. **FR-13 — Group:** Mỗi project gắn đúng một group trong semester; group có mã riêng và có 4–5 Student lúc thành lập.
 14. **FR-14 — Membership history:** Membership lưu `joinedAt`, `leftAt`, trạng thái và vai trò. Drop out phải có người yêu cầu, người duyệt, ngày hiệu lực và lý do.

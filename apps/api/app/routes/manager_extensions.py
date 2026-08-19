@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from io import BytesIO
 import re
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -29,6 +29,8 @@ from app.domain.round_setup import validate_round_configuration
 from app.services.semester_queries import (
     SEMESTER_LIFECYCLE_LOCK_KEY,
     academic_year_for_start,
+    ensure_round_semester_writable,
+    ensure_semester_writable,
     semester_or_404,
 )
 from app.response_models import (
@@ -51,6 +53,7 @@ from app.response_models import (
     TimeslotResponse,
 )
 
+_PHASE3_PROVENANCE_TABLE = "schedule_assignments"
 router = APIRouter(prefix="/api/v1", tags=["manager-ui-compatibility"])
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
@@ -84,6 +87,9 @@ class ProjectUpdate(BaseModel):
 
 class GroupUpdate(BaseModel):
     code: str | None = Field(default=None, min_length=1, max_length=64)
+    project_id: int | None = Field(
+        default=None, gt=0, description="Gán/đổi project cho nhóm. Truyền null để bỏ gán."
+    )
 
 
 class RoundUpdate(BaseModel):
@@ -100,6 +106,7 @@ class RoundUpdate(BaseModel):
     max_groups_per_timeslot: int | None = Field(default=None, gt=0)
     max_minutes_per_part: int | None = Field(default=None, gt=0)
     max_minutes_per_day: int | None = Field(default=None, gt=0)
+    room_types: list[Literal["NORMAL", "SEMINAR", "LAB"]] | None = None
 
 
 class TimeslotUpdate(BaseModel):
@@ -173,6 +180,8 @@ def update_semester(semester_id: int, payload: SemesterUpdate, db: Db, user: Use
             ).mappings().one_or_none()
             if locked is None:
                 raise HTTPException(status_code=404, detail={"code": "SEMESTER_NOT_FOUND", "message": "Semester does not exist."})
+            if str(locked["status"]) == "ARCHIVED":
+                raise HTTPException(status_code=409, detail={"code": "SEMESTER_ARCHIVED", "message": "An archived semester is read-only."})
             actor_id = _actor_id(db, user)
             db.execute(
                 text(
@@ -223,7 +232,10 @@ def get_round_detail(round_id: int, db: Db, user: User) -> dict[str, Any]:
                    COALESCE((SELECT MIN(day_date) FROM round_days WHERE round_id = r.id), r.start_date) AS effective_start_date,
                    COALESCE((SELECT MAX(day_date) FROM round_days WHERE round_id = r.id), r.end_date) AS effective_end_date,
                    (SELECT COUNT(*) FROM round_groups WHERE round_id = r.id) AS group_count,
-                   (SELECT COUNT(*) FROM round_rooms WHERE round_id = r.id) AS room_count,
+                   (SELECT COUNT(*) FROM rooms rm JOIN round_room_types rrt ON rrt.room_type = rm.room_type
+                    WHERE rrt.round_id = r.id AND rm.active = TRUE) AS room_count,
+                   COALESCE((SELECT array_agg(rrt.room_type::text ORDER BY rrt.room_type::text)
+                             FROM round_room_types rrt WHERE rrt.round_id = r.id), ARRAY[]::text[]) AS room_types,
                    (SELECT COUNT(*) FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id WHERE rd.round_id = r.id AND ts.active) AS active_timeslot_count
             FROM rounds r JOIN semesters s ON s.id = r.semester_id WHERE r.id = :id
             """
@@ -253,10 +265,11 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
         raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
     columns = {"start_date", "end_date", "session_duration_minutes", "reviewer_count", "result_owner_mode", "group_selection_mode", "registration_deadline", "h12_sessions_per_part", "h12_sessions_per_day", "h12_semester_quota", "max_groups_per_timeslot", "max_minutes_per_part", "max_minutes_per_day"}
     assignments = [f"{key} = :{key}" for key in values if key in columns]
-    if not assignments:
+    if not assignments and "room_types" not in values:
         raise HTTPException(status_code=422, detail={"code": "ROUND_UPDATE_EMPTY", "message": "No editable round fields supplied."})
     values["id"] = round_id
     with db.begin():
+        ensure_round_semester_writable(db, round_id)
         current_round = db.execute(text("SELECT status, type, reviewer_count, result_owner_mode, start_date, end_date FROM rounds WHERE id = :id FOR UPDATE"), {"id": round_id}).mappings().one_or_none()
         if current_round is None:
             raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
@@ -270,9 +283,17 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
             validate_round_configuration({"type": str(current_round["type"]), "reviewer_count": values.get("reviewer_count", current_round["reviewer_count"]), "result_owner_mode": values.get("result_owner_mode", current_round["result_owner_mode"]), "groups": [1], "timeslots": [1], "rooms": [1]})
         except DomainError as exc:
             raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
-        updated = db.execute(text(f"UPDATE rounds SET {', '.join(assignments)} WHERE id = :id RETURNING id"), values).scalar_one_or_none()
-        if updated is None:
-            raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
+        if assignments:
+            updated = db.execute(text(f"UPDATE rounds SET {', '.join(assignments)} WHERE id = :id RETURNING id"), values).scalar_one_or_none()
+            if updated is None:
+                raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
+        if "room_types" in values:
+            room_types = values["room_types"] or []
+            if not room_types:
+                raise HTTPException(status_code=422, detail={"code": "ROUND_ROOM_TYPES_REQUIRED", "message": "At least one allowed room type is required."})
+            db.execute(text("DELETE FROM round_room_types WHERE round_id = :id"), {"id": round_id})
+            for room_type in sorted(set(room_types)):
+                db.execute(text("INSERT INTO round_room_types (round_id, room_type) VALUES (:round_id, CAST(:room_type AS room_type))"), {"round_id": round_id, "room_type": room_type})
     return get_round_detail(round_id, db, user)
 
 
@@ -282,9 +303,10 @@ def update_project(project_id: int, payload: ProjectUpdate, db: Db, user: User) 
     values = payload.model_dump(exclude_unset=True)
     try:
         with db.begin():
-            row = db.execute(text("SELECT id, code, title FROM projects WHERE id = :id FOR UPDATE"), {"id": project_id}).mappings().one_or_none()
+            row = db.execute(text("SELECT id, code, title, semester_id FROM projects WHERE id = :id FOR UPDATE"), {"id": project_id}).mappings().one_or_none()
             if row is None:
                 raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "message": "Project does not exist."})
+            ensure_semester_writable(db, int(row["semester_id"]))
             scalar = {key: values[key] for key in ("code", "title") if key in values}
             if scalar:
                 assignments = ", ".join(f"{key} = :{key}" for key in scalar)
@@ -334,14 +356,49 @@ def get_project_detail(project_id: int, db: Db, user: User) -> dict[str, Any]:
 @router.patch("/groups/{group_id}", response_model=GroupResponse)
 def update_group(group_id: int, payload: GroupUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
-    if payload.code is None:
+    changes = payload.model_dump(exclude_unset=True)
+    if "project_id" in changes and changes["project_id"] is not None:
+        project_exists = db.execute(
+            text("SELECT 1 FROM projects WHERE id = :project_id"), {"project_id": changes["project_id"]}
+        ).scalar_one_or_none()
+        if project_exists is None:
+            raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "message": "Project does not exist."})
+        db.rollback()
+    if not changes:
         row = db.execute(text("SELECT id, code, status, project_id FROM groups WHERE id = :id"), {"id": group_id}).mappings().one_or_none()
     else:
+        params: dict[str, Any] = {"id": group_id}
+        assignments = []
+        if "code" in changes:
+            params["code"] = changes["code"].strip()
+            assignments.append("code = :code")
+        if "project_id" in changes:
+            params["project_id"] = changes["project_id"]
+            assignments.append("project_id = :project_id")
         try:
             with db.begin():
-                row = db.execute(text("UPDATE groups SET code = :code WHERE id = :id RETURNING id, code, status, project_id"), {"id": group_id, "code": payload.code.strip()}).mappings().one_or_none()
+                current_project = db.execute(
+                    text("SELECT semester_id FROM groups g JOIN projects p ON p.id = g.project_id WHERE g.id = :id FOR UPDATE"),
+                    {"id": group_id},
+                ).scalar_one_or_none()
+                if current_project is not None:
+                    ensure_semester_writable(db, int(current_project))
+                if changes.get("project_id") is not None:
+                    target_semester = db.execute(
+                        text("SELECT semester_id FROM projects WHERE id = :project_id FOR UPDATE"),
+                        {"project_id": changes["project_id"]},
+                    ).scalar_one_or_none()
+                    if target_semester is not None:
+                        ensure_semester_writable(db, int(target_semester))
+                row = db.execute(
+                    text(f"UPDATE groups SET {', '.join(assignments)} WHERE id = :id RETURNING id, code, status, project_id"),
+                    params,
+                ).mappings().one_or_none()
         except IntegrityError as exc:
             db.rollback()
+            constraint = str(getattr(exc, "orig", exc))
+            if "project_id" in changes and "project_id" in constraint:
+                raise HTTPException(status_code=409, detail={"code": "PROJECT_ALREADY_ASSIGNED", "message": "Project already has a group assigned."}) from exc
             raise HTTPException(status_code=409, detail={"code": "GROUP_DUPLICATE", "message": "Group code already exists."}) from exc
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "GROUP_NOT_FOUND", "message": "Group does not exist."})
@@ -353,8 +410,8 @@ def get_group_detail(group_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     row = db.execute(
         text(
-            "SELECT g.id, g.code, g.status, p.id AS project_id, p.code AS project_code, p.title "
-            "FROM groups g JOIN projects p ON p.id = g.project_id WHERE g.id = :id"
+            "SELECT g.id, g.code, g.status, g.project_id, p.code AS project_code, p.title "
+            "FROM groups g LEFT JOIN projects p ON p.id = g.project_id WHERE g.id = :id"
         ),
         {"id": group_id},
     ).mappings().one_or_none()
@@ -390,6 +447,7 @@ def list_round_invitations(round_id: int, db: Db, user: User) -> list[dict[str, 
 def resend_invitation(round_id: int, lecturer_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
+        ensure_round_semester_writable(db, round_id)
         exists = db.execute(text("SELECT 1 FROM round_invitations WHERE round_id = :round_id AND lecturer_id = :lecturer_id"), {"round_id": round_id, "lecturer_id": lecturer_id}).scalar_one_or_none()
         if exists is None:
             raise HTTPException(status_code=404, detail={"code": "INVITATION_NOT_FOUND", "message": "Invitation does not exist."})
@@ -426,9 +484,10 @@ def update_timeslot(timeslot_id: int, payload: TimeslotUpdate, db: Db, user: Use
     if not values:
         values = {}
     with db.begin():
-        row = db.execute(text("SELECT ts.id, ts.start_at, ts.end_at, r.status FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id JOIN rounds r ON r.id = rd.round_id WHERE ts.id = :id FOR UPDATE"), {"id": timeslot_id}).mappings().one_or_none()
+        row = db.execute(text("SELECT ts.id, ts.start_at, ts.end_at, r.id AS round_id, r.status FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id JOIN rounds r ON r.id = rd.round_id WHERE ts.id = :id FOR UPDATE"), {"id": timeslot_id}).mappings().one_or_none()
         if row is None:
             raise HTTPException(status_code=404, detail={"code": "TIMESLOT_NOT_FOUND", "message": "Timeslot does not exist."})
+        ensure_round_semester_writable(db, int(row["round_id"]))
         if str(row["status"]) not in {"DRAFT", "OPEN_REGISTRATION"}:
             raise HTTPException(status_code=409, detail={"code": "TIMESLOT_LOCKED", "message": "Timeslot cannot be changed after scheduling starts."})
         merged_start = values.get("start_at", row["start_at"])
@@ -446,7 +505,9 @@ def update_timeslot(timeslot_id: int, payload: TimeslotUpdate, db: Db, user: Use
 def disable_timeslot(timeslot_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
-        row = db.execute(text("SELECT ts.id, r.status FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id JOIN rounds r ON r.id = rd.round_id WHERE ts.id = :id FOR UPDATE"), {"id": timeslot_id}).mappings().one_or_none()
+        row = db.execute(text("SELECT ts.id, r.id AS round_id, r.status FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id JOIN rounds r ON r.id = rd.round_id WHERE ts.id = :id FOR UPDATE"), {"id": timeslot_id}).mappings().one_or_none()
+        if row is not None:
+            ensure_round_semester_writable(db, int(row["round_id"]))
         if row is not None and str(row["status"]) not in {"DRAFT", "OPEN_REGISTRATION"}:
             raise HTTPException(status_code=409, detail={"code": "TIMESLOT_LOCKED", "message": "Timeslot cannot be changed after scheduling starts."})
         row = db.execute(text("UPDATE timeslots SET active = FALSE WHERE id = :id RETURNING id, active"), {"id": timeslot_id}).mappings().one_or_none()
@@ -461,10 +522,11 @@ def list_lecturer_quotas(semester_id: int, db: Db, user: User) -> list[dict[str,
     rows = db.execute(
         text(
             "SELECT l.id AS lecturer_id, l.lecturer_code, a.display_name, COALESCE(q.quota, 0) AS quota, "
-            "COUNT(sr.session_id) AS used "
+            "COUNT(ss.id) AS used "
             "FROM lecturers l JOIN accounts a ON a.id = l.account_id LEFT JOIN semester_lecturer_quotas q ON q.lecturer_id = l.id AND q.semester_id = :semester_id "
-            "LEFT JOIN rounds r ON r.semester_id = :semester_id LEFT JOIN schedule_versions sv ON sv.round_id = r.id AND sv.status IN ('VALID', 'PUBLISHED') "
-            "LEFT JOIN session_reviewers sr ON sr.lecturer_id = l.id AND sr.schedule_version_id = sv.id "
+            "LEFT JOIN rounds r ON r.semester_id = :semester_id LEFT JOIN schedule_versions sv ON sv.round_id = r.id AND sv.status IN ('ACTIVE', 'PUBLISHED') "
+            "LEFT JOIN sessions ss ON ss.schedule_version_id = sv.id "
+            "LEFT JOIN council_members cm ON cm.council_id = ss.council_id AND cm.lecturer_id = l.id "
             "GROUP BY l.id, l.lecturer_code, a.display_name, q.quota ORDER BY l.lecturer_code"
         ),
         {"semester_id": semester_id},
@@ -476,6 +538,7 @@ def list_lecturer_quotas(semester_id: int, db: Db, user: User) -> list[dict[str,
 def set_lecturer_quota(semester_id: int, lecturer_id: int, payload: QuotaUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
+        ensure_semester_writable(db, semester_id)
         row = db.execute(
             text(
                 "INSERT INTO semester_lecturer_quotas (semester_id, lecturer_id, quota, updated_by) VALUES (:semester_id, :lecturer_id, :quota, :updated_by) "
@@ -492,11 +555,11 @@ def list_sessions(db: Db, user: User, round_id: int | None = None, version_id: i
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
-            "SELECT s.id, s.schedule_version_id AS version_id, sv.round_id, s.group_id, g.code AS group_code, p.code AS project_code, "
+            "SELECT s.id, sa.id AS assignment_id, s.schedule_version_id AS version_id, sv.round_id, s.group_id, g.code AS group_code, p.code AS project_code, "
             "s.timeslot_id, s.room_id, rm.code AS room_code, s.start_at, s.end_at, s.status, "
             "jsonb_agg(DISTINCT jsonb_build_object('id', l.id, 'code', l.lecturer_code, 'name', a.display_name)) FILTER (WHERE l.id IS NOT NULL) AS reviewers "
-            "FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN groups g ON g.id = s.group_id JOIN projects p ON p.id = g.project_id "
-            "LEFT JOIN rooms rm ON rm.id = s.room_id LEFT JOIN session_reviewers sr ON sr.session_id = s.id LEFT JOIN lecturers l ON l.id = sr.lecturer_id LEFT JOIN accounts a ON a.id = l.account_id "
+            "FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN groups g ON g.id = s.group_id JOIN schedule_assignments sa ON sa.schedule_version_id=s.schedule_version_id AND sa.group_id=s.group_id JOIN projects p ON p.id = sa.project_id "
+            "LEFT JOIN rooms rm ON rm.id = s.room_id LEFT JOIN council_members cm ON cm.council_id = s.council_id LEFT JOIN lecturers l ON l.id = cm.lecturer_id LEFT JOIN accounts a ON a.id = l.account_id "
             "WHERE (CAST(:round_id AS BIGINT) IS NULL OR sv.round_id = CAST(:round_id AS BIGINT)) AND (CAST(:version_id AS BIGINT) IS NULL OR s.schedule_version_id = CAST(:version_id AS BIGINT)) AND (CAST(:status_filter AS TEXT) IS NULL OR s.status::text = CAST(:status_filter AS TEXT)) "
             "GROUP BY s.id, sv.round_id, g.code, p.code, rm.code ORDER BY s.start_at, s.id"
         ),
@@ -536,15 +599,24 @@ def group_progress_report(semester_id: int, db: Db, user: User) -> list[dict[str
     rows = db.execute(
         text(
             "WITH latest_results AS ("
-            " SELECT s.group_id, r.type, sr.outcome::text AS outcome, sr.entered_at, sr.verifier_lecturer_id, "
+            " SELECT s.group_id, a.project_id, pr.title AS project_name, r.type, sr.outcome::text AS outcome, sr.entered_at, sr.verifier_lecturer_id, "
             " ROW_NUMBER() OVER (PARTITION BY s.group_id, r.type ORDER BY sr.entered_at DESC, sr.id DESC) AS rn "
-            " FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
-            " JOIN rounds r ON r.id = sv.round_id WHERE r.semester_id = :semester_id AND sv.status IN ('VALID', 'PUBLISHED')"
+            " FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id JOIN projects pr ON pr.id=a.project_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+            " JOIN rounds r ON r.id = sv.round_id WHERE r.semester_id = :semester_id AND sv.status IN ('ACTIVE', 'PUBLISHED')"
             "), latest_remediation AS ("
             " SELECT rc.group_id, rc.status::text AS remediation_status, rc.due_at, rc.verifier_lecturer_id, "
             " ROW_NUMBER() OVER (PARTITION BY rc.group_id ORDER BY rc.due_at DESC, rc.id DESC) AS rn "
-            " FROM remediation_cases rc JOIN groups rg ON rg.id = rc.group_id JOIN projects rp ON rp.id = rg.project_id WHERE rp.semester_id = :semester_id"
-            ") SELECT g.id AS group_id, g.code AS group_code, p.title AS project_name, g.status AS group_status, "
+            " FROM remediation_cases rc JOIN session_results rrs ON rrs.id = rc.session_result_id "
+            " JOIN sessions rss ON rss.id = rrs.session_id "
+            " JOIN schedule_assignments ra ON ra.schedule_version_id = rss.schedule_version_id AND ra.group_id = rss.group_id "
+            " JOIN projects rp ON rp.id = ra.project_id WHERE rp.semester_id = :semester_id"
+            "), historical_groups AS ("
+            " SELECT DISTINCT ON (a.group_id) a.group_id, a.project_id, p.title AS project_name"
+            " FROM schedule_assignments a JOIN projects p ON p.id = a.project_id"
+            " JOIN schedule_versions hv ON hv.id = a.schedule_version_id"
+            " WHERE p.semester_id = :semester_id AND hv.status IN ('ACTIVE', 'PUBLISHED')"
+            " ORDER BY a.group_id, hv.activated_at DESC NULLS LAST, a.id DESC"
+            ") SELECT hg.group_id AS group_id, g.code AS group_code, COALESCE(MAX(lr.project_name), hg.project_name) AS project_name, g.status AS group_status, "
             "MAX(lr.outcome) FILTER (WHERE lr.type = 'REVIEW_1' AND lr.rn = 1) AS review_1, "
             "MAX(lr.outcome) FILTER (WHERE lr.type = 'REVIEW_2' AND lr.rn = 1) AS review_2, "
             "MAX(lr.outcome) FILTER (WHERE lr.type = 'DEFENSE_1_1' AND lr.rn = 1) AS defense_1_1, "
@@ -554,9 +626,9 @@ def group_progress_report(semester_id: int, db: Db, user: User) -> list[dict[str
             "MAX(lm.remediation_status) FILTER (WHERE lm.rn = 1) AS remediation_status, "
             "MAX(lm.due_at) FILTER (WHERE lm.rn = 1) AS remediation_due_at, "
             "MAX(lm.verifier_lecturer_id) FILTER (WHERE lm.rn = 1) AS remediation_verifier_lecturer_id "
-            "FROM groups g JOIN projects p ON p.id = g.project_id LEFT JOIN latest_results lr ON lr.group_id = g.id "
-            "LEFT JOIN latest_remediation lm ON lm.group_id = g.id WHERE p.semester_id = :semester_id "
-            "GROUP BY g.id, g.code, p.title, g.status ORDER BY g.code"
+            "FROM historical_groups hg JOIN groups g ON g.id = hg.group_id LEFT JOIN latest_results lr ON lr.group_id = hg.group_id "
+            "LEFT JOIN latest_remediation lm ON lm.group_id = hg.group_id "
+            "GROUP BY hg.group_id, g.code, hg.project_name, g.status ORDER BY g.code"
         ),
         {"semester_id": semester_id},
     ).mappings().all()
@@ -623,6 +695,7 @@ async def import_projects(
             if semester_id is None or major_id is None:
                 errors.append({"row": index, "code": "SEMESTER_OR_MAJOR_NOT_FOUND"})
                 continue
+            ensure_semester_writable(db, int(semester_id))
             try:
                 with db.begin_nested():
                     db.execute(text("INSERT INTO projects (semester_id, major_id, code, title) VALUES (:semester_id, :major_id, :code, :title)"), {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title})
@@ -662,6 +735,8 @@ async def import_groups(
             if project_id is None:
                 errors.append({"group_code": group_code, "code": "PROJECT_NOT_FOUND_OR_AMBIGUOUS"})
                 continue
+            semester_id = db.execute(text("SELECT semester_id FROM projects WHERE id = :project_id"), {"project_id": project_id}).scalar_one()
+            ensure_semester_writable(db, int(semester_id))
             try:
                 with db.begin_nested():
                     group_id = db.execute(text("INSERT INTO groups (project_id, code) VALUES (:project_id, :code) RETURNING id"), {"project_id": project_id, "code": group_code}).scalar_one()
@@ -698,7 +773,7 @@ def export_round(round_id: int, db: Db, user: User) -> StreamingResponse:
     sheet = workbook.active
     sheet.title = "Schedule"
     sheet.append(["Session", "Group", "Round", "Start", "End", "Room", "Status"])
-    rows = db.execute(text("SELECT s.id, g.code AS group_code, r.type, s.start_at, s.end_at, rm.code AS room_code, s.status FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id WHERE r.id = :round_id AND sv.activated_at IS NOT NULL AND sv.status IN ('VALID', 'PUBLISHED') ORDER BY s.start_at"), {"round_id": round_id}).mappings().all()
+    rows = db.execute(text("SELECT s.id, g.code AS group_code, r.type, s.start_at, s.end_at, rm.code AS room_code, s.status FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id WHERE r.id = :round_id AND sv.activated_at IS NOT NULL AND sv.status IN ('ACTIVE', 'PUBLISHED') ORDER BY s.start_at"), {"round_id": round_id}).mappings().all()
     for row in rows:
         sheet.append([row[key] for key in ("id", "group_code", "type", "start_at", "end_at", "room_code", "status")])
     return _xlsx_response(workbook, f"round-{round_id}.xlsx")
@@ -711,7 +786,7 @@ def export_semester_schedule(semester_id: int, db: Db, user: User) -> StreamingR
     sheet = workbook.active
     sheet.title = "Semester Schedule"
     sheet.append(["Session", "Group", "Round", "Start", "End", "Room", "Status"])
-    rows = db.execute(text("SELECT s.id, g.code AS group_code, r.type, s.start_at, s.end_at, rm.code AS room_code, s.status FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id WHERE r.semester_id = :semester_id AND sv.activated_at IS NOT NULL AND sv.status IN ('VALID', 'PUBLISHED') ORDER BY s.start_at"), {"semester_id": semester_id}).mappings().all()
+    rows = db.execute(text("SELECT s.id, g.code AS group_code, r.type, s.start_at, s.end_at, rm.code AS room_code, s.status FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id LEFT JOIN rooms rm ON rm.id = s.room_id WHERE r.semester_id = :semester_id AND sv.activated_at IS NOT NULL AND sv.status IN ('ACTIVE', 'PUBLISHED') ORDER BY s.start_at"), {"semester_id": semester_id}).mappings().all()
     for row in rows:
         sheet.append([row[key] for key in ("id", "group_code", "type", "start_at", "end_at", "room_code", "status")])
     return _xlsx_response(workbook, f"semester-{semester_id}-schedule.xlsx")
@@ -724,7 +799,7 @@ def export_semester_results(semester_id: int, db: Db, user: User) -> StreamingRe
     sheet = workbook.active
     sheet.title = "Results"
     sheet.append(["Group", "Round", "Outcome", "Entered At", "Verify Status"])
-    rows = db.execute(text("SELECT g.code AS group_code, r.type, sr.outcome, sr.entered_at, sr.verify_status FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id WHERE r.semester_id = :semester_id AND sv.activated_at IS NOT NULL AND sv.status IN ('VALID', 'PUBLISHED') ORDER BY sr.entered_at"), {"semester_id": semester_id}).mappings().all()
+    rows = db.execute(text("SELECT g.code AS group_code, r.type, sr.outcome, sr.entered_at, sr.verify_status FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id WHERE r.semester_id = :semester_id AND sv.activated_at IS NOT NULL AND sv.status IN ('ACTIVE', 'PUBLISHED') ORDER BY sr.entered_at"), {"semester_id": semester_id}).mappings().all()
     for row in rows:
         sheet.append([row[key] for key in ("group_code", "type", "outcome", "entered_at", "verify_status")])
     return _xlsx_response(workbook, f"semester-{semester_id}-results.xlsx")

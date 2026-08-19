@@ -30,7 +30,6 @@ def test_candidate_generator_filters_supervisor_and_unavailable_reviewer():
         context,
         groups=[1],
         timeslots=[(1, "2030-01-01", "AM")],
-        rooms=[1],
         reviewers=[2, 3, 4, 99],
     )
     assert candidates
@@ -40,7 +39,7 @@ def test_candidate_generator_filters_supervisor_and_unavailable_reviewer():
 
 def test_unscheduled_reason_has_one_stable_reason_code():
     context = candidate_input()
-    reason = reason_for_unscheduled(1, context, reviewers=[], timeslots=[1], rooms=[1])
+    reason = reason_for_unscheduled(1, context, reviewers=[], timeslots=[1])
     assert reason.code == "NO_REVIEWER_AVAILABILITY"
     assert reason.explanation
     assert reason.remediation_hint
@@ -53,7 +52,6 @@ def test_snapshot_is_deterministic_and_contains_provenance():
         context=context,
         groups=[1],
         timeslots=[1, 2],
-        rooms=[1],
         reviewer_assignments={1: [2, 3, 4]},
         soft_weights={"S1": 2, "S2": 1},
     )
@@ -62,11 +60,9 @@ def test_snapshot_is_deterministic_and_contains_provenance():
         context=context,
         groups=[1],
         timeslots=[1, 2],
-        rooms=[1],
         reviewer_assignments={1: [2, 3, 4]},
         soft_weights={"S1": 2, "S2": 1},
     )
     assert first == second
     assert first["round_id"] == 7
     assert first["h_rules"]["H12"]["sessions_per_part"] == 4
-

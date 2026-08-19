@@ -6,7 +6,7 @@ def test_version_activation_keeps_history_and_allows_one_active_version():
     first = store.create(round_id=1, snapshot={"seed": 1})
     second = store.create(round_id=1, snapshot={"seed": 2})
     store.activate(second.id)
-    assert store.get(first.id).status == "DRAFT"
+    assert store.get(first.id).status == "DISCARDED"
     assert store.get(second.id).status == "ACTIVE"
     assert [version.id for version in store.list(round_id=1)] == [first.id, second.id]
 

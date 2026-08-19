@@ -29,7 +29,6 @@ def test_solver_returns_validator_safe_partial_schedule_with_reason_codes():
         context,
         groups=[1, 2],
         timeslots=[(1, datetime(2030, 1, 1, 9, tzinfo=UTC), datetime(2030, 1, 1, 9, 30, tzinfo=UTC), "2030-01-01", "AM")],
-        rooms=[1],
         reviewers=[2, 3, 4],
         time_limit_seconds=2,
         random_seed=7,
@@ -37,13 +36,12 @@ def test_solver_returns_validator_safe_partial_schedule_with_reason_codes():
     assert result.status in {"OPTIMAL", "FEASIBLE", "PARTIAL"}
     assert validate_schedule(result.sessions, context).valid
     assert len(result.unscheduled) == 1
-    assert result.unscheduled[0].code in {"NO_TIMESLOT", "NO_ROOM"}
+    assert result.unscheduled[0].code == "NO_TIMESLOT"
     assert result.soft_scores == solve_schedule(
         context,
         groups=[1, 2],
         timeslots=[(1, datetime(2030, 1, 1, 9, tzinfo=UTC), datetime(2030, 1, 1, 9, 30, tzinfo=UTC), "2030-01-01", "AM")],
-        rooms=[1],
-        reviewers=[2, 3, 4],
+            reviewers=[2, 3, 4],
         time_limit_seconds=2,
         random_seed=7,
     ).soft_scores
@@ -91,7 +89,6 @@ def test_solver_balances_reviewer_load_when_quota_and_s1_are_configured():
         context,
         groups=groups,
         timeslots=timeslots,
-        rooms=[1, 2],
         reviewers=reviewers,
         time_limit_seconds=5,
         random_seed=17,

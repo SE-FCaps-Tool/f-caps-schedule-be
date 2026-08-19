@@ -2,8 +2,8 @@ from app.domain.errors import DomainError
 
 
 def ensure_publishable(version_status: str, validation_valid: bool) -> bool:
-    if version_status != "VALID":
-        raise DomainError("VERSION_NOT_VALID", "Only a valid ScheduleVersion can be published.")
+    if version_status != "ACTIVE":
+        raise DomainError("VERSION_NOT_VALID", "Only an active ScheduleVersion can be published.")
     if not validation_valid:
         raise DomainError("SCHEDULE_HAS_VIOLATIONS", "The schedule still contains hard violations.")
     return True

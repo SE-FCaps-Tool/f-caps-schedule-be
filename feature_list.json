@@ -119,6 +119,26 @@
       "evidence": "SemesterResponse exposes created_by and updated_by actor objects with id/email/display_name, or null for legacy rows.",
       "notes": "Actor fields are populated from account joins when ownership is known.",
       "priority": "P2"
+    },
+    {
+      "id": "room-free-scheduling-solver",
+      "title": "Generate schedules without assigning physical rooms",
+      "user_visible_behavior": "so that room availability changes do not force a full CP-SAT re-solve and the solver remains responsible for Time + Council only.",
+      "verification_command": "Accepted when generate_candidates/solve_schedule have no rooms input, H3 is deferred to Room Assignment, and the 74-group benchmark finishes under 60 seconds with zero validator violations.",
+      "status": "not_started",
+      "evidence": "",
+      "notes": "",
+      "priority": "P1"
+    },
+    {
+      "id": "post-activation-room-assignment",
+      "title": "Assign and suggest rooms after schedule activation",
+      "user_visible_behavior": "so that Managers can assign or reassign valid rooms without rerunning the scheduler.",
+      "verification_command": "Accepted when the four Room Assignment endpoints exist, enforce active allowed room types, serialize global conflicts, and return structured errors.",
+      "status": "not_started",
+      "evidence": "",
+      "notes": "",
+      "priority": "P1"
     }
   ]
 }

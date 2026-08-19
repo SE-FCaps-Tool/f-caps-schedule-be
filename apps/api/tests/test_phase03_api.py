@@ -57,8 +57,8 @@ def test_seed_fixture_is_idempotent_and_returns_target_counts(client):
     assert first.status_code == 201
     assert second.status_code in {200, 201}
     assert first.json()["counts"] == second.json()["counts"]
-    assert first.json()["counts"]["lecturers"] == 26
-    assert first.json()["counts"]["groups"] == 74
+    assert first.json()["counts"]["accounts"] == 8
+    assert first.json()["counts"]["rooms"] == 6
 
 
 def test_invalid_semester_payload_is_rejected_before_database_access(client):
@@ -104,7 +104,6 @@ def test_semester_duration_and_status_transitions(client):
     [
         ("2030-01-01", "2030-04-14"),
         ("2030-01-01", "2030-05-01"),
-        ("2030-04-15", "2030-01-01"),
     ],
 )
 def test_invalid_semester_duration_is_rejected(client, start_date, end_date):
@@ -120,6 +119,21 @@ def test_invalid_semester_duration_is_rejected(client, start_date, end_date):
     )
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "SEMESTER_DURATION_INVALID"
+
+
+def test_semester_end_before_start_is_rejected_as_date_invalid(client):
+    response = client.post(
+        "/api/v1/semesters",
+        json={
+            "code": f"INVALID-{uuid4().hex[:8]}",
+            "name": "Invalid Date Order",
+            "start_date": "2030-04-15",
+            "end_date": "2030-01-01",
+        },
+        headers={"X-Test-Session": "active-manager"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "SEMESTER_DATE_INVALID"
 
 
 def test_manager_only_endpoint_rejects_lecturer(client):
@@ -141,6 +155,7 @@ def test_manager_can_create_round_day_and_manager_entered_availability(client):
             "semester_id": semester_id,
             "type": "DEFENSE_1_1",
             "reviewer_count": 3,
+            "room_types": ["NORMAL"],
             "result_owner_mode": True,
             "session_duration_minutes": 30,
         },
@@ -203,3 +218,82 @@ def test_group_mutation_validates_leader_and_rolls_back_atomically(client):
     assert invalid.status_code == 422
     assert invalid.json()["detail"]["code"] == "LEADER_REQUIRED"
     assert len(client.get("/api/v1/groups", headers=headers).json()) == before
+
+
+@pytest.mark.integration
+def test_group_can_be_created_before_project_and_assigned_later(client):
+    client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
+    headers = {"X-Test-Session": "active-manager"}
+    semesters = client.get("/api/v1/semesters", headers=headers).json()
+    semester_id = next(item["id"] for item in semesters if item["code"] == "SE-2026-2027")
+    majors = client.get("/api/v1/majors", headers=headers).json()
+    students = client.get("/api/v1/students", headers=headers).json()[4:8]
+    group_code = f"G-NOPROJ-{uuid4().hex[:6]}"
+
+    created = client.post(
+        "/api/v1/groups",
+        json={
+            "code": group_code,
+            "members": [
+                {"student_code": student["student_code"], "role": "LEADER" if index == 0 else "MEMBER"}
+                for index, student in enumerate(students)
+            ],
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    group_id = created.json()["id"]
+
+    listed = next(item for item in client.get("/api/v1/groups", headers=headers).json() if item["id"] == group_id)
+    assert listed["project_id"] is None
+    assert listed["project_code"] is None
+
+    detail = client.get(f"/api/v1/groups/{group_id}", headers=headers)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["project_id"] is None
+
+    project = client.post(
+        "/api/v1/projects",
+        json={
+            "semester_id": semester_id,
+            "major_id": majors[0]["id"],
+            "code": f"P-NOPROJ-{uuid4().hex[:6]}",
+            "title": "Assigned Later Project",
+            "supervisors": ["GV01:MAIN"],
+        },
+        headers=headers,
+    )
+    assert project.status_code == 201, project.text
+    project_id = project.json()["id"]
+
+    assigned = client.patch(
+        f"/api/v1/groups/{group_id}",
+        json={"project_id": project_id},
+        headers=headers,
+    )
+    assert assigned.status_code == 200, assigned.text
+    assert assigned.json()["project_id"] == project_id
+
+    detail_after = client.get(f"/api/v1/groups/{group_id}", headers=headers)
+    assert detail_after.json()["project_id"] == project_id
+    assert detail_after.json()["project_code"] == project.json()["code"]
+
+    duplicate_assign = client.post(
+        "/api/v1/groups",
+        json={
+            "code": f"G-DUP-{uuid4().hex[:6]}",
+            "members": [
+                {"student_code": student["student_code"], "role": "LEADER" if index == 0 else "MEMBER"}
+                for index, student in enumerate(client.get("/api/v1/students", headers=headers).json()[8:12])
+            ],
+        },
+        headers=headers,
+    )
+    assert duplicate_assign.status_code == 201, duplicate_assign.text
+    conflict = client.patch(
+        f"/api/v1/groups/{duplicate_assign.json()['id']}",
+        json={"project_id": project_id},
+        headers=headers,
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "PROJECT_ALREADY_ASSIGNED"

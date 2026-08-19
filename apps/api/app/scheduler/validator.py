@@ -158,7 +158,11 @@ def validate_schedule(
                             other.session_id,
                         )
                     )
-                if current.room_id == other.room_id:
+                if (
+                    current.room_id is not None
+                    and other.room_id is not None
+                    and current.room_id == other.room_id
+                ):
                     violations.append(
                         _violation(
                             "H3",

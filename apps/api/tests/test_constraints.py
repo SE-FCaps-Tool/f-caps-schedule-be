@@ -14,7 +14,7 @@ def session(
     *,
     group_id: int = 1,
     project_id: int = 10,
-    room_id: int = 1,
+    room_id: int | None = 1,
     reviewer_ids: tuple[int, ...] = (2, 3, 4),
     slot_id: int = 1,
     start_hour: int = 9,
@@ -89,6 +89,40 @@ def test_h11_waiver_allows_missing_continuity_but_is_not_a_general_waiver():
         h11_waiver_reasons={1: "Prior Reviewer unavailable."},
     )
     assert validate_schedule([session(1)], context).valid is True
+
+
+def test_overlapping_unassigned_sessions_do_not_trigger_h3():
+    context = base_input(
+        group_status={1: "PENDING_D11", 2: "PENDING_D11"},
+        group_project={1: 10, 2: 11},
+        project_supervisors={10: {99}, 11: {98}},
+        lecturer_availability={(2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1)},
+    )
+    result = validate_schedule(
+        [
+            session(1, room_id=None),
+            session(2, group_id=2, project_id=11, room_id=None, reviewer_ids=(5, 6, 7)),
+        ],
+        context,
+    )
+    assert "H3" not in {violation.rule for violation in result.violations}
+
+
+def test_overlapping_sessions_with_same_concrete_room_still_trigger_h3():
+    context = base_input(
+        group_status={1: "PENDING_D11", 2: "PENDING_D11"},
+        group_project={1: 10, 2: 11},
+        project_supervisors={10: {99}, 11: {98}},
+        lecturer_availability={(2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1)},
+    )
+    result = validate_schedule(
+        [
+            session(1, room_id=42),
+            session(2, group_id=2, project_id=11, room_id=42, reviewer_ids=(5, 6, 7)),
+        ],
+        context,
+    )
+    assert "H3" in {violation.rule for violation in result.violations}
 
 
 @pytest.mark.parametrize("actor", ["ADMIN", "LECTURER", ""])

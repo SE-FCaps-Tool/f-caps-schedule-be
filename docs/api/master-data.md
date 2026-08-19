@@ -7,7 +7,7 @@ Tất cả route trong file này đều có prefix `/api/v1`.
 ### `GET /semesters`
 
 - **Role:** `ADMIN`, `MANAGER`.
-- **Query:** `search` (code/name), `status=ACTIVE|CLOSED`, `academic_year=YYYY-YYYY`; all filters combine with AND.
+- **Query:** `search` (code/name), `status=PLANNING|ACTIVE|CLOSED|ARCHIVED`, `academic_year=YYYY-YYYY`; all filters combine with AND.
 - **Response `200`:** array `{ id, code, name, note, start_date, end_date, academic_year, status, project_count, group_count, round_count, created_at, created_by, updated_at, updated_by }`.
 
 ```json
@@ -33,17 +33,17 @@ Tất cả route trong file này đều có prefix `/api/v1`.
 
 - **Role:** `ADMIN`, `MANAGER`.
 - **Body:** [`SemesterCreate`](schemas.md#semestercreate).
-- **Body:** `{ code, name, note?, start_date, end_date }`; status không nhận từ client.
-- **Success `201`:** object semester đầy đủ; status luôn là `ACTIVE`.
+- **Body:** `{ code, name, note?, start_date, end_date, status? }`; `status` nhận `PLANNING` hoặc `ACTIVE`.
+- **Success `201`:** object semester đầy đủ; mặc định status là `ACTIVE` để tương thích client cũ.
 - **`409 DATA_DUPLICATE`:** code đã tồn tại.
 - **`422 SEMESTER_DURATION_INVALID`:** thời lượng không nằm trong cấu hình 105–120 ngày hoặc ngày kết thúc trước ngày bắt đầu.
 
 ### `POST /semesters/{semester_id}/transition`
 
 - **Role:** `ADMIN`, `MANAGER`.
-- **Body:** `{ "target_status": "CLOSED", "reason": "..." }`.
-- **Transitions:** chỉ cho phép `ACTIVE → CLOSED`.
-- **Success `200`:** `{ "id": 1, "status": "CLOSED" }`.
+- **Body:** `{ "target_status": "ARCHIVED", "reason": "..." }`.
+- **Transitions:** chỉ cho phép `PLANNING → ACTIVE → CLOSED → ARCHIVED`.
+- **Success `200`:** `{ "id": 1, "status": "ARCHIVED" }`.
 - **`422 ACTIVE_SEMESTER_EXISTS`:** đã có semester `ACTIVE` khác.
 - **`422 SEMESTER_STATUS_INVALID`:** transition không hợp lệ.
 - **`404 SEMESTER_NOT_FOUND`:** semester không tồn tại.
@@ -265,7 +265,7 @@ Nếu group xuống dưới minimum, backend vẫn trả warning để FE hiện
 - **Role:** `ADMIN`, `MANAGER`.
 - **Body:** `RoundTransitionPayload`.
 - **Success `200`:** `{ round_id, status }`.
-- Transition tới scheduling sẽ kiểm tra có group, timeslot, room và đủ Reviewer availability.
+- Transition tới scheduling sẽ kiểm tra có group, timeslot và đủ Reviewer availability; room inventory không còn chặn việc bắt đầu scheduler.
 - **`422 ROUND_INPUTS_INCOMPLETE`/`ROUND_STATUS_INVALID`:** chưa đủ input hoặc state transition không hợp lệ.
 
 ### `POST /rounds/{round_id}/unlock`

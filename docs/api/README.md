@@ -154,6 +154,7 @@ Chi tiết request/response theo nhóm:
 - [Scheduler, lịch và vận hành thay đổi](scheduling.md)
 - [Kết quả, remediation, dashboard, reports, notification](results-reports.md)
 - [Request schemas, enum và response shapes dùng chung](schemas.md)
+- [Semester API — toàn bộ thay đổi và contract](semester-api-changes.md)
 
 ### Auth/system
 

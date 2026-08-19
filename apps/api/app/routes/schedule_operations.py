@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -17,17 +17,6 @@ from app.domain.schedule_operations import (
     require_change_reason,
 )
 from app.domain.transitions import transition_round
-from app.scheduler.candidates import generate_candidates
-from app.scheduler.models import RoundInput, ScheduledSession
-from app.scheduler.scheduler import solve_schedule
-from app.scheduler.snapshot import build_input_snapshot
-from app.scheduler.validator import validate_schedule
-from app.services.access import (
-    affected_schedule_recipients,
-    can_read_session,
-    is_active_group_leader,
-    visible_session_ids,
-)
 from app.response_models import (
     ActionResponse,
     CompareResponse,
@@ -40,8 +29,35 @@ from app.response_models import (
     VersionDetailResponse,
     VersionSummaryResponse,
 )
+from app.scheduler.candidates import generate_candidates
+from app.scheduler.models import RoundInput, ScheduledSession
+from app.scheduler.scheduler import solve_schedule
+from app.scheduler.snapshot import build_input_snapshot
+from app.scheduler.validator import validate_schedule
+from app.services.access import (
+    affected_schedule_recipients,
+    can_read_session,
+    is_active_group_leader,
+    visible_session_ids,
+)
+from app.services.councils import (
+    CouncilError,
+    create_council,
+    load_council_members,
+    lock_reviewer_ids,
+    validate_council_change,
+)
+from app.services.room_assignment import (
+    RoomAssignmentError,
+    allowed_room,
+    find_room_conflict,
+    lock_room_ids,
+    validate_publish_room_readiness,
+)
+from app.services.semester_queries import ensure_round_semester_writable
 
 router = APIRouter(prefix="/api/v1", tags=["schedule-operations"])
+CONTROLLED_CHANGE_PATH = "/schedule/versions/{version_id}/sessions/{session_id}/controlled-change"
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
 
@@ -73,6 +89,13 @@ class RescheduleDecisionPayload(BaseModel):
     note: str = Field(min_length=1, max_length=1000)
 
 
+class MakeupSessionPayload(BaseModel):
+    timeslot_id: int = Field(gt=0)
+    room_id: int | None = Field(default=None, gt=0)
+    reviewer_ids: list[int] | None = None
+    reason: str = Field(min_length=1, max_length=1000)
+
+
 class RoundOperationPayload(BaseModel):
     action: Literal["POSTPONED", "CANCELLED"]
     reason: str = Field(min_length=1, max_length=1000)
@@ -98,10 +121,51 @@ def _actor_id(db: Session, user: CurrentUser) -> int | None:
     ).scalar_one_or_none()
 
 
+def _queue_schedule_changed(
+    db: Session,
+    recipient_ids: set[int],
+    *,
+    round_id: int,
+    source_version_id: int,
+    replacement_version_id: int | None,
+    session_id: int,
+    change_kind: str,
+    reason: str,
+) -> None:
+    """Queue schedule-change notifications in the same transaction as the mutation."""
+    for recipient_id in sorted(recipient_ids):
+        payload = _json(
+            {
+                "round_id": round_id,
+                "source_version_id": source_version_id,
+                "replacement_version_id": replacement_version_id,
+                "session_id": session_id,
+                "change_kind": change_kind,
+                "reason": reason,
+                "recipient_id": recipient_id,
+            }
+        )
+        key = f"schedule-changed:{source_version_id}:{replacement_version_id or source_version_id}:{session_id}:{recipient_id}"
+        db.execute(
+            text(
+                "INSERT INTO notifications (recipient_account_id, event_type, payload, dedupe_key) "
+                "VALUES (:recipient_id, 'SCHEDULE_CHANGED', CAST(:payload AS JSONB), :key) ON CONFLICT DO NOTHING"
+            ),
+            {"recipient_id": recipient_id, "payload": payload, "key": key},
+        )
+        db.execute(
+            text(
+                "INSERT INTO outbox_jobs (topic, payload, dedupe_key) "
+                "VALUES ('SCHEDULE_CHANGED', CAST(:payload AS JSONB), :key) ON CONFLICT DO NOTHING"
+            ),
+            {"payload": payload, "key": key},
+        )
+
+
 def _round_input(
     db: Session, round_id: int
 ) -> tuple[
-    RoundInput, list[int], list[tuple[int, datetime, datetime, str, str]], list[int], list[int]
+    RoundInput, list[int], list[tuple[int, datetime, datetime, str, str]], list[int]
 ]:
     round_row = (
         db.execute(
@@ -163,13 +227,6 @@ def _round_input(
         (row["id"], row["start_at"], row["end_at"], str(row["day_date"]), row["part"])
         for row in day_slots
     ]
-    room_ids = [
-        row[0]
-        for row in db.execute(
-            text("SELECT room_id FROM round_rooms WHERE round_id = :round_id ORDER BY room_id"),
-            {"round_id": round_id},
-        ).all()
-    ]
     accepted_reviewer_ids = [
         row[0]
         for row in db.execute(
@@ -191,12 +248,12 @@ def _round_input(
     reviewer_ids = accepted_reviewer_ids or available_reviewer_ids
     existing_load_rows = db.execute(
         text(
-            "SELECT sr.lecturer_id, COUNT(*) AS session_count "
-            "FROM session_reviewers sr JOIN sessions s ON s.id = sr.session_id "
+            "SELECT cm.lecturer_id, COUNT(*) AS session_count "
+            "FROM council_members cm JOIN sessions s ON s.council_id = cm.council_id "
             "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
             "JOIN rounds previous_round ON previous_round.id = sv.round_id "
             "WHERE previous_round.semester_id = :semester_id AND previous_round.id <> :round_id "
-            "AND sv.status IN ('VALID', 'PUBLISHED') GROUP BY sr.lecturer_id"
+            "AND sv.status IN ('ACTIVE', 'PUBLISHED') GROUP BY cm.lecturer_id"
         ),
         {"semester_id": round_row["semester_id"], "round_id": round_id},
     ).all()
@@ -223,12 +280,12 @@ def _round_input(
     if round_row["type"] == "DEFENSE_1_2":
         prior_rows = db.execute(
             text(
-                "SELECT s.group_id, sr.lecturer_id FROM sessions s "
-                "JOIN session_reviewers sr ON sr.session_id = s.id "
+                "SELECT s.group_id, cm.lecturer_id FROM sessions s "
+                "JOIN council_members cm ON cm.council_id = s.council_id "
                 "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
                 "JOIN rounds previous_round ON previous_round.id = sv.round_id "
                 "WHERE s.group_id = ANY(:group_ids) AND previous_round.type = 'DEFENSE_1_1' "
-                "AND sv.status IN ('VALID', 'PUBLISHED')"
+                "AND sv.status IN ('ACTIVE', 'PUBLISHED')"
             ),
             {"group_ids": [row["id"] for row in group_rows] or [0]},
         ).all()
@@ -275,16 +332,16 @@ def _round_input(
     )
     for group_id, timeslot_id in selected_rows:
         input_data.group_selected_slots.setdefault(group_id, set()).add(timeslot_id)
-    return input_data, [row["id"] for row in group_rows], timeslots, room_ids, reviewer_ids
+    return input_data, [row["id"] for row in group_rows], timeslots, reviewer_ids
 
 
 def _session_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
     sessions = (
         db.execute(
             text(
-                "SELECT s.id, s.group_id, g.code AS group_code, g.project_id, s.timeslot_id, s.room_id, "
+                "SELECT s.id, a.id AS assignment_id, s.group_id, g.code AS group_code, a.project_id, s.timeslot_id, s.room_id, s.council_id, "
                 "s.start_at, s.end_at, s.status "
-                "FROM sessions s JOIN groups g ON g.id = s.group_id WHERE s.schedule_version_id = :version_id ORDER BY s.id"
+                "FROM sessions s JOIN groups g ON g.id = s.group_id JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id WHERE s.schedule_version_id = :version_id ORDER BY s.id"
             ),
             {"version_id": version_id},
         )
@@ -293,8 +350,9 @@ def _session_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
     )
     reviewers = db.execute(
         text(
-            "SELECT sr.session_id, sr.lecturer_id, sr.is_result_owner, sr.snapshot_name "
-            "FROM session_reviewers sr WHERE sr.schedule_version_id = :version_id ORDER BY sr.lecturer_id"
+            "SELECT s.id AS session_id, cm.lecturer_id, cm.is_result_owner, cm.snapshot_name "
+            "FROM council_members cm JOIN sessions s ON s.council_id = cm.council_id "
+            "WHERE s.schedule_version_id = :version_id ORDER BY cm.lecturer_id"
         ),
         {"version_id": version_id},
     ).all()
@@ -315,6 +373,31 @@ def _session_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
         }
         for row in sessions
     ]
+
+
+def _assignment_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
+    """Load the durable solver record, including reviewer snapshots."""
+    rows = db.execute(text(
+        "SELECT a.id AS assignment_id, a.id, a.schedule_version_id, a.group_id, g.code AS group_code, "
+        "a.project_id, a.timeslot_id, a.start_at, a.end_at FROM schedule_assignments a "
+        "JOIN groups g ON g.id=a.group_id WHERE a.schedule_version_id=:version_id ORDER BY a.id"
+    ), {"version_id": version_id}).mappings().all()
+    reviewers = db.execute(text(
+        "SELECT r.assignment_id, r.lecturer_id, r.is_result_owner, r.snapshot_name "
+        "FROM schedule_assignment_reviewers r JOIN schedule_assignments a ON a.id=r.assignment_id "
+        "WHERE a.schedule_version_id=:version_id ORDER BY r.assignment_id,r.lecturer_id"
+    ), {"version_id": version_id}).all()
+    by_assignment: dict[int, list[int]] = {}
+    owners: dict[int, list[int]] = {}
+    names: dict[int, dict[int, str]] = {}
+    for aid, lecturer_id, is_owner, snapshot_name in reviewers:
+        by_assignment.setdefault(aid, []).append(lecturer_id)
+        names.setdefault(aid, {})[lecturer_id] = snapshot_name
+        if is_owner:
+            owners.setdefault(aid, []).append(lecturer_id)
+    return [{**dict(row), "room_id": None, "status": "PLANNED", "reviewer_ids": tuple(by_assignment.get(row["assignment_id"], [])),
+             "result_owner_ids": tuple(owners.get(row["assignment_id"], [])),
+             "reviewer_names": names.get(row["assignment_id"], {})} for row in rows]
 
 
 def _to_domain_sessions(rows: list[dict[str, Any]]) -> list[ScheduledSession]:
@@ -376,7 +459,9 @@ def _owner_for_edit(
     if not round_row["result_owner_mode"] or round_row["type"] not in {"DEFENSE_1_1", "DEFENSE_2"}:
         return None
     current_owner = db.execute(
-        text("SELECT lecturer_id FROM session_reviewers WHERE session_id = :session_id AND is_result_owner = TRUE"),
+        text("SELECT cm.lecturer_id FROM council_members cm JOIN sessions s ON s.council_id = cm.council_id "
+             "WHERE s.id = :session_id AND cm.is_result_owner = TRUE "
+             "UNION ALL SELECT lecturer_id FROM schedule_assignment_reviewers WHERE assignment_id = :session_id AND is_result_owner = TRUE"),
         {"session_id": session_id},
     ).all()
     owner_id = requested_owner_id or (current_owner[0][0] if len(current_owner) == 1 else None)
@@ -417,6 +502,7 @@ def list_schedule_versions(round_id: int, db: Db, user: User) -> list[dict[str, 
 
 @router.get("/schedule/versions/{version_id}", response_model=VersionDetailResponse)
 def schedule_version_detail(version_id: int, db: Db, user: User) -> dict[str, Any]:
+    # Drafts are sourced from schedule_assignments; Sessions are materialized later.
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     version = (
         db.execute(text("SELECT * FROM schedule_versions WHERE id = :id"), {"id": version_id})
@@ -428,19 +514,20 @@ def schedule_version_detail(version_id: int, db: Db, user: User) -> dict[str, An
             status_code=404,
             detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."},
         )
-    sessions = _session_rows(db, version_id)
+    assignments = _assignment_rows(db, version_id)
+    sessions = [] if version["status"] == "DRAFT" else _session_rows(db, version_id)
     if user.role not in {"ADMIN", "MANAGER"}:
         visible = visible_session_ids(db, user, version_id=version_id)
         sessions = [row for row in sessions if row["id"] in visible]
         if not sessions:
             raise HTTPException(status_code=403, detail="Schedule is outside the actor's scope.")
-    return {**_version_ui(version), "sessions": sessions}
+    return {**_version_ui(version), "sessions": sessions, "assignments": assignments}
 
 
 def _version_ui(row: Any) -> dict[str, Any]:
     payload = dict(row)
-    payload["is_active"] = payload.get("activated_at") is not None and payload.get("status") in {"VALID", "PUBLISHED"}
-    payload["ui_status"] = "ACTIVE" if payload["is_active"] else payload.get("status")
+    payload["is_active"] = payload.get("status") in {"ACTIVE", "PUBLISHED"}
+    payload["ui_status"] = payload.get("status")
     return payload
 
 
@@ -454,10 +541,14 @@ def compare_schedule_versions(version_a: int, version_b: int, db: Db, user: User
     ).mappings().all()
     if len(versions) != 2 or versions[0]["round_id"] != versions[1]["round_id"]:
         raise HTTPException(status_code=404, detail={"code": "VERSION_COMPARE_INVALID", "message": "Both versions must exist in the same round."})
-    sessions = db.execute(
-        text("SELECT schedule_version_id, group_id, timeslot_id, room_id FROM sessions WHERE schedule_version_id = ANY(:ids)"),
-        {"ids": [version_a, version_b]},
-    ).mappings().all()
+    sessions = db.execute(text(
+        "SELECT a.schedule_version_id, a.group_id, a.project_id, a.timeslot_id, "
+        "COALESCE(array_agg(ar.lecturer_id ORDER BY ar.lecturer_id) "
+        "FILTER (WHERE ar.lecturer_id IS NOT NULL), ARRAY[]::bigint[]) AS reviewer_ids "
+        "FROM schedule_assignments a LEFT JOIN schedule_assignment_reviewers ar ON ar.assignment_id = a.id "
+        "WHERE a.schedule_version_id = ANY(:ids) "
+        "GROUP BY a.schedule_version_id, a.group_id, a.project_id, a.timeslot_id"
+    ), {"ids": [version_a, version_b]}).mappings().all()
     by_version = {version_a: {}, version_b: {}}
     for row in sessions:
         by_version[row["schedule_version_id"]][row["group_id"]] = dict(row)
@@ -472,23 +563,19 @@ def compare_schedule_versions(version_a: int, version_b: int, db: Db, user: User
 
 @router.delete("/schedule/versions/{version_id}", response_model=ActionResponse, response_model_exclude_none=True)
 def delete_draft_version(version_id: int, db: Db, user: User) -> dict[str, Any]:
+    # schedule_assignments and scheduler_jobs are owned by the version cascade.
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
-        row = db.execute(text("SELECT id, status, activated_at FROM schedule_versions WHERE id = :id FOR UPDATE"), {"id": version_id}).mappings().one_or_none()
+        version_ref = db.execute(text("SELECT round_id FROM schedule_versions WHERE id = :id"), {"id": version_id}).mappings().one_or_none()
+        if version_ref is None:
+            raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+        ensure_round_semester_writable(db, int(version_ref["round_id"]))
+        row = db.execute(text("SELECT id, round_id, status, activated_at FROM schedule_versions WHERE id = :id FOR UPDATE"), {"id": version_id}).mappings().one_or_none()
         if row is None:
             raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
-        if row["activated_at"] is not None or row["status"] in {"PUBLISHED", "SUPERSEDED"}:
+        if row["status"] != "DRAFT":
             raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_FORBIDDEN", "message": "Only an unused draft/valid version can be deleted."})
-        dependency_count = db.execute(
-            text(
-                "SELECT "
-                "(SELECT COUNT(*) FROM scheduler_jobs WHERE schedule_version_id = :id) + "
-                "(SELECT COUNT(*) FROM schedule_change_records WHERE schedule_version_id = :id) + "
-                "(SELECT COUNT(*) FROM sessions WHERE schedule_version_id = :id) + "
-                "(SELECT COUNT(*) FROM session_reviewers WHERE schedule_version_id = :id)"
-            ),
-            {"id": version_id},
-        ).scalar_one()
+        dependency_count = db.execute(text("SELECT COUNT(*) FROM schedule_change_records WHERE schedule_version_id=:id"), {"id": version_id}).scalar_one()
         if dependency_count:
             raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_HAS_DEPENDENCIES", "message": "Version has dependent schedule or audit records and cannot be deleted."})
         db.execute(text("DELETE FROM schedule_versions WHERE id = :id"), {"id": version_id})
@@ -500,6 +587,7 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
     _require(user, "ADMIN", "MANAGER")
     try:
         with db.begin():
+            ensure_round_semester_writable(db, round_id)
             round_status = db.execute(
                 text("SELECT status FROM rounds WHERE id = :round_id FOR UPDATE"),
                 {"round_id": round_id},
@@ -518,14 +606,13 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
                     text("UPDATE rounds SET status = 'SCHEDULING' WHERE id = :round_id"),
                     {"round_id": round_id},
                 )
-            context, groups, timeslots, rooms, reviewers = _round_input(db, round_id)
-            if not groups or not timeslots or not rooms or not reviewers:
-                raise DomainError("ROUND_INPUTS_INCOMPLETE", "Round needs groups, timeslots, rooms and at least one available Reviewer before scheduling.")
+            context, groups, timeslots, reviewers = _round_input(db, round_id)
+            if not groups or not timeslots or not reviewers:
+                raise DomainError("ROUND_INPUTS_INCOMPLETE", "Round needs groups, timeslots and at least one available Reviewer before scheduling.")
             result = solve_schedule(
                 context,
                 groups=groups,
                 timeslots=timeslots,
-                rooms=rooms,
                 reviewers=reviewers,
                 time_limit_seconds=payload.time_limit_seconds,
                 random_seed=payload.random_seed,
@@ -535,7 +622,6 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
                 context=context,
                 groups=groups,
                 timeslots=[row[0] for row in timeslots],
-                rooms=rooms,
                 reviewer_assignments={
                     session.group_id: list(session.reviewer_ids) for session in result.sessions
                 },
@@ -553,7 +639,7 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
                 text(
                     "INSERT INTO schedule_versions (round_id, version_no, status, input_snapshot, algorithm_parameters, "
                     "random_seed, solver_status, total_score, soft_scores, created_by) VALUES "
-                    "(:round_id, :version_no, 'VALID', CAST(:snapshot AS JSONB), CAST(:parameters AS JSONB), :seed, "
+                    "(:round_id, :version_no, 'DRAFT', CAST(:snapshot AS JSONB), CAST(:parameters AS JSONB), :seed, "
                     ":solver_status, :score, CAST(:soft_scores AS JSONB), :created_by) RETURNING id"
                 ),
                 {
@@ -569,20 +655,12 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
                 },
             ).scalar_one()
             for session in result.sessions:
-                session_id = db.execute(
-                    text(
-                        "INSERT INTO sessions (schedule_version_id, group_id, timeslot_id, room_id, start_at, end_at) "
-                        "VALUES (:version_id, :group_id, :timeslot_id, :room_id, :start_at, :end_at) RETURNING id"
-                    ),
-                    {
-                        "version_id": version_id,
-                        "group_id": session.group_id,
-                        "timeslot_id": session.timeslot_id,
-                        "room_id": session.room_id,
-                        "start_at": session.start_at,
-                        "end_at": session.end_at,
-                    },
-                ).scalar_one()
+                assignment_id = db.execute(text(
+                    "INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,start_at,end_at) "
+                    "VALUES (:version_id,:group_id,:project_id,:timeslot_id,:start_at,:end_at) RETURNING id"
+                ), {"version_id": version_id, "group_id": session.group_id,
+                    "project_id": context.group_project[session.group_id], "timeslot_id": session.timeslot_id,
+                    "start_at": session.start_at, "end_at": session.end_at}).scalar_one()
                 names = db.execute(
                     text(
                         "SELECT l.id, a.display_name FROM lecturers l JOIN accounts a ON a.id = l.account_id "
@@ -594,17 +672,14 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
                 for reviewer_index, lecturer_id in enumerate(session.reviewer_ids):
                     db.execute(
                         text(
-                            "INSERT INTO session_reviewers (session_id, schedule_version_id, lecturer_id, is_result_owner, snapshot_name, start_at, end_at) "
-                            "VALUES (:session_id, :version_id, :lecturer_id, :is_owner, :snapshot_name, :start_at, :end_at)"
+                        "INSERT INTO schedule_assignment_reviewers (assignment_id, lecturer_id, is_result_owner, snapshot_name) "
+                        "VALUES (:assignment_id, :lecturer_id, :is_owner, :snapshot_name)"
                         ),
                         {
-                            "session_id": session_id,
-                            "version_id": version_id,
+                            "assignment_id": assignment_id,
                             "lecturer_id": lecturer_id,
                             "is_owner": context.result_owner_mode and context.round_type in {"DEFENSE_1_1", "DEFENSE_2"} and reviewer_index == 0,
                             "snapshot_name": name_map.get(lecturer_id, str(lecturer_id)),
-                            "start_at": session.start_at,
-                            "end_at": session.end_at,
                         },
                     )
             job_status = "PARTIAL" if result.unscheduled else "COMPLETED"
@@ -623,10 +698,6 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
                 },
             )
             db.execute(
-                text("UPDATE rounds SET status = 'SCHEDULED' WHERE id = :round_id"),
-                {"round_id": round_id},
-            )
-            db.execute(
                 text(
                     "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
                     "VALUES (:actor_id, 'SCHEDULER_RUN', 'schedule_version', :entity_id, CAST(:after_json AS JSONB))"
@@ -639,7 +710,7 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
             )
         return {
             "version_id": version_id,
-            "status": result.status,
+            "status": "DRAFT",
             "scheduled_count": len(result.sessions),
             "unscheduled": [reason.__dict__ for reason in result.unscheduled],
             "soft_scores": result.soft_scores,
@@ -663,6 +734,7 @@ def grant_h11_waiver(round_id: int, group_id: int, payload: H11WaiverPayload, db
     _require(user, "MANAGER")
     require_change_reason(payload.reason)
     with db.begin():
+        ensure_round_semester_writable(db, round_id)
         attached = db.execute(text("SELECT 1 FROM round_groups WHERE round_id = :round_id AND group_id = :group_id"), {"round_id": round_id, "group_id": group_id}).scalar_one_or_none()
         if attached is None:
             raise HTTPException(status_code=404, detail={"code": "ROUND_GROUP_NOT_FOUND", "message": "The group is not attached to this round."})
@@ -676,6 +748,7 @@ def grant_h11_waiver(round_id: int, group_id: int, payload: H11WaiverPayload, db
 def revoke_h11_waiver(round_id: int, group_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "MANAGER")
     with db.begin():
+        ensure_round_semester_writable(db, round_id)
         updated = db.execute(text("UPDATE h11_waivers SET active = FALSE WHERE round_id = :round_id AND group_id = :group_id AND active = TRUE RETURNING id"), {"round_id": round_id, "group_id": group_id}).mappings().one_or_none()
         if updated is None:
             raise HTTPException(status_code=404, detail={"code": "H11_WAIVER_NOT_FOUND", "message": "Active H11 waiver does not exist."})
@@ -685,8 +758,27 @@ def revoke_h11_waiver(round_id: int, group_id: int, db: Db, user: User) -> dict[
 
 @router.post("/schedule/versions/{version_id}/activate", response_model=ActionResponse, response_model_exclude_none=True)
 def activate_schedule_version(version_id: int, db: Db, user: User) -> dict[str, Any]:
+    # acquire_resource_locks issues pg_advisory_xact_lock for every Reviewer.
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
+        version = (
+            db.execute(
+                text("SELECT round_id FROM schedule_versions WHERE id = :id"),
+                {"id": version_id},
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if version is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."},
+            )
+        db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": version["round_id"]})
+        ensure_round_semester_writable(db, int(version["round_id"]))
+        # The round lock serializes all activations for this round. Re-read the
+        # target after acquiring it so a concurrent activation cannot activate
+        # a stale DRAFT snapshot.
         version = (
             db.execute(
                 text("SELECT round_id, status FROM schedule_versions WHERE id = :id FOR UPDATE"),
@@ -700,23 +792,82 @@ def activate_schedule_version(version_id: int, db: Db, user: User) -> dict[str, 
                 status_code=404,
                 detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."},
             )
-        db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": version["round_id"]})
-        if version["status"] != "VALID":
+        if version["status"] != "DRAFT":
             raise HTTPException(
                 status_code=422,
                 detail={
                     "code": "VERSION_NOT_VALID",
-                    "message": "Only a valid version can become active.",
+                    "message": "Only a draft version can become active.",
                 },
             )
+        group_ids = [row[0] for row in db.execute(text(
+            "SELECT DISTINCT group_id FROM schedule_assignments WHERE schedule_version_id=:version_id ORDER BY group_id"
+        ), {"version_id": version_id}).all()]
+        db.execute(text("SELECT id FROM groups WHERE id=ANY(:group_ids) ORDER BY id FOR UPDATE"), {"group_ids": group_ids or [0]}).all()
+        assignments = db.execute(text(
+            "SELECT id, group_id, project_id, timeslot_id, start_at, end_at FROM schedule_assignments "
+            "WHERE schedule_version_id=:version_id ORDER BY id FOR UPDATE"
+        ), {"version_id": version_id}).mappings().all()
+        stale = db.execute(text(
+            "SELECT a.group_id FROM schedule_assignments a JOIN groups g ON g.id=a.group_id "
+            "WHERE a.schedule_version_id=:version_id AND g.project_id IS DISTINCT FROM a.project_id"
+        ), {"version_id": version_id}).all()
+        if stale:
+            raise HTTPException(status_code=409, detail={"code": "DRAFT_ASSIGNMENT_STALE", "message": "Group project provenance changed; regenerate the draft."})
+        reviewer_ids = [row[0] for row in db.execute(text(
+            "SELECT lecturer_id FROM schedule_assignment_reviewers r JOIN schedule_assignments a ON a.id=r.assignment_id WHERE a.schedule_version_id=:version_id"
+        ), {"version_id": version_id}).all()]
+        validation_rows = [dict(item) for item in assignments]
+        reviewer_map: dict[int, list[int]] = {}
+        for assignment_id, lecturer_id in db.execute(text(
+            "SELECT assignment_id, lecturer_id FROM schedule_assignment_reviewers WHERE assignment_id=ANY(:assignment_ids) ORDER BY assignment_id, lecturer_id"
+        ), {"assignment_ids": [item["id"] for item in assignments] or [0]}).all():
+            reviewer_map.setdefault(assignment_id, []).append(lecturer_id)
+        for item in validation_rows:
+            item["reviewer_ids"] = tuple(reviewer_map.get(item["id"], []))
+            item["room_id"] = None
+            item["status"] = "PLANNED"
+        activation_context, _, _, _ = _round_input(db, version["round_id"])
+        activation_validation = validate_schedule(_to_domain_sessions(validation_rows), activation_context)
+        if not activation_validation.valid:
+            raise HTTPException(status_code=422, detail={"code": "HARD_CONSTRAINT_VIOLATION", "violations": [item.__dict__ for item in activation_validation.violations]})
+        # acquire_resource_locks issues pg_advisory_xact_lock(bigint) for each
+        # reviewer key before the global overlap re-check.
+        lock_reviewer_ids(db, reviewer_ids)
+        # Re-check conflicts against every live schedule, including other rounds.
+        conflict = db.execute(text(
+            "SELECT 1 FROM schedule_assignment_reviewers ar JOIN schedule_assignments a ON a.id=ar.assignment_id "
+            "JOIN sessions s ON s.start_at < a.end_at AND s.end_at > a.start_at "
+            "JOIN council_members cm ON cm.council_id=s.council_id AND cm.lecturer_id=ar.lecturer_id "
+            "JOIN schedule_versions sv ON sv.id=s.schedule_version_id "
+            "WHERE a.schedule_version_id=:version_id AND s.schedule_version_id<>:version_id "
+            "AND sv.status IN ('ACTIVE','PUBLISHED') LIMIT 1"
+        ), {"version_id": version_id}).first()
+        if conflict:
+            raise HTTPException(status_code=409, detail={"code": "REVIEWER_OVERLAP", "message": "A Reviewer is already assigned in an overlapping live schedule."})
+        for assignment in assignments:
+            reviewers = db.execute(text(
+                "SELECT lecturer_id,is_result_owner,snapshot_name FROM schedule_assignment_reviewers WHERE assignment_id=:assignment_id ORDER BY lecturer_id"
+            ), {"assignment_id": assignment["id"]}).mappings().all()
+            council_id = create_council(
+                db,
+                int(version["round_id"]),
+                [dict(reviewer) for reviewer in reviewers],
+                created_by=_actor_id(db, user),
+                reason="Schedule activation",
+            )
+            db.execute(text(
+                "INSERT INTO sessions (schedule_version_id,group_id,timeslot_id,room_id,council_id,start_at,end_at,status) "
+                "VALUES (:version_id,:group_id,:timeslot_id,NULL,:council_id,:start_at,:end_at,'PLANNED') RETURNING id"
+            ), {"version_id": version_id, **dict(assignment), "council_id": council_id}).scalar_one()
         db.execute(
             text(
-                "UPDATE schedule_versions SET status = 'SUPERSEDED' WHERE round_id = :round_id AND status = 'VALID' AND id <> :id"
+                "UPDATE schedule_versions SET status = 'DISCARDED' WHERE round_id = :round_id AND status IN ('DRAFT', 'ACTIVE') AND id <> :id"
             ),
             {"round_id": version["round_id"], "id": version_id},
         )
         db.execute(
-            text("UPDATE schedule_versions SET activated_at = now() WHERE id = :id"),
+            text("UPDATE schedule_versions SET status = 'ACTIVE', activated_at = now() WHERE id = :id"),
             {"id": version_id},
         )
         db.execute(
@@ -731,31 +882,60 @@ def activate_schedule_version(version_id: int, db: Db, user: User) -> dict[str, 
             {
                 "actor_id": _actor_id(db, user),
                 "entity_id": str(version_id),
-                "after_json": _json({"round_id": version["round_id"], "status": "VALID"}),
+                "after_json": _json({"round_id": version["round_id"], "status": "ACTIVE"}),
             },
         )
-    return {"version_id": version_id, "status": "VALID"}
+    return {"version_id": version_id, "status": "ACTIVE"}
 
 
 @router.post("/schedule/versions/{version_id}/sessions/{session_id}/result-owner", response_model=ResultOwnerResponse)
 def assign_result_owner(version_id: int, session_id: int, payload: ResultOwnerPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "MANAGER")
     lecturer_id = payload.lecturer_id
-    with db.begin():
-        session = db.execute(text("SELECT s.status, r.type, r.result_owner_mode, s.group_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id WHERE s.id = :session_id AND s.schedule_version_id = :version_id FOR UPDATE"), {"session_id": session_id, "version_id": version_id}).mappings().one_or_none()
-        if session is None:
-            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist in this version."})
-        if session["status"] == "COMPLETED":
-            raise HTTPException(status_code=422, detail={"code": "COMPLETED_SESSION_IMMUTABLE", "message": "A completed session's Reviewer ownership is immutable."})
-        if not session["result_owner_mode"] or session["type"] not in {"DEFENSE_1_1", "DEFENSE_2"}:
-            raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_NOT_ALLOWED", "message": "Result Owner mode is disabled for this session."})
-        assigned = db.execute(text("SELECT 1 FROM session_reviewers WHERE session_id = :session_id AND lecturer_id = :lecturer_id"), {"session_id": session_id, "lecturer_id": lecturer_id}).scalar_one_or_none()
-        if assigned is None:
-            raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_MUST_BE_REVIEWER", "message": "The Result Owner must be one of this session's Reviewers."})
-        db.execute(text("UPDATE session_reviewers SET is_result_owner = FALSE WHERE session_id = :session_id"), {"session_id": session_id})
-        db.execute(text("UPDATE session_reviewers SET is_result_owner = TRUE WHERE session_id = :session_id AND lecturer_id = :lecturer_id"), {"session_id": session_id, "lecturer_id": lecturer_id})
-        db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'RESULT_OWNER_ASSIGNED', 'session', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(session_id), "after_json": _json({"lecturer_id": lecturer_id, "version_id": version_id})})
-    return {"version_id": version_id, "session_id": session_id, "result_owner_id": lecturer_id}
+    try:
+        with db.begin():
+            session_ref = db.execute(
+                text("SELECT sv.round_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE s.id = :session_id AND s.schedule_version_id = :version_id"),
+                {"session_id": session_id, "version_id": version_id},
+            ).mappings().one_or_none()
+            if session_ref is None:
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist in this version."})
+            db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": session_ref["round_id"]})
+            ensure_round_semester_writable(db, int(session_ref["round_id"]))
+            session = db.execute(text(
+                "SELECT s.status, s.council_id, s.start_at, s.end_at, r.id AS round_id, r.type, "
+                "r.result_owner_mode FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+                "JOIN rounds r ON r.id = sv.round_id WHERE s.id = :session_id AND s.schedule_version_id = :version_id FOR UPDATE"
+            ), {"session_id": session_id, "version_id": version_id}).mappings().one_or_none()
+            if session is None:
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist in this version."})
+            if session["status"] in {"COMPLETED", "GROUP_ABSENT", "POSTPONED", "CANCELLED"}:
+                raise HTTPException(status_code=422, detail={"code": "SESSION_IMMUTABLE", "message": "This session's Council ownership is immutable."})
+            before_recipients = affected_schedule_recipients(db, version_id)
+            if not session["result_owner_mode"] or session["type"] not in {"DEFENSE_1_1", "DEFENSE_2"}:
+                raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_NOT_ALLOWED", "message": "Result Owner mode is disabled for this session."})
+            members = load_council_members(db, int(session["council_id"]))
+            if lecturer_id not in {int(member["lecturer_id"]) for member in members}:
+                raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_MUST_BE_REVIEWER", "message": "The Result Owner must be one of this session's Reviewers."})
+            validate_council_change(db, session_id, int(session["round_id"]), [member["lecturer_id"] for member in members], session["start_at"], session["end_at"])
+            next_members = [{**member, "is_result_owner": int(member["lecturer_id"]) == lecturer_id} for member in members]
+            council_id = create_council(db, int(session["round_id"]), next_members, created_by=_actor_id(db, user), reason="Result Owner reassignment", supersedes_council_id=int(session["council_id"]))
+            db.execute(text("UPDATE sessions SET council_id = :council_id WHERE id = :session_id"), {"council_id": council_id, "session_id": session_id})
+            after_recipients = affected_schedule_recipients(db, version_id)
+            _queue_schedule_changed(
+                db,
+                before_recipients | after_recipients,
+                round_id=int(session["round_id"]),
+                source_version_id=version_id,
+                replacement_version_id=None,
+                session_id=session_id,
+                change_kind="COUNCIL_REPLACED",
+                reason="Result Owner reassignment",
+            )
+            db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'RESULT_OWNER_ASSIGNED', 'session', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(session_id), "after_json": _json({"lecturer_id": lecturer_id, "version_id": version_id, "before_council_id": session["council_id"], "after_council_id": council_id})})
+        return {"version_id": version_id, "session_id": session_id, "result_owner_id": lecturer_id}
+    except CouncilError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": exc.code, "message": str(exc), **(exc.details or {})}) from exc
 
 
 @router.post("/schedule/versions/{version_id}/sessions/{session_id}/edit", response_model=SessionEditResponse)
@@ -765,10 +945,11 @@ def edit_draft_session(version_id: int, session_id: int, payload: SessionEditPay
     version = db.execute(text("SELECT round_id, status FROM schedule_versions WHERE id = :id"), {"id": version_id}).mappings().one_or_none()
     if version is None:
         raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
-    if version["status"] != "VALID":
-        raise HTTPException(status_code=422, detail={"code": "DRAFT_EDIT_REQUIRED", "message": "Only the active valid version can be edited."})
-    context, _, timeslots, _, _ = _round_input(db, version["round_id"])
-    rows = _session_rows(db, version_id)
+    ensure_round_semester_writable(db, int(version["round_id"]))
+    if version["status"] != "DRAFT":
+        raise HTTPException(status_code=422, detail={"code": "DRAFT_EDIT_REQUIRED", "message": "Only a draft version can be edited."})
+    context, _, timeslots, _ = _round_input(db, version["round_id"])
+    rows = _assignment_rows(db, version_id)
     try:
         edited, change = _edited_rows(rows, session_id, payload, timeslots)
         validation = validate_schedule(_to_domain_sessions(edited), context)
@@ -777,30 +958,25 @@ def edit_draft_session(version_id: int, session_id: int, payload: SessionEditPay
                 status_code=422,
                 detail={"code": "HARD_CONSTRAINT_VIOLATION", "violations": [violation.__dict__ for violation in validation.violations]},
             )
-        owner_id = _owner_for_edit(
-            db,
-            session_id=session_id,
-            round_id=version["round_id"],
-            reviewer_ids=change["after"]["reviewer_ids"],
-            requested_owner_id=payload.result_owner_id,
-        )
+        owner_id = _owner_for_edit(db, session_id=session_id, round_id=version["round_id"], reviewer_ids=change["after"]["reviewer_ids"], requested_owner_id=payload.result_owner_id)
         prepared_before = change["before"]
         db.commit()
         with db.begin():
+            ensure_round_semester_writable(db, int(version["round_id"]))
+            db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": version["round_id"]})
             locked_version = db.execute(
                 text("SELECT round_id, status FROM schedule_versions WHERE id = :id FOR UPDATE"),
                 {"id": version_id},
             ).mappings().one_or_none()
-            if locked_version is None or locked_version["status"] != "VALID":
+            if locked_version is None or locked_version["status"] != "DRAFT":
                 raise HTTPException(
                     status_code=409,
                     detail={"code": "DRAFT_EDIT_CONCURRENT_UPDATE", "message": "The draft version changed while this request was being prepared."},
                 )
-            db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": locked_version["round_id"]})
-            fresh_context, _, fresh_timeslots, _, _ = _round_input(db, locked_version["round_id"])
-            fresh_rows = _session_rows(db, version_id)
+            fresh_context, _, fresh_timeslots, _ = _round_input(db, locked_version["round_id"])
+            fresh_rows = _assignment_rows(db, version_id)
             fresh_target = next((row for row in fresh_rows if row["id"] == session_id), None)
-            compared_fields = ("timeslot_id", "room_id", "start_at", "end_at", "status", "reviewer_ids", "result_owner_ids")
+            compared_fields = ("timeslot_id", "start_at", "end_at", "reviewer_ids", "result_owner_ids")
             if fresh_target is None or any(fresh_target[field] != prepared_before[field] for field in compared_fields):
                 raise HTTPException(
                     status_code=409,
@@ -813,102 +989,208 @@ def edit_draft_session(version_id: int, session_id: int, payload: SessionEditPay
                     status_code=422,
                     detail={"code": "HARD_CONSTRAINT_VIOLATION", "violations": [violation.__dict__ for violation in validation.violations]},
                 )
-            owner_id = _owner_for_edit(
-                db,
-                session_id=session_id,
-                round_id=locked_version["round_id"],
-                reviewer_ids=change["after"]["reviewer_ids"],
-                requested_owner_id=payload.result_owner_id,
-            )
-            db.execute(text("UPDATE sessions SET timeslot_id = :timeslot_id, room_id = :room_id, start_at = :start_at, end_at = :end_at WHERE id = :session_id AND schedule_version_id = :version_id"), {"timeslot_id": change["after"]["timeslot_id"], "room_id": change["after"]["room_id"], "start_at": change["after"]["start_at"], "end_at": change["after"]["end_at"], "session_id": session_id, "version_id": version_id})
-            db.execute(text("DELETE FROM session_reviewers WHERE session_id = :session_id"), {"session_id": session_id})
+            owner_id = _owner_for_edit(db, session_id=session_id, round_id=locked_version["round_id"], reviewer_ids=change["after"]["reviewer_ids"], requested_owner_id=payload.result_owner_id)
+            db.execute(text("UPDATE schedule_assignments SET timeslot_id=:timeslot_id,start_at=:start_at,end_at=:end_at WHERE id=:assignment_id AND schedule_version_id=:version_id"), {"timeslot_id": change["after"]["timeslot_id"], "start_at": change["after"]["start_at"], "end_at": change["after"]["end_at"], "assignment_id": session_id, "version_id": version_id})
+            db.execute(text("DELETE FROM schedule_assignment_reviewers WHERE assignment_id=:assignment_id"), {"assignment_id": session_id})
             names = db.execute(text("SELECT l.id, a.display_name FROM lecturers l JOIN accounts a ON a.id = l.account_id WHERE l.id = ANY(:ids)"), {"ids": list(change["after"]["reviewer_ids"]) or [0]}).all()
             name_map = {row[0]: row[1] for row in names}
             for lecturer_id in change["after"]["reviewer_ids"]:
-                db.execute(text("INSERT INTO session_reviewers (session_id, schedule_version_id, lecturer_id, is_result_owner, snapshot_name, start_at, end_at) VALUES (:session_id, :version_id, :lecturer_id, :is_owner, :snapshot_name, :start_at, :end_at)"), {"session_id": session_id, "version_id": version_id, "lecturer_id": lecturer_id, "is_owner": lecturer_id == owner_id, "snapshot_name": name_map.get(lecturer_id, str(lecturer_id)), "start_at": change["after"]["start_at"], "end_at": change["after"]["end_at"]})
+                db.execute(text("INSERT INTO schedule_assignment_reviewers (assignment_id, lecturer_id, is_result_owner, snapshot_name) VALUES (:assignment_id, :lecturer_id, :is_owner, :snapshot_name)"), {"assignment_id": session_id, "lecturer_id": lecturer_id, "is_owner": lecturer_id == owner_id, "snapshot_name": name_map.get(lecturer_id, str(lecturer_id))})
             actor_id = _actor_id(db, user)
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, before_json, after_json) VALUES (:actor_id, 'SCHEDULE_SESSION_EDITED', 'session', :entity_id, :reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"), {"actor_id": actor_id, "entity_id": str(session_id), "reason": payload.reason.strip(), "before_json": _json(change["before"]), "after_json": _json(change["after"])})
-        return {"session_id": session_id, "version_id": version_id, "status": "UPDATED"}
+        return {"session_id": session_id, "assignment_id": session_id, "version_id": version_id, "status": "UPDATED"}
     except DomainError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
 
 
-@router.post("/schedule/versions/{version_id}/sessions/{session_id}/controlled-change", response_model=ControlledChangeResponse)
-def controlled_change(version_id: int, session_id: int, payload: SessionEditPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post(CONTROLLED_CHANGE_PATH, response_model=ControlledChangeResponse)
+def controlled_change(
+    round_scope: int | None = Query(default=None, include_in_schema=False),
+    *,
+    version_id: int,
+    session_id: int,
+    payload: SessionEditPayload,
+    db: Db,
+    user: User,
+) -> dict[str, Any]:
+    """Lock round/version/session/room/reviewer resources. Branches: reviewer-only, time/room, or mixed."""
     _require(user, "ADMIN", "MANAGER")
     require_change_reason(payload.reason)
-    version = db.execute(text("SELECT * FROM schedule_versions WHERE id = :id FOR UPDATE"), {"id": version_id}).mappings().one_or_none()
-    if version is None:
-        raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
-    db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": version["round_id"]})
-    if version["status"] != "PUBLISHED":
-        raise HTTPException(status_code=422, detail={"code": "CONTROLLED_CHANGE_REQUIRES_PUBLISHED", "message": "Controlled change is only for a published version."})
-    context, _, timeslots, _, _ = _round_input(db, version["round_id"])
-    rows = _session_rows(db, version_id)
-    target = next((row for row in rows if row["id"] == session_id), None)
-    if target is None:
-        raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist in this version."})
-    if target["status"] == "COMPLETED":
-        raise HTTPException(status_code=422, detail={"code": "COMPLETED_SESSION_IMMUTABLE", "message": "A completed session's Reviewer history cannot be changed."})
+    reviewer_changed = False
+    topology_changed = False
     try:
-        edited, change = _edited_rows(rows, session_id, payload, timeslots)
-        validation = validate_schedule(_to_domain_sessions(edited), context)
-        if not validation.valid:
-            raise HTTPException(status_code=422, detail={"code": "HARD_CONSTRAINT_VIOLATION", "violations": [violation.__dict__ for violation in validation.violations]})
-        owner_id = _owner_for_edit(
-            db,
-            session_id=session_id,
-            round_id=version["round_id"],
-            reviewer_ids=change["after"]["reviewer_ids"],
-            requested_owner_id=payload.result_owner_id,
-        )
-        db.commit()
         with db.begin():
-            locked_version = db.execute(text("SELECT status FROM schedule_versions WHERE id = :id FOR UPDATE"), {"id": version_id}).mappings().one_or_none()
-            if locked_version is None or locked_version["status"] != "PUBLISHED":
-                raise HTTPException(status_code=409, detail={"code": "CONTROLLED_CHANGE_CONCURRENT_UPDATE", "message": "The published version changed while this request was being prepared."})
-            db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": version["round_id"]})
-            new_version_no = db.execute(text("SELECT COALESCE(MAX(version_no), 0) + 1 FROM schedule_versions WHERE round_id = :round_id"), {"round_id": version["round_id"]}).scalar_one()
-            new_version_id = db.execute(text("INSERT INTO schedule_versions (round_id, version_no, status, input_snapshot, algorithm_parameters, random_seed, solver_status, total_score, soft_scores, created_by) VALUES (:round_id, :version_no, 'VALID', CAST(:snapshot AS JSONB), CAST(:parameters AS JSONB), :seed, 'CONTROLLED_CHANGE', :score, CAST(:soft_scores AS JSONB), :created_by) RETURNING id"), {"round_id": version["round_id"], "version_no": new_version_no, "snapshot": _json(version["input_snapshot"]), "parameters": _json(version["algorithm_parameters"]), "seed": version["random_seed"], "score": version["total_score"], "soft_scores": _json(version["soft_scores"]), "created_by": _actor_id(db, user)}).scalar_one()
-            new_session_ids: dict[int, int] = {}
+            version_ref = db.execute(
+                text("SELECT round_id FROM schedule_versions WHERE id = :id"),
+                {"id": version_id},
+            ).mappings().one_or_none()
+            if version_ref is None:
+                raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+            # Controlled-change lock order is Round -> ScheduleVersion -> Sessions
+            # -> Rooms -> Reviewers. The initial version lookup is non-locking so
+            # the round can be serialized before the version row is locked.
+            db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": version_ref["round_id"]})
+            ensure_round_semester_writable(db, int(version_ref["round_id"]))
+            version = db.execute(
+                text("SELECT * FROM schedule_versions WHERE id = :id AND round_id = :round_id FOR UPDATE"),
+                {"id": version_id, "round_id": version_ref["round_id"]},
+            ).mappings().one_or_none()
+            if version is None:
+                raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+            locked_source_ids = [
+                int(row[0])
+                for row in db.execute(
+                    text("SELECT id FROM sessions WHERE schedule_version_id = :version_id ORDER BY id FOR UPDATE"),
+                    {"version_id": version_id},
+                ).all()
+            ]
+            if version["status"] != "PUBLISHED":
+                raise HTTPException(status_code=422, detail={"code": "CONTROLLED_CHANGE_REQUIRES_PUBLISHED", "message": "Controlled change is only for a published version."})
+            context, _, timeslots, _ = _round_input(db, version["round_id"])
+            rows = _session_rows(db, version_id)
+            target = next((row for row in rows if row["id"] == session_id), None)
+            if target is None:
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist in this version."})
+            if target["status"] in {"COMPLETED", "GROUP_ABSENT", "POSTPONED", "CANCELLED"}:
+                raise HTTPException(status_code=422, detail={"code": "SESSION_IMMUTABLE", "message": "This session's history is immutable."})
+            current_owner_ids = set(target.get("result_owner_ids", ()))
+            reviewer_changed = payload.reviewer_ids is not None and set(payload.reviewer_ids) != set(target["reviewer_ids"])
+            reviewer_changed = reviewer_changed or (payload.result_owner_id is not None and payload.result_owner_id not in current_owner_ids)
+            topology_changed = (payload.timeslot_id is not None and payload.timeslot_id != target["timeslot_id"]) or (payload.room_id is not None and payload.room_id != target["room_id"])
+            if not reviewer_changed and not topology_changed:
+                raise HTTPException(status_code=422, detail={"code": "CONTROLLED_CHANGE_EMPTY", "message": "Provide a reviewer, result-owner, time, or room change."})
+            edited, change = _edited_rows(rows, session_id, payload, timeslots)
+            before_recipients = affected_schedule_recipients(db, version_id)
+            validation = validate_schedule(_to_domain_sessions(edited), context)
+            if not validation.valid:
+                raise HTTPException(status_code=422, detail={"code": "HARD_CONSTRAINT_VIOLATION", "violations": [item.__dict__ for item in validation.violations]})
+            owner_id = _owner_for_edit(db, session_id=session_id, round_id=version["round_id"], reviewer_ids=change["after"]["reviewer_ids"], requested_owner_id=payload.result_owner_id)
+            # reviewer-only: preserve the published Version and repoint only one Session.
+            if reviewer_changed and not topology_changed:
+                names = db.execute(text("SELECT l.id, a.display_name FROM lecturers l JOIN accounts a ON a.id=l.account_id WHERE l.id=ANY(:ids)"), {"ids": list(change["after"]["reviewer_ids"]) or [0]}).all()
+                name_map = {row[0]: row[1] for row in names}
+                next_members = [{"lecturer_id": lecturer_id, "is_result_owner": lecturer_id == owner_id, "snapshot_name": name_map.get(lecturer_id, str(lecturer_id))} for lecturer_id in change["after"]["reviewer_ids"]]
+                validate_council_change(db, session_id, int(version["round_id"]), change["after"]["reviewer_ids"], target["start_at"], target["end_at"])
+                council_id = create_council(db, int(version["round_id"]), next_members, created_by=_actor_id(db, user), reason=payload.reason.strip(), supersedes_council_id=int(target["council_id"]))
+                db.execute(text("UPDATE sessions SET council_id=:council_id WHERE id=:session_id"), {"council_id": council_id, "session_id": session_id})
+                after_recipients = affected_schedule_recipients(db, version_id)
+                db.execute(text("INSERT INTO schedule_change_records (round_id,schedule_version_id,session_id,actor_id,reason,before_json,after_json) VALUES (:round_id,:version_id,:session_id,:actor_id,:reason,CAST(:before_json AS JSONB),CAST(:after_json AS JSONB))"), {"round_id": version["round_id"], "version_id": version_id, "session_id": session_id, "actor_id": _actor_id(db, user), "reason": payload.reason.strip(), "before_json": _json({"council_id": target["council_id"]}), "after_json": _json({"council_id": council_id})})
+                db.execute(text("INSERT INTO audit_events (actor_id,action,entity_type,entity_id,reason,before_json,after_json) VALUES (:actor_id,'COUNCIL_REPLACED','session',:entity_id,:reason,CAST(:before_json AS JSONB),CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(session_id), "reason": payload.reason.strip(), "before_json": _json({"council_id": target["council_id"]}), "after_json": _json({"council_id": council_id})})
+                _queue_schedule_changed(
+                    db,
+                    before_recipients | after_recipients,
+                    round_id=int(version["round_id"]),
+                    source_version_id=version_id,
+                    replacement_version_id=None,
+                    session_id=session_id,
+                    change_kind="COUNCIL_REPLACED",
+                    reason=payload.reason.strip(),
+                )
+                return {"change_kind": "COUNCIL_REPLACED", "schedule_version_id": version_id, "replacement_version_id": None, "session_id": session_id, "status": "PUBLISHED", "before_council_id": target["council_id"], "after_council_id": council_id, "version_id": version_id, "source_version_id": version_id}
+            # time/room and mixed changes retain the PUBLISHED-to-PUBLISHED clone path.
+            lock_room_ids(db, [row["room_id"] for row in edited if row.get("room_id") is not None])
+            lock_reviewer_ids(db, [reviewer_id for row in edited for reviewer_id in row["reviewer_ids"]])
+            source_session_ids = locked_source_ids
             for row in edited:
-                new_id = db.execute(text("INSERT INTO sessions (schedule_version_id, group_id, timeslot_id, room_id, start_at, end_at, status) VALUES (:version_id, :group_id, :timeslot_id, :room_id, :start_at, :end_at, CAST(:status AS session_status)) RETURNING id"), {"version_id": new_version_id, "group_id": row["group_id"], "timeslot_id": row["timeslot_id"], "room_id": row["room_id"], "start_at": row["start_at"], "end_at": row["end_at"], "status": row["status"]}).scalar_one()
+                if row.get("room_id") is not None:
+                    conflict = find_room_conflict(db, int(row["room_id"]), row["start_at"], row["end_at"], exclude_session_ids=source_session_ids)
+                    if conflict is not None:
+                        raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Controlled change conflicts with another live room assignment."})
+                validate_council_change(db, int(row["id"]), int(version["round_id"]), row["reviewer_ids"], row["start_at"], row["end_at"], exclude_session_ids=source_session_ids)
+            new_version_no = db.execute(text("SELECT COALESCE(MAX(version_no),0)+1 FROM schedule_versions WHERE round_id=:round_id"), {"round_id": version["round_id"]}).scalar_one()
+            new_version_id = db.execute(text("INSERT INTO schedule_versions (round_id,version_no,status,activated_at,input_snapshot,algorithm_parameters,random_seed,solver_status,total_score,soft_scores,created_by) VALUES (:round_id,:version_no,'PUBLISHED',now(),CAST(:snapshot AS JSONB),CAST(:parameters AS JSONB),:seed,'CONTROLLED_CHANGE',:score,CAST(:soft_scores AS JSONB),:created_by) RETURNING id"), {"round_id": version["round_id"], "version_no": new_version_no, "snapshot": _json(version["input_snapshot"]), "parameters": _json(version["algorithm_parameters"]), "seed": version["random_seed"], "score": version["total_score"], "soft_scores": _json(version["soft_scores"]), "created_by": _actor_id(db, user)}).scalar_one()
+            new_session_ids: dict[int, int] = {}
+            after_target_council = target["council_id"]
+            for row in edited:
+                assignment_id = db.execute(text("INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,start_at,end_at) VALUES (:version_id,:group_id,:project_id,:timeslot_id,:start_at,:end_at) RETURNING id"), {"version_id": new_version_id, **{key: row[key] for key in ("group_id", "project_id", "timeslot_id", "start_at", "end_at")}}).scalar_one()
+                council_id = int(row["council_id"]) if "council_id" in row else int(next(item["council_id"] for item in rows if item["id"] == row["id"]))
+                if row["id"] == session_id and reviewer_changed:
+                    names = db.execute(text("SELECT l.id,a.display_name FROM lecturers l JOIN accounts a ON a.id=l.account_id WHERE l.id=ANY(:ids)"), {"ids": list(row["reviewer_ids"]) or [0]}).all()
+                    name_map = {item[0]: item[1] for item in names}
+                    council_id = create_council(db, int(version["round_id"]), [{"lecturer_id": lecturer_id, "is_result_owner": lecturer_id == owner_id, "snapshot_name": name_map.get(lecturer_id, str(lecturer_id))} for lecturer_id in row["reviewer_ids"]], created_by=_actor_id(db, user), reason=payload.reason.strip(), supersedes_council_id=council_id)
+                    after_target_council = council_id
+                new_id = db.execute(text("INSERT INTO sessions(schedule_version_id,group_id,timeslot_id,room_id,council_id,start_at,end_at,status) VALUES (:version_id,:group_id,:timeslot_id,:room_id,:council_id,:start_at,:end_at,'SCHEDULED') RETURNING id"), {"version_id": new_version_id, "group_id": row["group_id"], "timeslot_id": row["timeslot_id"], "room_id": row["room_id"], "council_id": council_id, "start_at": row["start_at"], "end_at": row["end_at"]}).scalar_one()
                 new_session_ids[row["id"]] = new_id
-                names = db.execute(text("SELECT l.id, a.display_name FROM lecturers l JOIN accounts a ON a.id = l.account_id WHERE l.id = ANY(:ids)"), {"ids": list(row["reviewer_ids"]) or [0]}).all()
-                name_map = {item[0]: item[1] for item in names}
-                owner_ids = set(row.get("result_owner_ids", ()))
-                if row["id"] == session_id:
-                    owner_ids = {owner_id} if owner_id is not None else set()
-                for lecturer_id in row["reviewer_ids"]:
-                    db.execute(text("INSERT INTO session_reviewers (session_id, schedule_version_id, lecturer_id, is_result_owner, snapshot_name, start_at, end_at) VALUES (:session_id, :version_id, :lecturer_id, :is_owner, :snapshot_name, :start_at, :end_at)"), {"session_id": new_id, "version_id": new_version_id, "lecturer_id": lecturer_id, "is_owner": lecturer_id in owner_ids, "snapshot_name": name_map.get(lecturer_id, str(lecturer_id)), "start_at": row["start_at"], "end_at": row["end_at"]})
-                previous_result = db.execute(text("SELECT outcome, note, entered_by, entered_at, correction_reason, before_json, after_json, remediation_due_at, verifier_lecturer_id, verify_status, before_group_status, after_group_status FROM session_results WHERE session_id = :session_id"), {"session_id": row["id"]}).mappings().one_or_none()
-                if previous_result is not None:
-                    new_result_id = db.execute(text("INSERT INTO session_results (session_id, outcome, note, entered_by, entered_at, correction_reason, before_json, after_json, remediation_due_at, verifier_lecturer_id, verify_status, before_group_status, after_group_status) VALUES (:session_id, CAST(:outcome AS result_outcome), :note, :entered_by, :entered_at, :correction_reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB), :due_at, :verifier_id, CAST(:verify_status AS verify_status), CAST(:before_group_status AS group_status), CAST(:after_group_status AS group_status)) RETURNING id"), {"session_id": new_id, **dict(previous_result)}).scalar_one()
-                    previous_case = db.execute(text("SELECT due_at, status, verifier_lecturer_id, verified_at, note FROM remediation_cases WHERE session_result_id = :result_id"), {"result_id": db.execute(text("SELECT id FROM session_results WHERE session_id = :session_id"), {"session_id": row["id"]}).scalar_one()}).mappings().one_or_none()
-                    if previous_case is not None:
-                        db.execute(text("INSERT INTO remediation_cases (session_result_id, group_id, due_at, status, verifier_lecturer_id, verified_at, note) VALUES (:result_id, :group_id, :due_at, CAST(:status AS remediation_status), :verifier_lecturer_id, :verified_at, :note) ON CONFLICT (session_result_id) DO NOTHING"), {"result_id": new_result_id, "group_id": row["group_id"], **dict(previous_case)})
-            db.execute(text("INSERT INTO schedule_change_records (round_id, schedule_version_id, session_id, actor_id, reason, before_json, after_json) VALUES (:round_id, :version_id, :session_id, :actor_id, :reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"), {"round_id": version["round_id"], "version_id": new_version_id, "session_id": session_id, "actor_id": _actor_id(db, user), "reason": payload.reason.strip(), "before_json": _json(change["before"]), "after_json": _json(change["after"])})
-            db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, before_json, after_json) VALUES (:actor_id, 'SCHEDULE_CONTROLLED_CHANGE', 'schedule_version', :entity_id, :reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(new_version_id), "reason": payload.reason.strip(), "before_json": _json(change["before"]), "after_json": _json(change["after"])})
-            for recipient_id in affected_schedule_recipients(db, new_version_id):
-                key = f"change:{new_version_id}:{recipient_id}"
-                payload_json = _json({"source_version_id": version_id, "version_id": new_version_id, "session_id": session_id, "recipient_id": recipient_id})
-                db.execute(text("INSERT INTO notifications (recipient_account_id, event_type, payload, dedupe_key) VALUES (:recipient_id, 'SCHEDULE_CHANGED', CAST(:payload AS JSONB), :key) ON CONFLICT DO NOTHING"), {"recipient_id": recipient_id, "payload": payload_json, "key": key})
-                db.execute(text("INSERT INTO outbox_jobs (topic, payload, dedupe_key) VALUES ('SCHEDULE_CHANGED', CAST(:payload AS JSONB), :key) ON CONFLICT DO NOTHING"), {"payload": payload_json, "key": key})
-        return {"version_id": new_version_id, "source_version_id": version_id, "session_id": new_session_ids[session_id], "status": "VALID"}
-    except DomainError as exc:
-        raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
+                for member in load_council_members(db, council_id):
+                    db.execute(text("INSERT INTO schedule_assignment_reviewers(assignment_id,lecturer_id,is_result_owner,snapshot_name) VALUES (:assignment_id,:lecturer_id,:is_owner,:snapshot_name)"), {"assignment_id": assignment_id, "lecturer_id": member["lecturer_id"], "is_owner": member["is_result_owner"], "snapshot_name": member["snapshot_name"]})
+                source_result = db.execute(
+                    text("SELECT * FROM session_results WHERE session_id = :session_id"),
+                    {"session_id": row["id"]},
+                ).mappings().one_or_none()
+                if source_result is not None:
+                    new_result_id = db.execute(
+                        text(
+                            "INSERT INTO session_results "
+                            "(session_id,outcome,note,entered_by,entered_at,correction_reason,before_json,after_json,remediation_due_at,verifier_lecturer_id,verify_status,before_group_status,after_group_status) "
+                            "VALUES (:session_id,:outcome,:note,:entered_by,:entered_at,:correction_reason,CAST(:before_json AS JSONB),CAST(:after_json AS JSONB),:remediation_due_at,:verifier_lecturer_id,:verify_status,CAST(:before_group_status AS group_status),CAST(:after_group_status AS group_status)) "
+                            "RETURNING id"
+                        ),
+                        {
+                            "session_id": new_id,
+                            "outcome": source_result["outcome"],
+                            "note": source_result["note"],
+                            "entered_by": source_result["entered_by"],
+                            "entered_at": source_result["entered_at"],
+                            "correction_reason": source_result["correction_reason"],
+                            "before_json": _json(source_result["before_json"]) if source_result["before_json"] is not None else None,
+                            "after_json": _json(source_result["after_json"]) if source_result["after_json"] is not None else None,
+                            "remediation_due_at": source_result["remediation_due_at"],
+                            "verifier_lecturer_id": source_result["verifier_lecturer_id"],
+                            "verify_status": source_result["verify_status"],
+                            "before_group_status": source_result["before_group_status"],
+                            "after_group_status": source_result["after_group_status"],
+                        },
+                    ).scalar_one()
+                    source_case = db.execute(
+                        text("SELECT * FROM remediation_cases WHERE session_result_id = :result_id"),
+                        {"result_id": source_result["id"]},
+                    ).mappings().one_or_none()
+                    if source_case is not None:
+                        db.execute(
+                            text(
+                                "INSERT INTO remediation_cases "
+                                "(session_result_id,group_id,due_at,status,verifier_lecturer_id,verified_at,note) "
+                                "VALUES (:session_result_id,:group_id,:due_at,:status,:verifier_lecturer_id,:verified_at,:note)"
+                            ),
+                            {
+                                "session_result_id": new_result_id,
+                                "group_id": source_case["group_id"],
+                                "due_at": source_case["due_at"],
+                                "status": source_case["status"],
+                                "verifier_lecturer_id": source_case["verifier_lecturer_id"],
+                                "verified_at": source_case["verified_at"],
+                                "note": source_case["note"],
+                            },
+                        )
+            after_recipients = affected_schedule_recipients(db, new_version_id)
+            db.execute(text("UPDATE schedule_versions SET status='DISCARDED' WHERE id=:id"), {"id": version_id})
+            db.execute(text("INSERT INTO schedule_change_records(round_id,schedule_version_id,session_id,actor_id,reason,before_json,after_json) VALUES (:round_id,:version_id,:session_id,:actor_id,:reason,CAST(:before_json AS JSONB),CAST(:after_json AS JSONB))"), {"round_id": version["round_id"], "version_id": new_version_id, "session_id": session_id, "actor_id": _actor_id(db, user), "reason": payload.reason.strip(), "before_json": _json({"council_id": target["council_id"], "version_id": version_id}), "after_json": _json({"council_id": after_target_council, "version_id": new_version_id})})
+            db.execute(text("INSERT INTO audit_events(actor_id,action,entity_type,entity_id,reason,before_json,after_json) VALUES (:actor_id,'SCHEDULE_CONTROLLED_CHANGE','schedule_version',:entity_id,:reason,CAST(:before_json AS JSONB),CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(new_version_id), "reason": payload.reason.strip(), "before_json": _json({"version_id": version_id}), "after_json": _json({"version_id": new_version_id, "change_kind": "MIXED_REPLACEMENT" if reviewer_changed else "VERSION_REPLACED"})})
+            _queue_schedule_changed(
+                db,
+                before_recipients | after_recipients,
+                round_id=int(version["round_id"]),
+                source_version_id=version_id,
+                replacement_version_id=new_version_id,
+                session_id=session_id,
+                change_kind="MIXED_REPLACEMENT" if reviewer_changed else "VERSION_REPLACED",
+                reason=payload.reason.strip(),
+            )
+            return {"change_kind": "MIXED_REPLACEMENT" if reviewer_changed else "VERSION_REPLACED", "schedule_version_id": version_id, "replacement_version_id": new_version_id, "session_id": session_id, "status": "PUBLISHED", "before_council_id": target["council_id"], "after_council_id": after_target_council, "version_id": new_version_id, "source_version_id": version_id}
+    except (DomainError, CouncilError) as exc:
+        raise HTTPException(status_code=getattr(exc, "status_code", 422), detail={"code": exc.code, "message": str(exc), **(getattr(exc, "details", None) or {})}) from exc
 
 
 @router.get("/sessions/{session_id}/replacement-suggestions", response_model=list[ReplacementSuggestionResponse])
 def replacement_suggestions(session_id: int, db: Db, user: User) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER")
-    row = db.execute(text("SELECT s.*, sv.round_id, g.project_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN groups g ON g.id = s.group_id WHERE s.id = :id"), {"id": session_id}).mappings().one_or_none()
+    row = db.execute(text("SELECT s.*, sv.round_id, a.project_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN groups g ON g.id = s.group_id JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id WHERE s.id = :id"), {"id": session_id}).mappings().one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
-    context, _, timeslots, rooms, reviewers = _round_input(db, row["round_id"])
-    current_reviewers = {item[0] for item in db.execute(text("SELECT lecturer_id FROM session_reviewers WHERE session_id = :id"), {"id": session_id}).all()}
+    context, _, timeslots, reviewers = _round_input(db, row["round_id"])
+    current_reviewers = {item[0] for item in db.execute(text("SELECT cm.lecturer_id FROM council_members cm JOIN sessions s ON s.council_id=cm.council_id WHERE s.id = :id"), {"id": session_id}).all()}
     existing_rows = [item for item in _session_rows(db, row["schedule_version_id"]) if item["id"] != session_id]
-    candidates = generate_candidates(context, groups=[row["group_id"]], timeslots=timeslots, rooms=rooms, reviewers=reviewers)
+    candidates = generate_candidates(context, groups=[row["group_id"]], timeslots=timeslots, reviewers=reviewers)
     suggestions: list[dict[str, Any]] = []
     for candidate in candidates:
         overlap = current_reviewers.intersection(candidate.reviewer_ids)
@@ -919,7 +1201,7 @@ def replacement_suggestions(session_id: int, db: Db, user: User) -> list[dict[st
             group_id=candidate.group_id,
             project_id=row["project_id"],
             timeslot_id=candidate.timeslot_id,
-            room_id=candidate.room_id,
+            room_id=None,
             start_at=candidate.start_at,
             end_at=candidate.end_at,
             reviewer_ids=candidate.reviewer_ids,
@@ -928,7 +1210,7 @@ def replacement_suggestions(session_id: int, db: Db, user: User) -> list[dict[st
         )
         if not validate_schedule(_to_domain_sessions(existing_rows) + [candidate_session], context).valid:
             continue
-        suggestions.append({"timeslot_id": candidate.timeslot_id, "room_id": candidate.room_id, "reviewer_ids": list(candidate.reviewer_ids), "replaces": sorted(current_reviewers - overlap)})
+        suggestions.append({"timeslot_id": candidate.timeslot_id, "room_id": None, "reviewer_ids": list(candidate.reviewer_ids), "replaces": sorted(current_reviewers - overlap)})
         if len(suggestions) >= 50:
             break
     return suggestions
@@ -939,10 +1221,15 @@ def postpone_session(session_id: int, payload: RescheduleRequestPayload, db: Db,
     _require(user, "ADMIN", "MANAGER")
     require_change_reason(payload.reason)
     with db.begin():
-        session_row = db.execute(text("SELECT s.id, s.schedule_version_id FROM sessions s WHERE s.id = :id FOR UPDATE"), {"id": session_id}).mappings().one_or_none()
+        round_id_ref = db.execute(text("SELECT sv.round_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE s.id = :id"), {"id": session_id}).scalar_one_or_none()
+        if round_id_ref is None:
+            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+        db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": round_id_ref})
+        ensure_round_semester_writable(db, int(round_id_ref))
+        session_row = db.execute(text("SELECT s.id, s.schedule_version_id, sv.round_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE s.id = :id FOR UPDATE"), {"id": session_id}).mappings().one_or_none()
         if session_row is None:
             raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
-        updated = db.execute(text("UPDATE sessions SET status = 'POSTPONED' WHERE id = :id AND status IN ('SCHEDULED', 'ONGOING') RETURNING id, status"), {"id": session_id}).mappings().one_or_none()
+        updated = db.execute(text("UPDATE sessions SET status = 'POSTPONED' WHERE id = :id AND status = 'SCHEDULED' RETURNING id, status"), {"id": session_id}).mappings().one_or_none()
         if updated is None:
             raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_POSTPONABLE", "message": "Session is not in an operational state."})
         db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason) VALUES (:actor_id, 'SESSION_POSTPONED', 'session', :entity_id, :reason)"), {"actor_id": _actor_id(db, user), "entity_id": str(session_id), "reason": payload.reason.strip()})
@@ -954,10 +1241,228 @@ def postpone_session(session_id: int, payload: RescheduleRequestPayload, db: Db,
     return dict(updated)
 
 
+@router.post("/sessions/{session_id}/makeup", response_model=ActionResponse, response_model_exclude_none=True)
+def create_makeup_session(session_id: int, payload: MakeupSessionPayload, db: Db, user: User) -> dict[str, Any]:
+    """Create a new operational Session for a postponed Session (spec §73)."""
+    _require(user, "ADMIN", "MANAGER")
+    try:
+        reason = require_change_reason(payload.reason)
+    except DomainError as exc:
+        raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
+    try:
+        with db.begin():
+            original_ref = db.execute(
+                text("SELECT sv.round_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE s.id = :id"),
+                {"id": session_id},
+            ).scalar_one_or_none()
+            if original_ref is None:
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+            db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": original_ref})
+            ensure_round_semester_writable(db, int(original_ref))
+            original = db.execute(
+                text(
+                    "SELECT s.id, s.status, s.schedule_version_id, s.group_id, s.council_id, a.project_id, "
+                    "sv.round_id, sv.status AS version_status "
+                    "FROM sessions s "
+                    "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+                    "JOIN schedule_assignments a ON a.schedule_version_id = s.schedule_version_id AND a.group_id = s.group_id "
+                    "WHERE s.id = :id FOR UPDATE"
+                ),
+                {"id": session_id},
+            ).mappings().one_or_none()
+            if original is None:
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+            if original["version_status"] != "PUBLISHED":
+                raise HTTPException(status_code=403, detail={"code": "SESSION_OUT_OF_SCOPE", "message": "Only a session in a published schedule can receive a make-up."})
+            if original["status"] != "POSTPONED":
+                raise HTTPException(status_code=409, detail={"code": "SESSION_NOT_POSTPONED", "message": "Only a postponed session can receive a make-up."})
+            existing_makeup = db.execute(
+                text("SELECT id FROM sessions WHERE makeup_of_session_id = :id FOR UPDATE"),
+                {"id": session_id},
+            ).scalar_one_or_none()
+            if existing_makeup is not None:
+                raise HTTPException(status_code=409, detail={"code": "MAKEUP_ALREADY_EXISTS", "message": "This session already has a make-up session."})
+            db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": original["round_id"]})
+            db.execute(text("SELECT id FROM schedule_versions WHERE id = :id FOR UPDATE"), {"id": original["schedule_version_id"]})
+            context, _, timeslots, _ = _round_input(db, original["round_id"])
+            slot = next((item for item in timeslots if item[0] == payload.timeslot_id), None)
+            if slot is None:
+                raise HTTPException(status_code=404, detail={"code": "TIMESLOT_NOT_FOUND", "message": "Timeslot does not belong to this round."})
+            _, start_at, end_at, _, _ = slot
+            original_members = load_council_members(db, int(original["council_id"]))
+            original_owner_ids = {int(member["lecturer_id"]) for member in original_members if member["is_result_owner"]}
+            if payload.reviewer_ids is not None:
+                normalized_ids = sorted(set(payload.reviewer_ids))
+                names = db.execute(
+                    text("SELECT l.id, a.display_name FROM lecturers l JOIN accounts a ON a.id = l.account_id WHERE l.id = ANY(:ids)"),
+                    {"ids": normalized_ids or [0]},
+                ).all()
+                name_map = {row[0]: row[1] for row in names}
+                members = [
+                    {
+                        "lecturer_id": lecturer_id,
+                        "assignment": "REVIEWER",
+                        "is_result_owner": lecturer_id in original_owner_ids,
+                        "snapshot_name": name_map.get(lecturer_id, str(lecturer_id)),
+                    }
+                    for lecturer_id in normalized_ids
+                ]
+            else:
+                members = original_members
+                normalized_ids = [int(member["lecturer_id"]) for member in members]
+            reviewer_ids = tuple(normalized_ids)
+            candidate = ScheduledSession(
+                session_id=-1,
+                group_id=original["group_id"],
+                project_id=original["project_id"],
+                timeslot_id=payload.timeslot_id,
+                room_id=None,
+                start_at=start_at,
+                end_at=end_at,
+                reviewer_ids=reviewer_ids,
+                day=str(start_at.date()),
+                part="AM" if start_at.hour < 13 else "PM",
+            )
+            existing_rows = [row for row in _session_rows(db, original["schedule_version_id"]) if row["id"] != session_id]
+            validation = validate_schedule(_to_domain_sessions(existing_rows) + [candidate], context)
+            if not validation.valid:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"code": "HARD_CONSTRAINT_VIOLATION", "violations": [violation.__dict__ for violation in validation.violations]},
+                )
+            validate_council_change(
+                db,
+                session_id,
+                int(original["round_id"]),
+                reviewer_ids,
+                start_at,
+                end_at,
+                exclude_session_ids=[session_id],
+            )
+            room_id = payload.room_id
+            if room_id is not None:
+                lock_room_ids(db, [room_id])
+                room = allowed_room(db, original["round_id"], room_id)
+                if room is None:
+                    exists = db.execute(text("SELECT id, active FROM rooms WHERE id = :id"), {"id": room_id}).mappings().one_or_none()
+                    if exists is None:
+                        raise HTTPException(status_code=404, detail={"code": "ROOM_NOT_FOUND", "message": "Room does not exist."})
+                    if not exists["active"]:
+                        raise HTTPException(status_code=422, detail={"code": "ROOM_INACTIVE", "message": "Room is not active."})
+                    raise HTTPException(status_code=422, detail={"code": "ROOM_TYPE_NOT_ALLOWED", "message": "Room type is not allowed for this round."})
+                room_conflict = find_room_conflict(db, room_id, start_at, end_at)
+                if room_conflict is not None:
+                    raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Room is already occupied during this session."})
+            actor_id = _actor_id(db, user)
+            council_id = create_council(
+                db,
+                int(original["round_id"]),
+                members,
+                created_by=actor_id,
+                reason=reason,
+            )
+            try:
+                new_session_id = db.execute(
+                    text(
+                        "INSERT INTO sessions (schedule_version_id, group_id, timeslot_id, room_id, council_id, start_at, end_at, status, makeup_of_session_id) "
+                        "VALUES (:version_id, :group_id, :timeslot_id, :room_id, :council_id, :start_at, :end_at, 'SCHEDULED', :makeup_of_session_id) RETURNING id"
+                    ),
+                    {
+                        "version_id": original["schedule_version_id"],
+                        "group_id": original["group_id"],
+                        "timeslot_id": payload.timeslot_id,
+                        "room_id": room_id,
+                        "council_id": council_id,
+                        "start_at": start_at,
+                        "end_at": end_at,
+                        "makeup_of_session_id": session_id,
+                    },
+                ).scalar_one()
+            except IntegrityError as exc:
+                raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Room is already occupied during this session."}) from exc
+            db.execute(
+                text(
+                    "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) "
+                    "VALUES (:actor_id, 'SESSION_MAKEUP_CREATED', 'session', :entity_id, :reason, CAST(:after_json AS JSONB))"
+                ),
+                {
+                    "actor_id": actor_id,
+                    "entity_id": str(new_session_id),
+                    "reason": reason,
+                    "after_json": _json({
+                        "makeup_of_session_id": session_id,
+                        "timeslot_id": payload.timeslot_id,
+                        "room_id": room_id,
+                        "council_id": council_id,
+                        "reviewer_ids": list(reviewer_ids),
+                    }),
+                },
+            )
+            for recipient_id in affected_schedule_recipients(db, original["schedule_version_id"]):
+                key = f"makeup:{new_session_id}:{recipient_id}"
+                event_payload = _json({"session_id": new_session_id, "makeup_of_session_id": session_id, "reason": reason, "recipient_id": recipient_id})
+                db.execute(text("INSERT INTO notifications (recipient_account_id, event_type, payload, dedupe_key) VALUES (:recipient_id, 'SESSION_MAKEUP_CREATED', CAST(:payload AS JSONB), :key) ON CONFLICT DO NOTHING"), {"recipient_id": recipient_id, "payload": event_payload, "key": key})
+                db.execute(text("INSERT INTO outbox_jobs (topic, payload, dedupe_key) VALUES ('SESSION_MAKEUP_CREATED', CAST(:payload AS JSONB), :key) ON CONFLICT DO NOTHING"), {"payload": event_payload, "key": key})
+    except CouncilError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": exc.code, "message": str(exc), **(exc.details or {})}) from exc
+    return {"id": new_session_id, "session_id": new_session_id, "status": "SCHEDULED", "makeup_of_session_id": session_id}
+
+
+@router.post("/sessions/{session_id}/group-absent", response_model=ActionResponse, response_model_exclude_none=True)
+def mark_group_absent(session_id: int, payload: RescheduleRequestPayload, db: Db, user: User) -> dict[str, Any]:
+    """Mark a published operational session absent when its group does not attend."""
+    _require(user, "ADMIN", "MANAGER")
+    try:
+        reason = require_change_reason(payload.reason)
+    except DomainError as exc:
+        raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
+    with db.begin():
+        session_ref = db.execute(
+            text("SELECT sv.round_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE s.id = :id"),
+            {"id": session_id},
+        ).scalar_one_or_none()
+        if session_ref is None:
+            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+        db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": session_ref})
+        ensure_round_semester_writable(db, int(session_ref))
+        session_row = db.execute(
+            text(
+                "SELECT s.id, s.status, s.schedule_version_id, sv.round_id, sv.status AS version_status "
+                "FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+                "WHERE s.id = :id FOR UPDATE"
+            ),
+            {"id": session_id},
+        ).mappings().one_or_none()
+        if session_row is None:
+            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+        if session_row["version_status"] != "PUBLISHED":
+            raise HTTPException(status_code=403, detail={"code": "SESSION_OUT_OF_SCOPE", "message": "Only a published session can be marked absent."})
+        updated = db.execute(
+            text("UPDATE sessions SET status = 'GROUP_ABSENT' WHERE id = :id AND status = 'SCHEDULED' RETURNING id, status"),
+            {"id": session_id},
+        ).mappings().one_or_none()
+        if updated is None:
+            raise HTTPException(status_code=422, detail={"code": "SESSION_NOT_ABSENTABLE", "message": "Only a scheduled session can be marked absent."})
+        actor_id = _actor_id(db, user)
+        db.execute(
+            text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'GROUP_MARKED_ABSENT', 'session', :entity_id, :reason, CAST(:after_json AS JSONB))"),
+            {"actor_id": actor_id, "entity_id": str(session_id), "reason": reason, "after_json": _json({"status": "GROUP_ABSENT", "reason": reason})},
+        )
+        for recipient_id in affected_schedule_recipients(db, session_row["schedule_version_id"]):
+            key = f"group-absent:{session_id}:{recipient_id}"
+            event_payload = _json({"session_id": session_id, "reason": reason, "recipient_id": recipient_id})
+            db.execute(text("INSERT INTO notifications (recipient_account_id, event_type, payload, dedupe_key) VALUES (:recipient_id, 'GROUP_ABSENT', CAST(:payload AS JSONB), :key) ON CONFLICT DO NOTHING"), {"recipient_id": recipient_id, "payload": event_payload, "key": key})
+            db.execute(text("INSERT INTO outbox_jobs (topic, payload, dedupe_key) VALUES ('GROUP_ABSENT', CAST(:payload AS JSONB), :key) ON CONFLICT DO NOTHING"), {"payload": event_payload, "key": key})
+    return {"id": session_id, "status": "GROUP_ABSENT"}
+
+
 @router.post("/rounds/{round_id}/schedule/publish/{version_id}", response_model=PublishResponse)
 def publish_schedule(round_id: int, version_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
+        # Publish lifecycle lock order is Round -> ScheduleVersion -> Sessions -> Rooms.
+        ensure_round_semester_writable(db, round_id)
+        db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": round_id})
         version = (
             db.execute(
                 text(
@@ -973,26 +1478,44 @@ def publish_schedule(round_id: int, version_id: int, db: Db, user: User) -> dict
                 status_code=404,
                 detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."},
             )
-        db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": round_id})
-        context, _, _, _, _ = _round_input(db, round_id)
+        context, _, _, _ = _round_input(db, round_id)
         try:
-            if version["activated_at"] is None and version["status"] == "VALID":
+            if version["status"] != "ACTIVE":
                 raise DomainError("VERSION_NOT_ACTIVE", "Activate the selected version before publishing it.")
+            assignment_count = db.execute(text(
+                "SELECT COUNT(*) FROM schedule_assignments WHERE schedule_version_id=:version_id"
+            ), {"version_id": version_id}).scalar_one()
+            session_count = db.execute(text(
+                "SELECT COUNT(*) FROM sessions WHERE schedule_version_id=:version_id"
+            ), {"version_id": version_id}).scalar_one()
+            incomplete = assignment_count != session_count or db.execute(text(
+                "SELECT 1 FROM schedule_assignments a WHERE a.schedule_version_id=:version_id AND ("
+                "(SELECT COUNT(*) FROM sessions s WHERE s.schedule_version_id=a.schedule_version_id AND s.group_id=a.group_id) <> 1 OR "
+                "(SELECT COUNT(*) FROM schedule_assignment_reviewers ar WHERE ar.assignment_id=a.id) <> "
+                "(SELECT COUNT(*) FROM council_members cm JOIN sessions s ON s.council_id=cm.council_id WHERE s.schedule_version_id=a.schedule_version_id AND s.group_id=a.group_id) OR "
+                "EXISTS (SELECT lecturer_id FROM schedule_assignment_reviewers ar WHERE ar.assignment_id=a.id EXCEPT SELECT cm.lecturer_id FROM council_members cm JOIN sessions s ON s.council_id=cm.council_id WHERE s.schedule_version_id=a.schedule_version_id AND s.group_id=a.group_id)"
+                ") LIMIT 1"
+            ), {"version_id": version_id}).first()
+            if incomplete:
+                raise DomainError("MATERIALIZATION_INCOMPLETE", "Every assignment must have exactly one materialized Session and reviewer set before publishing.")
+            # Room readiness reads round_room_types and raises ROOM_INACTIVE,
+            # ROOM_TYPE_NOT_ALLOWED, or ROOM_CONFLICT.
+            validate_publish_room_readiness(db, round_id, version_id)
             ensure_publishable(
                 str(version["status"]),
                 validate_schedule(
                     _to_domain_sessions(_session_rows(db, version_id)), context
                 ).valid,
             )
-        except DomainError as exc:
+        except (DomainError, RoomAssignmentError) as exc:
             raise HTTPException(
-                status_code=422, detail={"code": exc.code, "message": str(exc)}
+                status_code=getattr(exc, "status_code", 422), detail={"code": exc.code, "message": str(exc), **(getattr(exc, "details", None) or {})}
             ) from exc
         db.execute(
             text(
-                "UPDATE schedule_versions SET status = 'SUPERSEDED' WHERE round_id = :round_id AND status = 'PUBLISHED'"
+                "UPDATE schedule_versions SET status = 'DISCARDED' WHERE round_id = :round_id AND status = 'PUBLISHED' AND id <> :id"
             ),
-            {"round_id": round_id},
+            {"round_id": round_id, "id": version_id},
         )
         db.execute(
             text(
@@ -1003,6 +1526,10 @@ def publish_schedule(round_id: int, version_id: int, db: Db, user: User) -> dict
         db.execute(
             text("UPDATE rounds SET status = 'PUBLISHED' WHERE id = :round_id"),
             {"round_id": round_id},
+        )
+        db.execute(
+            text("UPDATE sessions SET status = 'SCHEDULED' WHERE schedule_version_id = :version_id AND status = 'PLANNED'"),
+            {"version_id": version_id},
         )
         recipients = [(recipient_id,) for recipient_id in sorted(affected_schedule_recipients(db, version_id))]
         for (recipient_id,) in recipients:
@@ -1059,7 +1586,7 @@ def request_reschedule(
     _require(user, "MANAGER", "LECTURER", "STUDENT")
     row = db.execute(
         text(
-            "SELECT s.group_id FROM sessions s WHERE s.id = :id"
+            "SELECT s.group_id, sv.round_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE s.id = :id"
         ),
         {"id": session_id},
     ).mappings().one_or_none()
@@ -1069,6 +1596,7 @@ def request_reschedule(
     ensure_reschedule_allowed(role=user.role, assigned=assigned, is_leader=is_active_group_leader(db, user, row["group_id"]))
     db.commit()
     with db.begin():
+        ensure_round_semester_writable(db, int(row["round_id"]))
         actor_id = _actor_id(db, user)
         request_id = db.execute(
             text(
@@ -1090,6 +1618,12 @@ def decide_reschedule(
 ) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
+        request_round = db.execute(
+            text("SELECT sv.round_id FROM reschedule_requests rr JOIN sessions s ON s.id = rr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE rr.id = :id FOR UPDATE"),
+            {"id": request_id},
+        ).scalar_one_or_none()
+        if request_round is not None:
+            ensure_round_semester_writable(db, int(request_round))
         actor_id = _actor_id(db, user)
         updated = (
             db.execute(
@@ -1126,6 +1660,7 @@ def operate_round(
     _require(user, "ADMIN", "MANAGER")
     require_change_reason(payload.reason)
     with db.begin():
+        ensure_round_semester_writable(db, round_id)
         row = (
             db.execute(
                 text("SELECT status FROM rounds WHERE id = :id FOR UPDATE"), {"id": round_id}

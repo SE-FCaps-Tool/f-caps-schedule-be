@@ -145,7 +145,7 @@ flowchart TD
     E --> H[Registration progress]
     F --> H
     H --> I[Manager chạy scheduler]
-    I --> J[ScheduleVersion VALID]
+    I --> J[ScheduleVersion DRAFT]
     J --> K{So sánh / kiểm tra}
     K -->|chọn| L[Activate version]
     K -->|chưa đạt| I
@@ -197,7 +197,8 @@ Login sai nhiều lần có thể trả `429` kèm `Retry-After`.
 8. Theo dõi `GET /api/v1/rounds/{id}/registration` cho tới khi đủ dữ liệu.
 
 Round là aggregate root của registration và schedule. Không chạy solver khi round chưa
-có group, slot, room và availability hợp lệ.
+có group, slot, Reviewer availability và các input hợp lệ. Room assignment là workflow sau
+solver; room inventory không phải input của CP-SAT.
 
 ### 6.3. Lecturer đăng ký
 
@@ -242,10 +243,10 @@ Content-Type: application/json
 
 ```mermaid
 stateDiagram-v2
-    [*] --> VALID: POST /rounds/{id}/schedule/run
-    VALID --> VALID: activate (version được chọn)
-    VALID --> SUPERSEDED: version khác được activate
-    VALID --> PUBLISHED: publish round
+    [*] --> DRAFT: POST /rounds/{id}/schedule/run
+    DRAFT --> ACTIVE: activate (version được chọn)
+    DRAFT --> DISCARDED: version khác được activate
+    ACTIVE --> PUBLISHED: publish round
     PUBLISHED --> PUBLISHED: controlled-change tạo version mới
     PUBLISHED --> [*]: round hoàn tất/khóa
 ```
@@ -260,15 +261,17 @@ cũ. Request hiện tại:
 Mỗi version lưu:
 
 - `version_no`, `round_id`, `status`;
-- `input_snapshot`: groups, slots, rooms, availability, constraints và `unscheduled`;
+- `input_snapshot`: groups, slots, Reviewer availability, constraints và `unscheduled` (solver không lưu room input);
 - `algorithm_parameters`, `random_seed`, `solver_status`;
 - `total_score`, `soft_scores`;
 - `created_by`, `created_at`, `activated_at`;
-- các `sessions` và snapshot `session_reviewers`.
+- durable `schedule_assignments` và `schedule_assignment_reviewers` gồm project provenance/reviewer snapshot;
+- các `sessions` và `session_reviewers` chỉ được materialize khi activation (controlled-change là replacement exception).
 
 `GET /api/v1/rounds/{round_id}/schedule/versions` dùng để so sánh các phương án.
-`GET /api/v1/schedule/versions/{version_id}` trả version và sessions; lecturer/student
-chỉ thấy sessions trong scope của mình.
+`GET /api/v1/schedule/versions/{version_id}` trả version, assignments và sessions.
+Generated DRAFT có assignments nhưng chưa có sessions; lecturer/student chỉ thấy
+version có session đã materialize trong scope của mình.
 
 Shape rút gọn của version detail:
 
@@ -277,17 +280,18 @@ Shape rút gọn của version detail:
   "id": 12,
   "round_id": 3,
   "version_no": 2,
-  "status": "VALID",
+  "status": "DRAFT",
   "solver_status": "FEASIBLE",
   "total_score": 91.5,
   "soft_scores": {"S1": 12.0, "S4": 7.5},
   "input_snapshot": {"unscheduled": []},
-  "sessions": [
+  "assignments": [
     {
-      "id": 101,
+      "assignment_id": 101,
       "group_id": 8,
+      "project_id": 7,
       "timeslot_id": 10,
-      "room_id": 2,
+      "room_id": null,
       "start_at": "2026-08-20T08:00:00+07:00",
       "end_at": "2026-08-20T08:30:00+07:00",
       "reviewer_ids": [31, 42],
@@ -299,11 +303,13 @@ Shape rút gọn của version detail:
 ```
 
 Frontend không được coi `version_no` là phiên bản duy nhất toàn hệ thống; nó chỉ duy nhất
-trong một `round_id`. `status=PUBLISHED` là bản đã công bố, còn `VALID` có thể là bản
-được activate trước khi publish.
+trong một `round_id`. Lifecycle là `DRAFT → ACTIVE → PUBLISHED`; version bị thay thế
+chuyển `DISCARDED`. `project_id` của assignment/session là provenance snapshot của
+solver, không đọc lại từ `groups.project_id` cho các truy vấn schedule-derived.
 
-`POST /api/v1/schedule/versions/{version_id}/activate` chọn version VALID làm phương án
-đang dùng. `POST /api/v1/rounds/{round_id}/schedule/publish/{version_id}` công bố
+`POST /api/v1/schedule/versions/{version_id}/activate` chọn version DRAFT, kiểm tra provenance
+và hard constraints, rồi materialize Session `PLANNED` cùng reviewer snapshots.
+`POST /api/v1/rounds/{round_id}/schedule/publish/{version_id}` công bố
 phương án đã chọn và phát notification.
 
 Sau publish, chạy lại toàn bộ solver bị chặn theo PRD. Muốn thay đổi phải dùng controlled

@@ -13,13 +13,19 @@ from app.domain.errors import DomainError
 from app.domain.result_workflow import validate_remediation_verifier, validate_result_outcome
 from app.domain.schedule_operations import require_change_reason
 from app.domain.transitions import transition_group
+from app.response_models import (
+    ActionResponse,
+    RemediationResponse,
+    ResultDetailResponse,
+    ResultWriteResponse,
+)
 from app.routes.schedule_operations import _actor_id
 from app.services.access import (
     affected_group_recipients,
     can_read_session,
     lecturer_id_for_account,
 )
-from app.response_models import ActionResponse, RemediationResponse, ResultDetailResponse, ResultWriteResponse
+from app.services.semester_queries import ensure_round_semester_writable
 
 router = APIRouter(prefix="/api/v1", tags=["results"])
 Db = Annotated[Session, Depends(get_db)]
@@ -52,9 +58,10 @@ def _session_context(db: Session, session_id: int) -> dict[str, Any]:
     row = (
         db.execute(
             text(
-                "SELECT s.id, s.group_id, g.project_id, s.status AS session_status, g.status AS group_status, "
+                "SELECT s.id, s.group_id, a.project_id, s.status AS session_status, g.status AS group_status, "
                 "sv.id AS version_id, r.id AS round_id, r.type, r.result_owner_mode "
                 "FROM sessions s JOIN groups g ON g.id = s.group_id "
+                "JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id "
                 "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
                 "JOIN rounds r ON r.id = sv.round_id WHERE s.id = :id"
             ),
@@ -70,7 +77,8 @@ def _session_context(db: Session, session_id: int) -> dict[str, Any]:
         )
     reviewer_rows = db.execute(
         text(
-            "SELECT lecturer_id, is_result_owner FROM session_reviewers WHERE session_id = :session_id"
+            "SELECT cm.lecturer_id, cm.is_result_owner FROM council_members cm "
+            "JOIN sessions s ON s.council_id = cm.council_id WHERE s.id = :session_id"
         ),
         {"session_id": session_id},
     ).all()
@@ -170,6 +178,14 @@ def list_remediation_cases(db: Db, user: User) -> list[dict[str, Any]]:
 def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "MANAGER", "LECTURER")
     context = _session_context(db, session_id)
+    if context["session_status"] in {"GROUP_ABSENT", "POSTPONED", "CANCELLED"}:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "RESULT_SESSION_NOT_OPERATIONAL",
+                "message": "Results cannot be entered for an absent, postponed, or cancelled session.",
+            },
+        )
     if not _can_write(db, user, context):
         raise HTTPException(
             status_code=403, detail="Only an assigned Reviewer or Manager may enter a result."
@@ -218,6 +234,9 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
         with db.begin():
             db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": session_id})
             locked_context = _session_context(db, session_id)
+            ensure_round_semester_writable(db, int(locked_context["round_id"]))
+            if locked_context["session_status"] in {"GROUP_ABSENT", "POSTPONED", "CANCELLED"}:
+                raise DomainError("RESULT_SESSION_NOT_OPERATIONAL", "Results cannot be entered for an absent, postponed, or cancelled session.")
             if locked_context["session_status"] != context["session_status"] or locked_context["group_status"] != context["group_status"]:
                 raise DomainError("RESULT_CONCURRENT_UPDATE", "The session or group changed while this result was being prepared.")
             initial_result_at = context["result"].get("entered_at") if context["result"] is not None else None
@@ -302,12 +321,19 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
                 row[0]
                 for row in db.execute(
                     text(
-                        "SELECT a.id FROM session_reviewers sr JOIN lecturers l ON l.id = sr.lecturer_id JOIN accounts a ON a.id = l.account_id WHERE sr.session_id = :session_id"
+                        "SELECT a.id FROM council_members cm JOIN sessions s ON s.council_id = cm.council_id "
+                        "JOIN lecturers l ON l.id = cm.lecturer_id JOIN accounts a ON a.id = l.account_id WHERE s.id = :session_id"
                     ),
                     {"session_id": session_id},
                 ).all()
             }
-            recipient_ids.update(affected_group_recipients(db, context["group_id"]))
+            recipient_ids.update(
+                affected_group_recipients(
+                    db,
+                    context["group_id"],
+                    schedule_version_id=context["version_id"],
+                )
+            )
             _queue_event(
                 db,
                 event_type="RESULT_RECORDED",
@@ -362,10 +388,18 @@ def decide_remediation(
 ) -> dict[str, Any]:
     _require(user, "LECTURER")
     with db.begin():
+        round_ref = db.execute(
+            text("SELECT sv.round_id FROM remediation_cases rc JOIN session_results sr ON sr.id = rc.session_result_id JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE rc.id = :id"),
+            {"id": case_id},
+        ).scalar_one_or_none()
+        if round_ref is None:
+            raise HTTPException(status_code=404, detail={"code": "REMEDIATION_NOT_FOUND", "message": "Remediation case does not exist."})
+        db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": round_ref})
+        ensure_round_semester_writable(db, int(round_ref))
         case = (
             db.execute(
                 text(
-                    "SELECT rc.*, g.status AS group_status, sr.session_id, s.group_id FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id JOIN session_results sr ON sr.id = rc.session_result_id JOIN sessions s ON s.id = sr.session_id WHERE rc.id = :id FOR UPDATE"
+                    "SELECT rc.*, g.status AS group_status, sr.session_id, s.group_id, sv.round_id FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id JOIN session_results sr ON sr.id = rc.session_result_id JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE rc.id = :id FOR UPDATE"
                 ),
                 {"id": case_id},
             )
@@ -401,7 +435,14 @@ def decide_remediation(
         ).value
         db.execute(text("UPDATE groups SET status = CAST(:status AS group_status) WHERE id = :group_id"), {"status": next_status, "group_id": case["group_id"]})
         db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, before_json, after_json) VALUES (:actor_id, 'REMEDIATION_DECISION', 'remediation_case', :entity_id, :reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"), {"actor_id": actor_id, "entity_id": str(case_id), "reason": payload.note, "before_json": _json({"status": case["status"], "group_status": case["group_status"]}), "after_json": _json({"status": status_value, "group_status": next_status})})
-        _queue_event(db, event_type="REMEDIATION_DECIDED", payload={"remediation_id": case_id, "outcome": status_value}, recipient_ids=affected_group_recipients(db, case["group_id"]))
+        version_id = db.execute(
+            text(
+                "SELECT s.schedule_version_id FROM session_results sr "
+                "JOIN sessions s ON s.id = sr.session_id WHERE sr.id = :result_id"
+            ),
+            {"result_id": case["session_result_id"]},
+        ).scalar_one_or_none()
+        _queue_event(db, event_type="REMEDIATION_DECIDED", payload={"remediation_id": case_id, "outcome": status_value}, recipient_ids=affected_group_recipients(db, case["group_id"], schedule_version_id=version_id))
     return {"id": case_id, "status": status_value}
 
 
@@ -412,9 +453,17 @@ def fail_overdue_remediation(
     _require(user, "MANAGER")
     require_change_reason(payload.reason)
     with db.begin():
+        round_ref = db.execute(
+            text("SELECT sv.round_id FROM remediation_cases rc JOIN session_results sr ON sr.id = rc.session_result_id JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE rc.id = :id"),
+            {"id": case_id},
+        ).scalar_one_or_none()
+        if round_ref is None:
+            raise HTTPException(status_code=404, detail={"code": "REMEDIATION_NOT_FOUND", "message": "Remediation case does not exist."})
+        db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": round_ref})
+        ensure_round_semester_writable(db, int(round_ref))
         case = (
             db.execute(
-                text("SELECT group_id, status, due_at FROM remediation_cases WHERE id = :id FOR UPDATE"),
+                text("SELECT rc.group_id, rc.status, rc.due_at, sv.round_id FROM remediation_cases rc JOIN session_results sr ON sr.id = rc.session_result_id JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE rc.id = :id FOR UPDATE"),
                 {"id": case_id},
             )
             .mappings()
@@ -443,7 +492,15 @@ def fail_overdue_remediation(
             {"group_id": case["group_id"]},
         )
         db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, before_json, after_json) VALUES (:actor_id, 'REMEDIATION_OVERDUE_FAILED', 'remediation_case', :entity_id, :reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(case_id), "reason": payload.reason.strip(), "before_json": _json({"status": case["status"]}), "after_json": _json({"status": "FAILED", "group_status": "FAILED"})})
-        _queue_event(db, event_type="REMEDIATION_OVERDUE", payload={"remediation_id": case_id, "outcome": "FAILED"}, recipient_ids=affected_group_recipients(db, case["group_id"]))
+        version_id = db.execute(
+            text(
+                "SELECT s.schedule_version_id FROM session_results sr "
+                "JOIN sessions s ON s.id = sr.session_id WHERE sr.id = "
+                "(SELECT session_result_id FROM remediation_cases WHERE id = :case_id)"
+            ),
+            {"case_id": case_id},
+        ).scalar_one_or_none()
+        _queue_event(db, event_type="REMEDIATION_OVERDUE", payload={"remediation_id": case_id, "outcome": "FAILED"}, recipient_ids=affected_group_recipients(db, case["group_id"], schedule_version_id=version_id))
     return {"id": case_id, "status": "FAILED"}
 
 
@@ -451,3 +508,6 @@ def _json(value: Any) -> str:
     import json
 
     return json.dumps(value, default=str)
+
+
+_PHASE3_PROVENANCE_TABLE = "schedule_assignments"

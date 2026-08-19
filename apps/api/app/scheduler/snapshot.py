@@ -9,7 +9,6 @@ def build_input_snapshot(
     context: RoundInput,
     groups: list[int],
     timeslots: list[int],
-    rooms: list[int],
     reviewer_assignments: dict[int, list[int]],
     soft_weights: dict[str, int],
 ) -> dict[str, Any]:
@@ -31,7 +30,6 @@ def build_input_snapshot(
             for group_id, slots in sorted(context.group_selected_slots.items())
         },
         "timeslots": sorted(timeslots),
-        "rooms": sorted(rooms),
         "reviewer_assignments": {
             str(group_id): sorted(reviewers)
             for group_id, reviewers in sorted(reviewer_assignments.items())

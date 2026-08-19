@@ -53,7 +53,7 @@ class SemesterResponse(ResponseModel):
     start_date: date | None = None
     end_date: date | None = None
     academic_year: str | None = None
-    status: Literal["ACTIVE", "CLOSED"]
+    status: Literal["PLANNING", "ACTIVE", "CLOSED", "ARCHIVED"]
     project_count: int = 0
     group_count: int = 0
     round_count: int = 0
@@ -178,6 +178,44 @@ class RoomResponse(ResponseModel):
     name: str
     capacity: int
     active: bool = True
+    room_type: str = "NORMAL"
+
+
+class AvailableRoomResponse(RoomResponse):
+    available: bool = True
+
+
+class RoomSuggestionResponse(ResponseModel):
+    session_id: int
+    room_id: int
+    room_code: str | None = None
+    room_type: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+
+
+class RoomSuggestionsResponse(ResponseModel):
+    suggestions: list[RoomSuggestionResponse] = Field(default_factory=list)
+
+
+class RoomAssignmentResponse(ResponseModel):
+    session_id: int
+    room_id: int
+    changed: bool = True
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+
+
+class RoomSuggestionApplyResponse(ResponseModel):
+    round_id: int
+    changed_count: int = 0
+    unchanged_count: int = 0
+    assignments: list[dict[str, int]] = Field(default_factory=list)
+
+
+class RoomReadinessResponse(ResponseModel):
+    readiness: str = "READY"
+    missing_sessions: list[int] = Field(default_factory=list)
 
 
 class RoundResponse(ResponseModel):
@@ -199,6 +237,7 @@ class RoundResponse(ResponseModel):
     max_minutes_per_part: int | None = None
     max_minutes_per_day: int | None = None
     soft_weights: dict[str, int] = Field(default_factory=dict)
+    room_types: list[str] = Field(default_factory=list)
 
 
 class RoundResourceResponse(ResponseModel):
@@ -206,6 +245,7 @@ class RoundResourceResponse(ResponseModel):
     groups: int
     timeslots: int
     rooms: int
+    room_types: list[str] = Field(default_factory=list)
 
 
 class AvailabilityWriteResponse(ResponseModel):
@@ -319,6 +359,7 @@ class QuotaResponse(ResponseModel):
 
 class SessionResponse(ResponseModel):
     id: int
+    assignment_id: int | None = None
     version_id: int | None = None
     schedule_version_id: int | None = None
     round_id: int | None = None
@@ -331,6 +372,8 @@ class SessionResponse(ResponseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     status: str | None = None
+    council_id: int | None = None
+    council_members: list[dict[str, Any]] = Field(default_factory=list)
     reviewers: list["ReviewerSummary"] | None = None
 
 
@@ -338,6 +381,21 @@ class ReviewerSummary(ResponseModel):
     id: int
     code: str
     name: str | None = None
+
+
+class CouncilMemberResponse(ResponseModel):
+    lecturer_id: int
+    assignment: str = "REVIEWER"
+    is_result_owner: bool = False
+    snapshot_name: str | None = None
+
+
+class CouncilResponse(ResponseModel):
+    id: int
+    round_id: int
+    supersedes_council_id: int | None = None
+    sealed_at: datetime | None = None
+    members: list[CouncilMemberResponse] = Field(default_factory=list)
 
 
 class RescheduleRequestResponse(ResponseModel):
@@ -389,9 +447,18 @@ class VersionSummaryResponse(ResponseModel):
 
 class VersionDetailResponse(VersionSummaryResponse):
     sessions: list[SessionResponse] = Field(default_factory=list)
+    assignments: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DashboardSemesterResponse(ResponseModel):
+    id: int
+    code: str
+    name: str
+    status: Literal["PLANNING", "ACTIVE", "CLOSED", "ARCHIVED"]
 
 
 class DashboardResponse(ResponseModel):
+    current_semester: DashboardSemesterResponse | None = None
     totals: dict[str, int] = Field(default_factory=dict)
     availability: dict[str, int] = Field(default_factory=dict)
     groups: dict[str, int] = Field(default_factory=dict)
@@ -557,6 +624,7 @@ class ActionResponse(ResponseModel):
     groups: int | None = None
     timeslots: int | None = None
     rooms: int | None = None
+    makeup_of_session_id: int | None = None
 
 
 class AuditResponse(ResponseModel):
@@ -670,15 +738,22 @@ class PublishResponse(ResponseModel):
 
 class SessionEditResponse(ResponseModel):
     session_id: int
+    assignment_id: int | None = None
     version_id: int
     status: str
 
 
 class ControlledChangeResponse(ResponseModel):
-    version_id: int
-    source_version_id: int
+    change_kind: str = "VERSION_REPLACED"
+    schedule_version_id: int
+    replacement_version_id: int | None = None
     session_id: int
     status: str
+    before_council_id: int | None = None
+    after_council_id: int | None = None
+    # Deprecated compatibility aliases retained for older clients.
+    version_id: int | None = None
+    source_version_id: int | None = None
 
 
 class ResultOwnerResponse(ResponseModel):

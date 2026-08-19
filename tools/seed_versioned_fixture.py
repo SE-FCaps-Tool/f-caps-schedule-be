@@ -1,14 +1,11 @@
 """Load the versioned demo fixture during Docker database bootstrap.
 
-This is intentionally a CLI bootstrap step, not an HTTP endpoint.  The Excel
-import runs first; this fixture then adds the deterministic demo records.  The
-lecturer emails are namespaced to avoid colliding with Excel lecturers because
-the lecturers.account_id column is unique.
+This is intentionally a CLI bootstrap step, not an HTTP endpoint. It is the
+sole seed source for a fresh database — no Excel import runs before it.
 """
 
 from __future__ import annotations
 
-import copy
 import json
 import os
 
@@ -24,9 +21,7 @@ def main() -> None:
     if not database_url:
         raise SystemExit("DATABASE_URL is required")
 
-    fixture = copy.deepcopy(seed_fixture_v1())
-    for lecturer in fixture["lecturers"]:
-        lecturer["email"] = f"fixture-{lecturer['email']}"
+    fixture = seed_fixture_v1()
 
     engine = create_engine(database_url)
     with Session(engine) as session:

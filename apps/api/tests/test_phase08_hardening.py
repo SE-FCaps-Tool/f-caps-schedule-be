@@ -29,7 +29,7 @@ def test_concurrent_activation_keeps_one_active_version(client):
                 db.execute(
                     text(
                         "INSERT INTO schedule_versions (round_id, version_no, status, input_snapshot, algorithm_parameters) "
-                        "VALUES (:round_id, :version_no, CAST('VALID' AS schedule_version_status), '{}'::jsonb, '{}'::jsonb) RETURNING id"
+                        "VALUES (:round_id, :version_no, CAST('DRAFT' AS schedule_version_status), '{}'::jsonb, '{}'::jsonb) RETURNING id"
                     ),
                     {"round_id": round_id, "version_no": version_no},
                 ).scalar_one()
@@ -51,7 +51,7 @@ def test_concurrent_activation_keeps_one_active_version(client):
         active_count = db.execute(
             text(
                 "SELECT COUNT(*) FROM schedule_versions "
-                "WHERE round_id = :round_id AND status = 'VALID' AND activated_at IS NOT NULL"
+                "WHERE round_id = :round_id AND status = 'ACTIVE' AND activated_at IS NOT NULL"
             ),
             {"round_id": round_id},
         ).scalar_one()
@@ -76,7 +76,7 @@ def test_round_operation_and_locked_round_unlock_are_authorized_and_audited(clie
     semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json() if item["code"] == "SE-2026-2027")
     round_response = client.post(
         "/api/v1/rounds",
-        json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "session_duration_minutes": 30},
+        json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "room_types": ["NORMAL"], "session_duration_minutes": 30},
         headers=manager_headers,
     )
     assert round_response.status_code == 201, round_response.text

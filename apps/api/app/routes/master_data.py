@@ -1,10 +1,9 @@
-import copy
 from datetime import UTC, date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from argon2 import PasswordHasher
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -33,6 +32,8 @@ from app.services.seed_loader import load_seed_fixture
 from app.services.semester_queries import (
     SEMESTER_LIFECYCLE_LOCK_KEY,
     academic_year_for_start,
+    ensure_round_semester_writable,
+    ensure_semester_writable,
     semester_or_404,
     semester_rows,
 )
@@ -94,6 +95,7 @@ class SemesterCreate(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
     start_date: date
     end_date: date
+    status: Literal["PLANNING", "ACTIVE"] = "ACTIVE"
 
     @field_validator("code")
     @classmethod
@@ -112,7 +114,7 @@ class SemesterCreate(BaseModel):
 
 
 class SemesterTransitionPayload(BaseModel):
-    target_status: Literal["CLOSED"]
+    target_status: Literal["PLANNING", "ACTIVE", "CLOSED", "ARCHIVED"]
     reason: str = Field(min_length=1, max_length=1000)
 
 
@@ -133,6 +135,7 @@ class RoundCreate(BaseModel):
     max_minutes_per_part: int | None = Field(default=None, gt=0)
     max_minutes_per_day: int | None = Field(default=None, gt=0)
     soft_weights: dict[str, int] = Field(default_factory=dict)
+    room_types: list[Literal["NORMAL", "SEMINAR", "LAB"]] = Field(min_length=1)
 
     @field_validator("soft_weights")
     @classmethod
@@ -149,9 +152,16 @@ class RoundTransitionPayload(BaseModel):
 
 
 class RoundResources(BaseModel):
+    model_config = ConfigDict(extra="allow")
     group_ids: list[int] = Field(min_length=1)
     timeslot_ids: list[int] = Field(min_length=1)
-    room_ids: list[int] = Field(min_length=1)
+    room_types: list[Literal["NORMAL", "SEMINAR", "LAB"]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_room_selection(self) -> "RoundResources":
+        if not self.room_types and not (self.model_extra or {}).get("room_ids"):
+            raise ValueError("room_types must contain at least one allowed type")
+        return self
 
 
 class SlotCreate(BaseModel):
@@ -215,6 +225,7 @@ class RoomCreate(BaseModel):
     code: str = Field(min_length=1, max_length=32)
     name: str = Field(min_length=1, max_length=160)
     capacity: int = Field(gt=0, le=500)
+    room_type: Literal["NORMAL", "SEMINAR", "LAB"] = "NORMAL"
 
 
 class ProjectCreate(BaseModel):
@@ -240,7 +251,9 @@ class MemberPayload(BaseModel):
 
 
 class GroupCreate(BaseModel):
-    project_id: int = Field(gt=0, description="ID project mà nhóm thuộc về.")
+    project_id: int | None = Field(
+        default=None, gt=0, description="ID project mà nhóm thuộc về. Có thể để trống và gán project sau."
+    )
     code: str = Field(min_length=1, max_length=64, description="Mã nhóm, ví dụ G001.")
     members: list[MemberPayload] = Field(
         min_length=4,
@@ -278,7 +291,7 @@ def list_semesters(
     db: Db,
     user: User,
     search: str | None = None,
-    status_filter: Literal["ACTIVE", "CLOSED"] | None = Query(default=None, alias="status"),
+    status_filter: Literal["PLANNING", "ACTIVE", "CLOSED", "ARCHIVED"] | None = Query(default=None, alias="status"),
     academic_year: str | None = None,
 ) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
@@ -493,7 +506,9 @@ def create_lecturer(payload: LecturerCreate, db: Db, user: User) -> dict[str, ob
 @router.get("/rooms", response_model=list[RoomResponse])
 def list_rooms(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
-    rows = db.execute(text("SELECT id, code, name, capacity, active FROM rooms ORDER BY code")).mappings()
+    rows = db.execute(
+        text("SELECT id, code, name, capacity, active, room_type FROM rooms ORDER BY code")
+    ).mappings()
     return [dict(row) for row in rows]
 
 
@@ -504,13 +519,15 @@ def create_room(payload: RoomCreate, db: Db, user: User) -> dict[str, object]:
         with db.begin():
             row = db.execute(
                 text(
-                    "INSERT INTO rooms (code, name, capacity) VALUES (:code, :name, :capacity) "
-                    "RETURNING id, code, name, capacity, active"
+                    "INSERT INTO rooms (code, name, capacity, room_type) "
+                    "VALUES (:code, :name, :capacity, :room_type) "
+                    "RETURNING id, code, name, capacity, active, room_type"
                 ),
                 {
                     "code": normalize_code(payload.code),
                     "name": payload.name.strip(),
                     "capacity": payload.capacity,
+                    "room_type": payload.room_type,
                 },
             ).mappings().one()
             db.execute(
@@ -534,15 +551,15 @@ def list_groups(db: Db, user: User, semester_id: int | None = None) -> list[dict
     rows = db.execute(
         text(
             """
-            SELECT g.id, g.code, g.status, p.code AS project_code, p.title
+            SELECT g.id, g.code, g.status, g.project_id, p.code AS project_code, p.title
                    , COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_member_count
                    , COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_count
                    , MAX(a.display_name) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_name
-             FROM groups g JOIN projects p ON p.id = g.project_id
+             FROM groups g LEFT JOIN projects p ON p.id = g.project_id
              LEFT JOIN group_memberships gm ON gm.group_id = g.id
              LEFT JOIN students st ON st.id = gm.student_id LEFT JOIN accounts a ON a.id = st.account_id
              WHERE (CAST(:semester_id AS BIGINT) IS NULL OR p.semester_id = CAST(:semester_id AS BIGINT))
-             GROUP BY g.id, g.code, g.status, p.code, p.title
+             GROUP BY g.id, g.code, g.status, g.project_id, p.code, p.title
             ORDER BY g.code
             """
         )
@@ -557,6 +574,7 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
     try:
         validate_project_supervisors(payload.supervisors)
         with db.begin():
+            ensure_semester_writable(db, payload.semester_id)
             lecturer_ids = {}
             for assignment in payload.supervisors:
                 lecturer_code = normalize_code(assignment.split(":", maxsplit=1)[0])
@@ -618,11 +636,13 @@ def create_group(payload: GroupCreate, db: Db, user: User) -> dict[str, object]:
     try:
         validate_group_members(members)
         with db.begin():
-            project_exists = db.execute(
-                text("SELECT 1 FROM projects WHERE id = :project_id"), {"project_id": payload.project_id}
-            ).scalar_one_or_none()
-            if project_exists is None:
-                raise DomainError("PROJECT_NOT_FOUND", "Project does not exist.")
+            if payload.project_id is not None:
+                project_exists = db.execute(
+                    text("SELECT semester_id FROM projects WHERE id = :project_id FOR UPDATE"), {"project_id": payload.project_id}
+                ).scalar_one_or_none()
+                if project_exists is None:
+                    raise DomainError("PROJECT_NOT_FOUND", "Project does not exist.")
+                ensure_semester_writable(db, int(project_exists))
             student_ids = {}
             for member in members:
                 student_code = normalize_code(member["student_code"])
@@ -687,6 +707,12 @@ def create_group(payload: GroupCreate, db: Db, user: User) -> dict[str, object]:
 def approve_dropout(group_id: int, student_id: int, payload: DropoutPayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
+        project_semester_id = db.execute(
+            text("SELECT p.semester_id FROM groups g JOIN projects p ON p.id = g.project_id WHERE g.id = :group_id FOR UPDATE"),
+            {"group_id": group_id},
+        ).scalar_one_or_none()
+        if project_semester_id is not None:
+            ensure_semester_writable(db, int(project_semester_id))
         row = db.execute(text("SELECT id, membership_role, status FROM group_memberships WHERE group_id = :group_id AND student_id = :student_id AND status = 'ACTIVE' FOR UPDATE"), {"group_id": group_id, "student_id": student_id}).mappings().one_or_none()
         if row is None:
             raise HTTPException(status_code=404, detail={"code": "MEMBERSHIP_NOT_FOUND", "message": "Active membership does not exist."})
@@ -700,6 +726,12 @@ def approve_dropout(group_id: int, student_id: int, payload: DropoutPayload, db:
 def change_group_leader(group_id: int, payload: LeaderPayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
+        project_semester_id = db.execute(
+            text("SELECT p.semester_id FROM groups g JOIN projects p ON p.id = g.project_id WHERE g.id = :group_id FOR UPDATE"),
+            {"group_id": group_id},
+        ).scalar_one_or_none()
+        if project_semester_id is not None:
+            ensure_semester_writable(db, int(project_semester_id))
         target = db.execute(text("SELECT id, membership_role, status FROM group_memberships WHERE group_id = :group_id AND student_id = :student_id AND status = 'ACTIVE' FOR UPDATE"), {"group_id": group_id, "student_id": payload.student_id}).mappings().one_or_none()
         if target is None:
             raise HTTPException(status_code=404, detail={"code": "LEADER_MEMBER_NOT_FOUND", "message": "The new Leader must be an active group member."})
@@ -714,13 +746,13 @@ def create_semester(
     payload: SemesterCreate, db: Db, user: User, settings: SettingsDep
 ) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
+    if payload.end_date < payload.start_date:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "SEMESTER_DATE_INVALID", "message": "end_date must be after start_date."},
+        )
     duration_days = (payload.end_date - payload.start_date).days + 1
-    if (
-        payload.end_date < payload.start_date
-        or not settings.semester_min_duration_days
-        <= duration_days
-        <= settings.semester_max_duration_days
-    ):
+    if not settings.semester_min_duration_days <= duration_days <= settings.semester_max_duration_days:
         raise HTTPException(
             status_code=422,
             detail={
@@ -748,7 +780,7 @@ def create_semester(
                          status, created_by, updated_by, updated_at)
                     VALUES
                         (:code, :name, :note, :start_date, :end_date, :academic_year,
-                         'ACTIVE', :actor_id, :actor_id, now())
+                         :status, :actor_id, :actor_id, now())
                     RETURNING id, code, name, note, start_date, end_date,
                               academic_year, status, created_at, updated_at,
                               created_by, updated_by
@@ -757,6 +789,7 @@ def create_semester(
                 {
                     **payload.model_dump(),
                     "academic_year": academic_year,
+                    "status": payload.status,
                     "actor_id": actor_id,
                 },
             ).mappings().one()
@@ -774,7 +807,7 @@ def create_semester(
                         {
                             **payload.model_dump(mode="json"),
                             "academic_year": academic_year,
-                            "status": "ACTIVE",
+                            "status": payload.status,
                         }
                     ),
                 },
@@ -820,8 +853,13 @@ def transition_semester(
                 raise DomainError("SEMESTER_NOT_FOUND", "Semester does not exist.")
 
             current_status = str(row["status"])
-            allowed = {"ACTIVE": "CLOSED"}
-            if allowed.get(current_status) != payload.target_status:
+            allowed = {
+                "PLANNING": {"ACTIVE"},
+                "ACTIVE": {"CLOSED"},
+                "CLOSED": {"ARCHIVED"},
+                "ARCHIVED": set(),
+            }
+            if payload.target_status not in allowed.get(current_status, set()):
                 raise DomainError(
                     "SEMESTER_STATUS_INVALID",
                     f"Invalid semester transition: {current_status} -> {payload.target_status}.",
@@ -856,7 +894,7 @@ def transition_semester(
         ) from exc
     except IntegrityError as exc:
         raise HTTPException(
-            status_code=422,
+            status_code=409,
             detail={"code": "ACTIVE_SEMESTER_EXISTS", "message": "Only one semester may be ACTIVE."},
         ) from exc
     return {"id": semester_id, "status": payload.target_status}
@@ -884,6 +922,8 @@ def set_current_semester(semester_id: int, db: Db, user: User) -> dict[str, obje
                 raise DomainError("SEMESTER_NOT_FOUND", "Semester does not exist.")
             if str(target["status"]) == "ACTIVE":
                 return semester_or_404(db, semester_id)
+            if str(target["status"]) == "ARCHIVED":
+                raise DomainError("SEMESTER_ARCHIVED", "An archived semester is read-only and cannot become current.")
 
             active = next((row for row in locked if str(row["status"]) == "ACTIVE"), None)
             actor_id = _actor_id(db, user)
@@ -944,10 +984,7 @@ def seed_fixture(db: Db, user: User) -> dict[str, object]:
     try:
         actor_id = _actor_id(db, user)
         db.commit()
-        fixture = copy.deepcopy(seed_fixture_v1())
-        for lecturer in fixture["lecturers"]:
-            lecturer["email"] = f"fixture-{lecturer['email']}"
-        counts = load_seed_fixture(db, fixture, actor_id=actor_id)
+        counts = load_seed_fixture(db, seed_fixture_v1(), actor_id=actor_id)
     except IntegrityError as exc:
         raise HTTPException(
             status_code=422,
@@ -965,7 +1002,9 @@ def list_rounds(db: Db, user: User, semester_id: int | None = None) -> list[dict
              SELECT id, semester_id, type, status, reviewer_count, result_owner_mode, group_selection_mode,
                     session_duration_minutes, start_date, end_date, registration_deadline,
                     h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
-                    max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights
+                    max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights,
+                    COALESCE((SELECT array_agg(rrt.room_type::text ORDER BY rrt.room_type::text)
+                              FROM round_room_types rrt WHERE rrt.round_id = rounds.id), ARRAY[]::text[]) AS room_types
              FROM rounds WHERE (CAST(:semester_id AS BIGINT) IS NULL OR semester_id = CAST(:semester_id AS BIGINT)) ORDER BY id DESC
             """
         )
@@ -990,6 +1029,17 @@ def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
             }
         )
         with db.begin():
+            semester_status = db.execute(
+                text("SELECT status FROM semesters WHERE id = :semester_id FOR UPDATE"),
+                {"semester_id": payload.semester_id},
+            ).scalar_one_or_none()
+            if semester_status is None:
+                raise DomainError("SEMESTER_NOT_FOUND", "Semester does not exist.")
+            if str(semester_status) != "ACTIVE":
+                raise DomainError(
+                    "SEMESTER_NOT_ACTIVE",
+                    "Evaluation Rounds may only be created in an ACTIVE semester.",
+                )
             row = db.execute(
                 text(
                     """
@@ -1012,6 +1062,12 @@ def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
                 ),
                 {**payload.model_dump(), "soft_weights": _json(payload.soft_weights), "created_by": _actor_id(db, user)},
             ).mappings().one()
+            for room_type in payload.room_types:
+                db.execute(
+                    text("INSERT INTO round_room_types (round_id, room_type) VALUES (:round_id, CAST(:room_type AS room_type)) ON CONFLICT DO NOTHING"),
+                    {"round_id": row["id"], "room_type": room_type},
+                )
+            row = {**dict(row), "room_types": list(payload.room_types)}
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'ROUND_CREATED', 'round', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(row["id"]), "after_json": _json(payload.model_dump())})
     except DomainError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
@@ -1028,6 +1084,7 @@ def transition_round_status(round_id: int, payload: RoundTransitionPayload, db: 
     _require(user, "ADMIN", "MANAGER")
     try:
         with db.begin():
+            ensure_round_semester_writable(db, round_id)
             row = db.execute(text("SELECT status, reviewer_count FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": round_id}).mappings().one_or_none()
             if row is None:
                 raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
@@ -1039,15 +1096,14 @@ def transition_round_status(round_id: int, payload: RoundTransitionPayload, db: 
                         "SELECT "
                         "(SELECT COUNT(*) FROM round_groups WHERE round_id = :round_id) AS groups, "
                         "(SELECT COUNT(*) FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id WHERE rd.round_id = :round_id) AS timeslots, "
-                        "(SELECT COUNT(*) FROM round_rooms WHERE round_id = :round_id) AS rooms, "
                         "(SELECT COUNT(*) FROM round_invitations WHERE round_id = :round_id AND status = 'ACCEPTED') AS accepted_reviewers, "
                         "(SELECT COUNT(DISTINCT lecturer_id) FROM lecturer_availabilities WHERE round_id = :round_id AND state = 'AVAILABLE') AS available_reviewers"
                     ),
                     {"round_id": round_id},
                 ).mappings().one()
                 reviewer_count = counts["accepted_reviewers"] or counts["available_reviewers"]
-                if not counts["groups"] or not counts["timeslots"] or not counts["rooms"] or reviewer_count < row["reviewer_count"]:
-                    raise DomainError("ROUND_INPUTS_INCOMPLETE", "Round needs groups, timeslots, rooms and enough available Reviewers before scheduling.")
+                if not counts["groups"] or not counts["timeslots"] or reviewer_count < row["reviewer_count"]:
+                    raise DomainError("ROUND_INPUTS_INCOMPLETE", "Round needs groups, timeslots and enough available Reviewers before scheduling.")
             db.execute(text("UPDATE rounds SET status = CAST(:status AS round_status) WHERE id = :round_id"), {"status": after.value, "round_id": round_id})
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, before_json, after_json) VALUES (:actor_id, 'ROUND_TRANSITION', 'round', :entity_id, :reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(round_id), "reason": payload.reason, "before_json": _json({"status": before.value}), "after_json": _json({"status": after.value})})
     except (DomainError, ValueError) as exc:
@@ -1060,6 +1116,7 @@ def transition_round_status(round_id: int, payload: RoundTransitionPayload, db: 
 def unlock_round(round_id: int, payload: UnlockPayload, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN")
     with db.begin():
+        ensure_round_semester_writable(db, round_id)
         row = db.execute(text("SELECT status FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": round_id}).mappings().one_or_none()
         if row is None:
             raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
@@ -1077,10 +1134,11 @@ def attach_round_resources(
     payload: RoundResources,
     db: Db,
     user: User,
-) -> dict[str, int | str]:
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     try:
         with db.begin():
+            ensure_round_semester_writable(db, round_id)
             if db.execute(text("SELECT 1 FROM rounds WHERE id = :id"), {"id": round_id}).scalar_one_or_none() is None:
                 raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
             for group_id in set(payload.group_ids):
@@ -1091,17 +1149,17 @@ def attach_round_resources(
                     ),
                     {"round_id": round_id, "group_id": group_id},
                 )
-            for room_id in set(payload.room_ids):
-                if db.execute(
-                    text("SELECT 1 FROM rooms WHERE id = :id AND active = TRUE"), {"id": room_id}
-                ).scalar_one_or_none() is None:
+            room_types = set(payload.room_types)
+            legacy_room_ids = (payload.model_extra or {}).get("room_ids", [])
+            for room_id in set(legacy_room_ids or []):
+                room = db.execute(text("SELECT room_type::text FROM rooms WHERE id = :id AND active = TRUE"), {"id": room_id}).scalar_one_or_none()
+                if room is None:
                     raise DomainError("ROUND_RESOURCE_INVALID", "Room does not exist or is inactive.")
+                room_types.add(str(room))
+            for room_type in sorted(room_types):
                 db.execute(
-                    text(
-                        "INSERT INTO round_rooms (round_id, room_id) VALUES (:round_id, :room_id) "
-                        "ON CONFLICT DO NOTHING"
-                    ),
-                    {"round_id": round_id, "room_id": room_id},
+                    text("INSERT INTO round_room_types (round_id, room_type) VALUES (:round_id, CAST(:room_type AS room_type)) ON CONFLICT DO NOTHING"),
+                    {"round_id": round_id, "room_type": room_type},
                 )
             for timeslot_id in set(payload.timeslot_ids):
                 if db.execute(
@@ -1118,7 +1176,8 @@ def attach_round_resources(
             counts = {
                 "groups": len(set(payload.group_ids)),
                 "timeslots": len(set(payload.timeslot_ids)),
-                "rooms": len(set(payload.room_ids)),
+                "rooms": db.execute(text("SELECT COUNT(*) FROM rooms r JOIN round_room_types rrt ON rrt.room_type = r.room_type WHERE rrt.round_id = :round_id AND r.active = TRUE"), {"round_id": round_id}).scalar_one(),
+                "room_types": sorted(room_types),
             }
     except DomainError as exc:
         raise HTTPException(status_code=404, detail={"code": exc.code, "message": str(exc)}) from exc
@@ -1142,6 +1201,7 @@ def create_round_day(
         if any(slot.end_at <= slot.start_at for slot in payload.slots):
             raise DomainError("TIMESLOT_INVALID", "Timeslot end must be after its start.")
         with db.begin():
+            ensure_round_semester_writable(db, round_id)
             day_id = db.execute(
                 text(
                     "INSERT INTO round_days (round_id, day_date) VALUES (:round_id, :day_date) "
@@ -1205,6 +1265,7 @@ def submit_lecturer_availability(
         db.commit()
     try:
         with db.begin():
+            ensure_round_semester_writable(db, round_id)
             slot_rows = db.execute(
                 text(
                     """
@@ -1289,6 +1350,7 @@ def submit_group_availability(
     db.commit()
     try:
         with db.begin():
+            ensure_round_semester_writable(db, round_id)
             slot_rows = db.execute(
                 text(
                     """
@@ -1345,6 +1407,7 @@ def invite_reviewers(
     _require(user, "ADMIN", "MANAGER")
     try:
         with db.begin():
+            ensure_round_semester_writable(db, round_id)
             for lecturer_id in set(payload.lecturer_ids):
                 lecturer = db.execute(
                     text("SELECT account_id FROM lecturers WHERE id = :lecturer_id"),
@@ -1402,6 +1465,7 @@ def respond_to_invitation(
     ).mappings().one_or_none()
     if round_row is None:
         raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
+    ensure_round_semester_writable(db, round_id)
     deadline = round_row["registration_deadline"]
     try:
         stored_response = "DECLINED" if payload.response == "REJECTED" else payload.response
@@ -1507,8 +1571,9 @@ def list_my_rounds(db: Db, user: User) -> list[dict[str, object]]:
                 "LEFT JOIN round_invitations ri ON ri.round_id = r.id "
                 "LEFT JOIN lecturers l ON l.id = ri.lecturer_id "
                 "WHERE (l.account_id = :account_id AND ri.status = 'ACCEPTED') "
-                "OR EXISTS (SELECT 1 FROM session_reviewers ssr JOIN lecturers sl ON sl.id = ssr.lecturer_id "
-                "JOIN schedule_versions sv ON sv.id = ssr.schedule_version_id WHERE sv.round_id = r.id AND sl.account_id = :account_id) "
+                "OR EXISTS (SELECT 1 FROM council_members cm JOIN sessions cs ON cs.council_id = cm.council_id "
+                "JOIN schedule_versions sv ON sv.id = cs.schedule_version_id JOIN lecturers sl ON sl.id = cm.lecturer_id "
+                "WHERE sv.round_id = r.id AND sl.account_id = :account_id) "
                 "ORDER BY r.id DESC"
             ),
             {"account_id": user.account_id},
@@ -1565,6 +1630,12 @@ def declare_conflict(
             lecturer_id=lecturer_id, project_id=payload.project_id, reason=payload.reason
         )
         with db.begin():
+            semester_id = db.execute(
+                text("SELECT semester_id FROM projects WHERE id = :project_id FOR UPDATE"),
+                {"project_id": payload.project_id},
+            ).scalar_one_or_none()
+            if semester_id is not None:
+                ensure_semester_writable(db, int(semester_id))
             conflict_id = db.execute(
                 text(
                     """

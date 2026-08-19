@@ -41,8 +41,8 @@ class VersionStore:
     def activate(self, version_id: int) -> ScheduleVersion:
         version = self.get(version_id)
         for other_id, other in list(self._versions.items()):
-            if other.round_id == version.round_id and other.status == "ACTIVE":
-                self._versions[other_id] = replace(other, status="SUPERSEDED")
+            if other.round_id == version.round_id and other.status in {"DRAFT", "ACTIVE"}:
+                self._versions[other_id] = replace(other, status="DISCARDED")
         version = replace(version, status="ACTIVE")
         self._versions[version.id] = version
         return deepcopy(version)

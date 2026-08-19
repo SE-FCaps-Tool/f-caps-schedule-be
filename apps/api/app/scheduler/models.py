@@ -9,7 +9,7 @@ class ScheduledSession:
     group_id: int
     project_id: int
     timeslot_id: int
-    room_id: int
+    room_id: int | None
     start_at: datetime
     end_at: datetime
     reviewer_ids: tuple[int, ...]
@@ -68,7 +68,6 @@ class ValidationResult:
 class Candidate:
     group_id: int
     timeslot_id: int
-    room_id: int
     start_at: datetime
     end_at: datetime
     day: str
