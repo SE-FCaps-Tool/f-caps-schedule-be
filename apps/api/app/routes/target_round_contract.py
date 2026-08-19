@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, time, timedelta
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -17,8 +19,10 @@ from app.routes.master_data import (
     AvailabilitySubmit,
     InvitationResponsePayload,
     RoundCreate,
+    RoundDayCreate,
     RoundTransitionPayload,
-    create_round,
+    SlotCreate,
+    create_round_with_days,
     list_rounds,
     my_availability,
     registration_dashboard,
@@ -42,6 +46,115 @@ class GroupPreferencePayload(AvailabilitySubmit):
     pass
 
 
+class TargetRoundSlot(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    start_time: time = Field(alias="startTime")
+    end_time: time = Field(alias="endTime")
+
+
+class TargetRoundDay(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    day_date: date = Field(alias="date")
+    slots: list[TargetRoundSlot] = Field(min_length=1)
+
+
+class TargetRoundCreate(BaseModel):
+    """Spec-shaped request for the semester-scoped round endpoint.
+
+    The legacy ``POST /rounds`` route remains snake_case.  This model keeps the
+    target route aligned with the frontend contract without changing that
+    existing API.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(min_length=1, max_length=255)
+    type: str
+    description: str | None = Field(default=None, max_length=2000)
+    duration_minutes: int = Field(alias="durationMinutes", gt=0, le=480)
+    reviewer_count: int = Field(alias="reviewerCount", gt=0)
+    max_groups_per_timeslot: int = Field(alias="maxGroupsPerTimeslot", gt=0)
+    registration_deadline: datetime = Field(alias="registrationDeadline")
+    group_selection_mode: bool = Field(alias="groupSelectionMode")
+    group_preference_deadline: datetime | None = Field(default=None, alias="groupPreferenceDeadline")
+    result_owner_mode: bool = Field(alias="resultOwnerMode")
+    room_types: list[str] = Field(alias="roomTypes", min_length=1)
+    days: list[TargetRoundDay] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_days(self) -> TargetRoundCreate:
+        expected_reviewers = {
+            "REVIEW_1": 2,
+            "REVIEW_2": 2,
+            "DEFENSE_1_1": 3,
+            "DEFENSE_1_2": 5,
+            "DEFENSE_2": 5,
+        }.get(self.type)
+        if expected_reviewers is None:
+            raise ValueError("type is not a supported round type")
+        if self.reviewer_count != expected_reviewers:
+            raise ValueError(f"{self.type} requires {expected_reviewers} reviewers")
+        if self.result_owner_mode and self.type not in {"DEFENSE_1_1", "DEFENSE_2"}:
+            raise ValueError("resultOwnerMode is only available for DEFENSE_1_1 and DEFENSE_2")
+        if self.group_selection_mode and self.group_preference_deadline is None:
+            raise ValueError("groupPreferenceDeadline is required when groupSelectionMode is enabled")
+        if any(room_type not in {"NORMAL", "SEMINAR", "LAB"} for room_type in self.room_types):
+            raise ValueError("roomTypes must contain only NORMAL, SEMINAR, or LAB")
+
+        dates: set[date] = set()
+        for day in self.days:
+            if day.day_date in dates:
+                raise ValueError("days must not contain duplicate dates")
+            dates.add(day.day_date)
+            ordered = sorted(day.slots, key=lambda slot: slot.start_time)
+            previous_end: time | None = None
+            for slot in ordered:
+                if slot.end_time <= slot.start_time:
+                    raise ValueError("endTime must be after startTime")
+                duration = datetime.combine(day.day_date, slot.end_time) - datetime.combine(day.day_date, slot.start_time)
+                if duration != timedelta(minutes=self.duration_minutes):
+                    raise ValueError("slot duration must equal durationMinutes")
+                if previous_end is not None and slot.start_time < previous_end:
+                    raise ValueError("slots on the same day must not overlap")
+                previous_end = slot.end_time
+        return self
+
+    def to_legacy(self, semester_id: int) -> tuple[RoundCreate, list[RoundDayCreate]]:
+        vietnam_tz = ZoneInfo("Asia/Ho_Chi_Minh")
+        days = [
+            RoundDayCreate(
+                day_date=day.day_date,
+                slots=[
+                    SlotCreate(
+                        start_at=datetime.combine(day.day_date, slot.start_time, tzinfo=vietnam_tz),
+                        end_at=datetime.combine(day.day_date, slot.end_time, tzinfo=vietnam_tz),
+                    )
+                    for slot in day.slots
+                ],
+            )
+            for day in self.days
+        ]
+        legacy = RoundCreate(
+            semester_id=semester_id,
+            name=self.name,
+            description=self.description,
+            type=self.type,
+            reviewer_count=self.reviewer_count,
+            start_date=min(day.day_date for day in self.days),
+            end_date=max(day.day_date for day in self.days),
+            result_owner_mode=self.result_owner_mode,
+            group_selection_mode=self.group_selection_mode,
+            group_preference_deadline=self.group_preference_deadline,
+            session_duration_minutes=self.duration_minutes,
+            registration_deadline=self.registration_deadline.isoformat(),
+            max_groups_per_timeslot=self.max_groups_per_timeslot,
+            room_types=self.room_types,
+        )
+        return legacy, days
+
+
 def _manager(user: CurrentUser) -> None:
     if user.role not in {"ADMIN", "MANAGER"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Manager permission required."})
@@ -55,9 +168,10 @@ def list_semester_rounds(semester_id: int, db: Db, user: User) -> dict[str, Any]
 
 
 @router.post("/semesters/{semester_id}/rounds", status_code=status.HTTP_201_CREATED)
-def create_semester_round(semester_id: int, payload: RoundCreate, db: Db, user: User) -> dict[str, Any]:
+def create_semester_round(semester_id: int, payload: TargetRoundCreate, db: Db, user: User) -> dict[str, Any]:
     _manager(user)
-    return success_payload(create_round(payload.model_copy(update={"semester_id": semester_id}), db, user))
+    legacy_payload, days = payload.to_legacy(semester_id)
+    return success_payload(create_round_with_days(legacy_payload, db, user, days=days))
 
 
 @router.get("/rounds/{round_id}/eligible-projects")

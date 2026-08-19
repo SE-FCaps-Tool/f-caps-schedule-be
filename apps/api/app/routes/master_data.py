@@ -120,12 +120,15 @@ class SemesterTransitionPayload(BaseModel):
 
 class RoundCreate(BaseModel):
     semester_id: int = Field(gt=0)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
     type: str
     reviewer_count: int = Field(gt=0)
     start_date: date | None = None
     end_date: date | None = None
     result_owner_mode: bool = False
     group_selection_mode: bool = False
+    group_preference_deadline: datetime | None = None
     session_duration_minutes: int = Field(gt=0, le=480)
     registration_deadline: str | None = None
     h12_sessions_per_part: int = Field(default=4, gt=0)
@@ -1006,8 +1009,9 @@ def list_rounds(db: Db, user: User, semester_id: int | None = None) -> list[dict
     rows = db.execute(
         text(
             """
-             SELECT id, semester_id, type, status, reviewer_count, result_owner_mode, group_selection_mode,
+             SELECT id, semester_id, name, description, type, status, reviewer_count, result_owner_mode, group_selection_mode,
                     session_duration_minutes, start_date, end_date, registration_deadline,
+                    group_preference_deadline,
                     h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
                     max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights,
                     COALESCE((SELECT array_agg(rrt.room_type::text ORDER BY rrt.room_type::text)
@@ -1020,7 +1024,20 @@ def list_rounds(db: Db, user: User, semester_id: int | None = None) -> list[dict
 
 
 @router.post("/rounds", status_code=status.HTTP_201_CREATED, response_model=RoundResponse)
-def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
+def create_round(
+    payload: RoundCreate,
+    db: Db,
+    user: User,
+) -> dict[str, object]:
+    return create_round_with_days(payload, db, user)
+
+
+def create_round_with_days(
+    payload: RoundCreate,
+    db: Db,
+    user: User,
+    days: list[RoundDayCreate] | None = None,
+) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     if payload.start_date and payload.end_date and payload.end_date < payload.start_date:
         raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
@@ -1051,18 +1068,21 @@ def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
                 text(
                     """
                     INSERT INTO rounds (
-                        semester_id, type, reviewer_count, result_owner_mode, group_selection_mode,
+                        semester_id, name, description, type, reviewer_count, result_owner_mode, group_selection_mode,
+                         group_preference_deadline,
                          session_duration_minutes, start_date, end_date, registration_deadline,
                          h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
                          max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights, created_by
                     ) VALUES (
-                        :semester_id, :type, :reviewer_count, :result_owner_mode, :group_selection_mode,
+                        :semester_id, :name, :description, :type, :reviewer_count, :result_owner_mode, :group_selection_mode,
+                         :group_preference_deadline,
                          :session_duration_minutes, :start_date, :end_date, :registration_deadline,
                          :h12_sessions_per_part, :h12_sessions_per_day, :h12_semester_quota,
                          :max_groups_per_timeslot, :max_minutes_per_part, :max_minutes_per_day, CAST(:soft_weights AS JSONB), :created_by
                     )
-                    RETURNING id, semester_id, type, status, reviewer_count, result_owner_mode, group_selection_mode,
+                    RETURNING id, semester_id, name, description, type, status, reviewer_count, result_owner_mode, group_selection_mode,
                                session_duration_minutes, start_date, end_date, registration_deadline,
+                               group_preference_deadline,
                                h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
                                max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights
                     """
@@ -1074,6 +1094,25 @@ def create_round(payload: RoundCreate, db: Db, user: User) -> dict[str, object]:
                     text("INSERT INTO round_room_types (round_id, room_type) VALUES (:round_id, CAST(:room_type AS room_type)) ON CONFLICT DO NOTHING"),
                     {"round_id": row["id"], "room_type": room_type},
                 )
+            if days:
+                for day in days:
+                    day_id = db.execute(
+                        text("INSERT INTO round_days (round_id, day_date) VALUES (:round_id, :day_date) RETURNING id"),
+                        {"round_id": row["id"], "day_date": day.day_date},
+                    ).scalar_one()
+                    for slot in day.slots:
+                        db.execute(
+                            text(
+                                "INSERT INTO timeslots (round_day_id, start_at, end_at, part) "
+                                "VALUES (:round_day_id, :start_at, :end_at, :part)"
+                            ),
+                            {
+                                "round_day_id": day_id,
+                                "start_at": slot.start_at,
+                                "end_at": slot.end_at,
+                                "part": "AM" if slot.start_at.hour < 13 else "PM",
+                            },
+                        )
             row = {**dict(row), "room_types": list(payload.room_types)}
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'ROUND_CREATED', 'round', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(row["id"]), "after_json": _json(payload.model_dump())})
     except DomainError as exc:

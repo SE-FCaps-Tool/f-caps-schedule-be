@@ -235,6 +235,8 @@ class RoomReadinessResponse(ResponseModel):
 class RoundResponse(ResponseModel):
     id: int
     semester_id: int
+    name: str | None = None
+    description: str | None = None
     type: str
     status: str
     reviewer_count: int
@@ -244,6 +246,7 @@ class RoundResponse(ResponseModel):
     start_date: date | None = None
     end_date: date | None = None
     registration_deadline: datetime | None = None
+    group_preference_deadline: datetime | None = None
     h12_sessions_per_part: int | None = None
     h12_sessions_per_day: int | None = None
     h12_semester_quota: int | None = None

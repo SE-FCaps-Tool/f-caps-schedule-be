@@ -1,4 +1,8 @@
+import pytest
+from pydantic import ValidationError
+
 from app.main import create_app
+from app.routes.target_round_contract import TargetRoundCreate
 
 
 def test_phase04_target_round_registration_routes_are_in_openapi():
@@ -19,3 +23,49 @@ def test_phase04_target_round_registration_routes_are_in_openapi():
         ("put", "/api/v1/rounds/{round_id}/groups/{group_id}/preferences"),
     }
     assert {(method, path) for path, item in paths.items() for method in item} >= expected
+
+
+def _spec_round_payload() -> dict:
+    return {
+        "name": "Defense 1.1",
+        "type": "DEFENSE_1_1",
+        "description": "demo",
+        "durationMinutes": 60,
+        "reviewerCount": 3,
+        "maxGroupsPerTimeslot": 3,
+        "registrationDeadline": "2026-08-20T23:59:00+07:00",
+        "groupSelectionMode": True,
+        "groupPreferenceDeadline": "2026-08-22T23:59:00+07:00",
+        "resultOwnerMode": True,
+        "roomTypes": ["NORMAL"],
+        "days": [{"date": "2026-08-25", "slots": [{"startTime": "08:00", "endTime": "09:00"}]}],
+    }
+
+
+def test_target_round_create_accepts_spec_camel_case_and_builds_legacy_rows():
+    payload = TargetRoundCreate.model_validate(_spec_round_payload())
+
+    legacy, days = payload.to_legacy(1)
+
+    assert legacy.semester_id == 1
+    assert legacy.session_duration_minutes == 60
+    assert legacy.reviewer_count == 3
+    assert legacy.room_types == ["NORMAL"]
+    assert days[0].day_date.isoformat() == "2026-08-25"
+    assert days[0].slots[0].start_at.isoformat() == "2026-08-25T08:00:00+07:00"
+
+
+def test_target_round_create_rejects_incompatible_result_owner_mode():
+    payload = _spec_round_payload() | {"type": "REVIEW_1", "reviewerCount": 2}
+
+    with pytest.raises(ValidationError, match="resultOwnerMode"):
+        TargetRoundCreate.model_validate(payload)
+
+
+def test_target_round_create_rejects_slot_duration_mismatch():
+    payload = _spec_round_payload() | {
+        "days": [{"date": "2026-08-25", "slots": [{"startTime": "08:00", "endTime": "08:30"}]}]
+    }
+
+    with pytest.raises(ValidationError, match="slot duration"):
+        TargetRoundCreate.model_validate(payload)
