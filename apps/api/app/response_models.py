@@ -67,6 +67,8 @@ class MajorResponse(ResponseModel):
 class StudentResponse(ResponseModel):
     id: int
     student_code: str
+    display_name: str | None = None
+    email: str | None = None
 
 
 class SupervisorResponse(ResponseModel):
@@ -110,6 +112,7 @@ class GroupMemberResponse(ResponseModel):
     student_id: int
     student_code: str
     display_name: str | None = None
+    email: str | None = None
     role: str | None = None
     status: str | None = None
 
@@ -133,6 +136,7 @@ class GroupMutationResponse(ResponseModel):
     member_count: int | None = None
     status: str | None = None
     project_id: int | None = None
+    members: list[GroupMemberResponse] = Field(default_factory=list)
 
 
 class GroupDetailResponse(GroupResponse):

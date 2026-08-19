@@ -345,7 +345,13 @@ def list_majors(db: Db, user: User) -> list[dict[str, object]]:
 @router.get("/students", response_model=list[StudentResponse])
 def list_students(db: Db, user: User) -> list[dict[str, object]]:
     _require(user, "ADMIN", "MANAGER")
-    rows = db.execute(text("SELECT id, student_code FROM students ORDER BY student_code")).mappings()
+    rows = db.execute(
+        text(
+            "SELECT st.id, st.student_code, a.display_name, a.email "
+            "FROM students st LEFT JOIN accounts a ON a.id = st.account_id "
+            "ORDER BY st.student_code"
+        )
+    ).mappings()
     return [dict(row) for row in rows]
 
 
@@ -550,7 +556,7 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
     return {"id": project_id, "code": normalize_code(payload.code), "title": payload.title.strip()}
 
 
-@router.post("/groups", status_code=status.HTTP_201_CREATED, response_model=GroupMutationResponse)
+@router.post("/groups", status_code=status.HTTP_201_CREATED, response_model=GroupMutationResponse, response_model_exclude_none=True)
 def create_group(payload: GroupCreate, db: Db, user: User) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     members = [member.model_dump() for member in payload.members]
@@ -595,6 +601,18 @@ def create_group(payload: GroupCreate, db: Db, user: User) -> dict[str, object]:
                 ),
                 {"actor_id": _actor_id(db, user), "entity_id": str(group_id), "after_json": _json({"code": normalize_code(payload.code), "member_count": len(members)})},
             )
+            member_rows = db.execute(
+                text(
+                    "SELECT st.id AS student_id, st.student_code, a.display_name, a.email, "
+                    "gm.membership_role AS role, gm.status "
+                    "FROM group_memberships gm "
+                    "JOIN students st ON st.id = gm.student_id "
+                    "LEFT JOIN accounts a ON a.id = st.account_id "
+                    "WHERE gm.group_id = :group_id "
+                    "ORDER BY gm.membership_role DESC, st.student_code"
+                ),
+                {"group_id": group_id},
+            ).mappings().all()
     except DomainError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
     except IntegrityError as exc:
@@ -602,7 +620,12 @@ def create_group(payload: GroupCreate, db: Db, user: User) -> dict[str, object]:
             status_code=409,
             detail={"code": "DATA_DUPLICATE", "message": "Group or membership already exists."},
         ) from exc
-    return {"id": group_id, "code": normalize_code(payload.code), "member_count": len(members)}
+    return {
+        "id": group_id,
+        "code": normalize_code(payload.code),
+        "member_count": len(members),
+        "members": [dict(row) for row in member_rows],
+    }
 
 
 @router.post("/groups/{group_id}/members/{student_id}/drop", response_model=DropoutResponse)

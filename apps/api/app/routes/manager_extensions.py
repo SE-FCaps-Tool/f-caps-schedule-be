@@ -281,7 +281,7 @@ def get_group_detail(group_id: int, db: Db, user: User) -> dict[str, Any]:
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "GROUP_NOT_FOUND", "message": "Group does not exist."})
     members = db.execute(
-        text("SELECT st.id AS student_id, st.student_code, a.display_name, gm.membership_role AS role, gm.status FROM group_memberships gm JOIN students st ON st.id = gm.student_id LEFT JOIN accounts a ON a.id = st.account_id WHERE gm.group_id = :id ORDER BY gm.membership_role DESC, st.student_code"),
+        text("SELECT st.id AS student_id, st.student_code, a.display_name, a.email, gm.membership_role AS role, gm.status FROM group_memberships gm JOIN students st ON st.id = gm.student_id LEFT JOIN accounts a ON a.id = st.account_id WHERE gm.group_id = :id ORDER BY gm.membership_role DESC, st.student_code"),
         {"id": group_id},
     ).mappings().all()
     return {**dict(row), "members": [dict(item) for item in members]}
