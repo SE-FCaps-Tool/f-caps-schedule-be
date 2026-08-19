@@ -213,14 +213,42 @@ class ProjectCreate(BaseModel):
 
 
 class MemberPayload(BaseModel):
-    student_code: str = Field(min_length=1, max_length=32)
-    role: Literal["MEMBER", "LEADER"] = "MEMBER"
+    student_code: str = Field(min_length=1, max_length=32, description="Mã sinh viên đã tồn tại trong hệ thống.")
+    role: Literal["MEMBER", "LEADER"] = Field(
+        default="MEMBER",
+        description="Vai trò trong nhóm; mỗi nhóm phải có đúng một LEADER.",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {"student_code": "SE001", "role": "LEADER"}
+        }
+    }
 
 
 class GroupCreate(BaseModel):
-    project_id: int = Field(gt=0)
-    code: str = Field(min_length=1, max_length=64)
-    members: list[MemberPayload] = Field(min_length=4, max_length=5)
+    project_id: int = Field(gt=0, description="ID project mà nhóm thuộc về.")
+    code: str = Field(min_length=1, max_length=64, description="Mã nhóm, ví dụ G001.")
+    members: list[MemberPayload] = Field(
+        min_length=4,
+        max_length=5,
+        description="Danh sách 4–5 sinh viên; phải có đúng một LEADER.",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "project_id": 12,
+                "code": "G001",
+                "members": [
+                    {"student_code": "SE001", "role": "LEADER"},
+                    {"student_code": "SE002", "role": "MEMBER"},
+                    {"student_code": "SE003", "role": "MEMBER"},
+                    {"student_code": "SE004", "role": "MEMBER"},
+                ],
+            }
+        }
+    }
 
 
 class DropoutPayload(BaseModel):
