@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -38,15 +38,17 @@ def _require(user: CurrentUser, *roles: str) -> None:
 
 
 class ResultPayload(BaseModel):
-    outcome: str = Field(min_length=1, max_length=32)
+    model_config = ConfigDict(populate_by_name=True)
+    outcome: str = Field(alias="result", min_length=1, max_length=32)
     note: str | None = Field(default=None, max_length=2000)
-    remediation_due_at: datetime | None = None
-    verifier_lecturer_id: int | None = Field(default=None, gt=0)
-    correction_reason: str | None = Field(default=None, max_length=1000)
+    remediation_due_at: datetime | None = Field(default=None, alias="remediationDueAt")
+    verifier_lecturer_id: int | None = Field(default=None, alias="verifierLecturerId", gt=0)
+    correction_reason: str | None = Field(default=None, alias="correctionReason", max_length=1000)
 
 
 class RemediationDecisionPayload(BaseModel):
-    outcome: str = Field(pattern="^(PASSED|FAILED)$")
+    model_config = ConfigDict(populate_by_name=True)
+    outcome: str = Field(alias="decision", pattern="^(PASSED|FAILED)$")
     note: str | None = Field(default=None, max_length=2000)
 
 

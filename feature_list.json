@@ -239,6 +239,76 @@
       "evidence": "Fast mode: deprecation header/telemetry tests pass (2 tests; 18 cumulative targeted tests); frontend sign-off and full integration suite remain external follow-up.",
       "notes": "Phase 10 of plans/api-contract-alignment.",
       "priority": "P1"
+    },
+    {
+      "id": "api-fast-fix-shared-contract",
+      "title": "Normalize target API envelopes, errors, aliases, and external IDs",
+      "user_visible_behavior": "so that every target endpoint accepts documented camelCase inputs and returns consistent envelopes, structured errors, and prefixed IDs.",
+      "verification_command": "Run the Phase 1 contract tests and OpenAPI assertions for aliases, envelopes, error codes, pagination, and ID codecs.",
+      "status": "passing-unverified",
+      "evidence": "fast mode — no test evidence",
+      "notes": "Phase 1 of plans/api-contract-alignment-fast-fix.",
+      "priority": "P0"
+    },
+    {
+      "id": "api-fast-fix-groups-projects",
+      "title": "Align group and project target DTOs and filters",
+      "user_visible_behavior": "so that manager group/project list, create, detail, and assignment flows match the frontend contract.",
+      "verification_command": "Run group/project request, response, pagination, authorization, and legacy-regression contract tests.",
+      "status": "passing-unverified",
+      "evidence": "fast mode — no test evidence",
+      "notes": "Phase 2 of plans/api-contract-alignment-fast-fix.",
+      "priority": "P0"
+    },
+    {
+      "id": "api-fast-fix-round-registration",
+      "title": "Align round registration and availability contracts",
+      "user_visible_behavior": "so that invitations, lecturer availability, group preferences, and readiness data use the documented fields and envelopes.",
+      "verification_command": "Run round, invitation, availability, preference, deadline, and idempotency contract tests.",
+      "status": "passing-unverified",
+      "evidence": "fast mode — no test evidence",
+      "notes": "Phase 3 of plans/api-contract-alignment-fast-fix.",
+      "priority": "P0"
+    },
+    {
+      "id": "api-fast-fix-schedules-sessions",
+      "title": "Align schedule version and session contracts",
+      "user_visible_behavior": "so that schedule generation, version activation, and session queries expose the documented fields, paths, and filters.",
+      "verification_command": "Run schedule/version/session contract tests, state-transition tests, and solver regression tests.",
+      "status": "passing-unverified",
+      "evidence": "fast mode — no test evidence",
+      "notes": "Phase 4 of plans/api-contract-alignment-fast-fix.",
+      "priority": "P0"
+    },
+    {
+      "id": "api-fast-fix-rooms-results",
+      "title": "Align rooms, publishing, results, and remediation contracts",
+      "user_visible_behavior": "so that operational room changes, publishing, result entry, and remediation verification match the frontend payloads and response shapes.",
+      "verification_command": "Run room/publish/result/remediation request, authorization, conflict, and privacy contract tests.",
+      "status": "passing-unverified",
+      "evidence": "fast mode — no test evidence",
+      "notes": "Phase 5 of plans/api-contract-alignment-fast-fix.",
+      "priority": "P0"
+    },
+    {
+      "id": "api-fast-fix-solver-soft-constraints",
+      "title": "Complete scheduler soft objectives and readiness diagnostics",
+      "user_visible_behavior": "so that generated drafts expose S1–S7 scoring and actionable readiness diagnostics while preserving H1–H13 hard constraints.",
+      "verification_command": "Run soft-objective unit tests, readiness tests, validator tests, and the 74-group benchmark.",
+      "status": "passing-unverified",
+      "evidence": "fast mode — no test evidence",
+      "notes": "Phase 6 of plans/api-contract-alignment-fast-fix.",
+      "priority": "P1"
+    },
+    {
+      "id": "api-fast-fix-rollout",
+      "title": "Verify and roll out the aligned target contract",
+      "user_visible_behavior": "so that frontend integration has a versioned OpenAPI contract, regression evidence, telemetry, and a reversible legacy fallback.",
+      "verification_command": "Run the complete target matrix, OpenAPI, migration, integration, benchmark, and legacy-alias regression suites.",
+      "status": "passing-unverified",
+      "evidence": "fast mode — no test evidence",
+      "notes": "Phase 7 of plans/api-contract-alignment-fast-fix.",
+      "priority": "P1"
     }
   ]
 }

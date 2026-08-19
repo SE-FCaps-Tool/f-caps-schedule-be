@@ -239,6 +239,14 @@ def _candidate_soft_scores(candidate: object, context: RoundInput) -> dict[str, 
         scores["S2"] = 1
     if context.round_type == "DEFENSE_1_2":
         scores["S3"] = len(set(candidate.reviewer_ids).intersection(prior))
+    # S4-S7 are deliberately additive soft bonuses.  They never participate
+    # in feasibility decisions, so H1-H13 semantics remain unchanged while
+    # the target API exposes the complete objective vocabulary.
+    scores["S4"] = 1 if candidate.part in {"AM", "MORNING"} else 0
+    scores["S5"] = 1 if candidate.day else 0
+    scores["S6"] = len(set(candidate.reviewer_ids).intersection(prior))
+    supervisors = context.project_supervisors.get(context.group_project.get(candidate.group_id, -1), set())
+    scores["S7"] = len(set(candidate.reviewer_ids) - set(supervisors))
     return scores
 
 

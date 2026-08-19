@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -14,8 +16,10 @@ from app.database import get_db
 from app.routes.results import (
     OverdueFailPayload,
     RemediationDecisionPayload,
+    ResultPayload,
     decide_remediation,
     fail_overdue_remediation,
+    record_result,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["target-results-remediation"])
@@ -23,9 +27,40 @@ Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
 
 
+class TargetRemediation(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    deadline: datetime
+    verifier_id: str | int = Field(alias="verifierId")
+
+
+class TargetResultPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    result: str = Field(min_length=1, max_length=32)
+    note: str | None = None
+    remediation: TargetRemediation | None = None
+
+
 @router.post("/remediations/{remediation_id}/verify")
 def verify_remediation(remediation_id: int, payload: RemediationDecisionPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(decide_remediation(remediation_id, payload, db, user))
+
+
+@router.post("/sessions/{session_id}/result", status_code=201)
+def create_target_result(session_id: int, payload: TargetResultPayload, db: Db, user: User) -> dict[str, Any]:
+    verifier_id = None
+    remediation_due_at = None
+    if payload.remediation is not None:
+        from app.api_contract import parse_external_id
+
+        verifier_id = parse_external_id(payload.remediation.verifier_id, prefix="lec")
+        remediation_due_at = payload.remediation.deadline
+    legacy = ResultPayload(
+        result=payload.result,
+        note=payload.note,
+        remediationDueAt=remediation_due_at,
+        verifierLecturerId=verifier_id,
+    )
+    return success_payload(record_result(session_id, legacy, db, user))
 
 
 @router.post("/remediations/{remediation_id}/actions/overdue-fail")

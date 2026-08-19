@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api_contract import success_payload
+from app.api_contract import external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.routes.manager_extensions import list_sessions
@@ -33,7 +33,17 @@ def list_target_schedules(round_id: int, db: Db, user: User) -> dict[str, Any]:
 
 @router.post("/rounds/{round_id}/schedules/generate", status_code=201)
 def generate_target_schedule(round_id: int, payload: ScheduleRunPayload, db: Db, user: User) -> dict[str, Any]:
-    return success_payload(run_scheduler(round_id, payload, db, user))
+    result = run_scheduler(round_id, payload, db, user)
+    return success_payload({
+        "versionId": external_id(result["version_id"], "sv") if result.get("version_id") else None,
+        "versionNumber": result.get("version_number", result.get("version_id")),
+        "status": result.get("status", "DRAFT"),
+        "scheduledCount": result.get("scheduled_count", 0),
+        "unscheduledCount": len(result.get("unscheduled", [])),
+        "overallScore": result.get("overall_score", result.get("soft_scores", {}).get("overall", 0)),
+        "scores": result.get("scores", result.get("soft_scores", {})),
+        "unscheduled": result.get("unscheduled", []),
+    })
 
 
 @router.get("/rounds/{round_id}/schedules/{schedule_id}")
@@ -57,6 +67,11 @@ def discard_target_schedule(round_id: int, schedule_id: int, db: Db, user: User)
 
 
 @router.get("/rounds/{round_id}/sessions")
-def list_target_sessions(round_id: int, db: Db, user: User, schedule_id: int | None = None) -> dict[str, Any]:
+def list_target_sessions(
+    round_id: int,
+    db: Db,
+    user: User,
+    schedule_id: int | None = Query(default=None, alias="versionId"),
+) -> dict[str, Any]:
     rows = list_sessions(db, user, round_id=round_id, version_id=schedule_id)
     return success_payload(rows, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})

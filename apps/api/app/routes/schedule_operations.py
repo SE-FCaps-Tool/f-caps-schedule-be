@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -68,8 +68,9 @@ def _require(user: CurrentUser, *roles: str) -> None:
 
 
 class ScheduleRunPayload(BaseModel):
-    random_seed: int = 0
-    time_limit_seconds: float = Field(default=10, gt=0, le=300)
+    model_config = ConfigDict(populate_by_name=True)
+    random_seed: int = Field(default=0, alias="randomSeed")
+    time_limit_seconds: float = Field(default=10, alias="timeLimitSeconds", gt=0, le=300)
 
 
 class SessionEditPayload(BaseModel):

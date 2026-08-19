@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -14,6 +14,14 @@ from sqlalchemy.orm import Session
 from app.api_contract import success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.routes.room_assignment import (
+    RoomAssignmentPayload,
+    RoomSuggestionPayload,
+    apply_room_suggestions,
+    assign_session_room,
+    list_available_rooms,
+    suggest_rooms,
+)
 from app.routes.schedule_operations import publish_schedule
 from app.services.room_assignment import RoomAssignmentError, validate_publish_room_readiness
 
@@ -23,15 +31,44 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 
 
 class RoomUpdateTarget(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     code: str | None = Field(default=None, min_length=1, max_length=32)
     name: str | None = Field(default=None, min_length=1, max_length=160)
     capacity: int | None = Field(default=None, gt=0, le=500)
     active: bool | None = None
-    room_type: Literal["NORMAL", "SEMINAR", "LAB"] | None = None
+    room_type: Literal["NORMAL", "SEMINAR", "LAB"] | None = Field(default=None, alias="roomType")
 
 
 class PublishTargetPayload(BaseModel):
-    version_id: int = Field(gt=0)
+    model_config = ConfigDict(populate_by_name=True)
+    version_id: int = Field(alias="versionId", gt=0)
+
+
+@router.get("/rounds/{round_id}/rooms/available")
+def target_available_rooms(
+    round_id: int,
+    db: Db,
+    user: User,
+    timeslot_id: int | None = Query(default=None, alias="timeslotId", gt=0),
+    room_type: Literal["NORMAL", "SEMINAR", "LAB"] | None = Query(default=None, alias="type"),
+) -> dict[str, Any]:
+    rows = list_available_rooms(round_id, db, user, timeslot_id=timeslot_id, room_type=room_type)
+    return success_payload(rows, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
+
+
+@router.put("/sessions/{session_id}/room")
+def target_assign_room(session_id: int, payload: RoomAssignmentPayload, db: Db, user: User) -> dict[str, Any]:
+    return success_payload(assign_session_room(session_id, payload, db, user))
+
+
+@router.post("/rounds/{round_id}/rooms/suggest")
+def target_suggest_rooms(round_id: int, db: Db, user: User) -> dict[str, Any]:
+    return success_payload(suggest_rooms(round_id, db, user))
+
+
+@router.post("/rounds/{round_id}/rooms/apply-suggestions")
+def target_apply_room_suggestions(round_id: int, payload: RoomSuggestionPayload, db: Db, user: User) -> dict[str, Any]:
+    return success_payload(apply_room_suggestions(round_id, payload, db, user))
 
 
 def _manager(user: CurrentUser) -> None:

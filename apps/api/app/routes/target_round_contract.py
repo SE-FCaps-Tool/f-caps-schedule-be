@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api_contract import success_payload
+from app.api_contract import external_id, parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.routes.manager_extensions import resend_invitation
@@ -44,6 +44,34 @@ class RegistrationAction(BaseModel):
 
 class GroupPreferencePayload(AvailabilitySubmit):
     pass
+
+
+class TargetAvailabilitySlot(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    timeslot_id: str | int = Field(alias="timeslotId")
+    available: bool = True
+
+
+class TargetAvailabilitySubmit(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    preferred_load: str = Field(default="MEDIUM", alias="preferredLoad", pattern="^(LOW|MEDIUM|HIGH)$")
+    slots: list[TargetAvailabilitySlot] = Field(default_factory=list)
+
+
+class TargetGroupPreferences(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    timeslot_ids: list[str | int] = Field(default_factory=list, alias="timeslotIds")
+
+
+class TargetInvitationCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    lecturer_ids: list[str | int] = Field(alias="lecturerIds", min_length=1)
+
+
+class TargetInvitationResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    decision: str = Field(pattern="^(ACCEPTED|DECLINED)$")
+    reason: str | None = None
 
 
 class TargetRoundSlot(BaseModel):
@@ -241,23 +269,39 @@ def get_my_availability(round_id: int, db: Db, user: User) -> dict[str, Any]:
 
 
 @router.put("/rounds/{round_id}/availability/me")
-def put_my_availability(round_id: int, payload: AvailabilitySubmit, db: Db, user: User) -> dict[str, Any]:
+def put_my_availability(round_id: int, payload: TargetAvailabilitySubmit, db: Db, user: User) -> dict[str, Any]:
     if user.role != "LECTURER":
         raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "Only a Lecturer may edit personal availability."})
     lecturer_id = lecturer_id_for_account(db, user.account_id)
     if lecturer_id is None:
         raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "Lecturer profile is not linked."})
-    return success_payload(submit_lecturer_availability(round_id, lecturer_id, payload, db, user))
+    selected = [parse_external_id(slot.timeslot_id, prefix="ts") for slot in payload.slots if slot.available]
+    legacy = AvailabilitySubmit(selected_timeslot_ids=selected, load_preference=payload.preferred_load)
+    return success_payload(submit_lecturer_availability(round_id, lecturer_id, legacy, db, user))
 
 
 @router.post("/rounds/{round_id}/invitations/me/respond")
-def respond_my_invitation(round_id: int, payload: InvitationResponsePayload, db: Db, user: User) -> dict[str, Any]:
+def respond_my_invitation(round_id: int, payload: TargetInvitationResponse, db: Db, user: User) -> dict[str, Any]:
     if user.role != "LECTURER":
         raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "Only a Lecturer may respond to an invitation."})
     lecturer_id = lecturer_id_for_account(db, user.account_id)
     if lecturer_id is None:
         raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "Lecturer profile is not linked."})
-    return success_payload(respond_to_invitation(round_id, lecturer_id, payload, db, user))
+    legacy = InvitationResponsePayload(response="DECLINED" if payload.decision == "DECLINED" else "ACCEPTED", reason=payload.reason)
+    return success_payload(respond_to_invitation(round_id, lecturer_id, legacy, db, user))
+
+
+@router.post("/rounds/{round_id}/invitations", status_code=status.HTTP_201_CREATED)
+def create_target_invitations(round_id: int, payload: TargetInvitationCreate, db: Db, user: User) -> dict[str, Any]:
+    _manager(user)
+    lecturer_ids = [parse_external_id(value, prefix="lec") for value in payload.lecturer_ids]
+    with db.begin():
+        for lecturer_id in set(lecturer_ids):
+            exists = db.execute(text("SELECT 1 FROM lecturers WHERE id = :lecturer_id"), {"lecturer_id": lecturer_id}).scalar_one_or_none()
+            if exists is None:
+                raise HTTPException(status_code=422, detail={"code": "INVITATION_RESOURCE_INVALID", "message": "Lecturer does not exist."})
+            db.execute(text("INSERT INTO round_invitations (round_id, lecturer_id) VALUES (:round_id, :lecturer_id) ON CONFLICT DO NOTHING"), {"round_id": round_id, "lecturer_id": lecturer_id})
+    return success_payload({"roundId": external_id(round_id, "rnd"), "invitedCount": len(set(lecturer_ids))})
 
 
 @router.post("/rounds/{round_id}/invitations/{invitation_id}/remind")
@@ -283,5 +327,7 @@ def get_group_preferences(round_id: int, group_id: int, db: Db, user: User) -> d
 
 
 @router.put("/rounds/{round_id}/groups/{group_id}/preferences")
-def put_group_preferences(round_id: int, group_id: int, payload: GroupPreferencePayload, db: Db, user: User) -> dict[str, Any]:
-    return success_payload(submit_group_availability(round_id, group_id, payload, db, user))
+def put_group_preferences(round_id: int, group_id: int, payload: TargetGroupPreferences, db: Db, user: User) -> dict[str, Any]:
+    selected = [parse_external_id(value, prefix="ts") for value in payload.timeslot_ids]
+    legacy = AvailabilitySubmit(selected_timeslot_ids=selected, load_preference="MEDIUM")
+    return success_payload(submit_group_availability(round_id, group_id, legacy, db, user))

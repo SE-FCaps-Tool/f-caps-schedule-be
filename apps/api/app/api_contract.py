@@ -17,6 +17,58 @@ from pydantic import BaseModel, ConfigDict, Field
 
 EnvelopeDataT = TypeVar("EnvelopeDataT")
 
+# Public identifiers are deliberately opaque to the frontend while the
+# database continues to use integer primary keys.  Keep this codec in one
+# place so every target route accepts both migration-era integers and the
+# documented ``prefix_number`` form.
+TARGET_ID_PREFIXES: tuple[str, ...] = (
+    "grp_", "prj_", "rnd_", "lec_", "stu_", "sv_", "ses_", "room_", "ts_", "inv_", "rem_"
+)
+
+
+def parse_external_id(value: Any, *, prefix: str | None = None) -> int:
+    """Resolve a legacy integer or target external id to a database id.
+
+    ``prefix`` may be supplied with or without the trailing underscore.  A
+    stable ``ValueError`` is used so route adapters can translate malformed
+    values to their normal validation envelope.
+    """
+
+    if isinstance(value, bool):
+        raise TypeError("identifier must be an integer or prefixed string")
+    if isinstance(value, int):
+        if value > 0:
+            return value
+        raise ValueError("identifier must be positive")
+    raw = str(value).strip()
+    if raw.isdigit() and int(raw) > 0:
+        return int(raw)
+    expected = None if prefix is None else prefix.rstrip("_") + "_"
+    match = re.fullmatch(r"([a-z][a-z0-9]*)_(\d+)", raw, flags=re.IGNORECASE)
+    if match is None or int(match.group(2)) <= 0:
+        raise ValueError("identifier must be an integer or prefixed string")
+    if expected is not None and match.group(1).lower() + "_" != expected.lower():
+        raise ValueError(f"identifier must use prefix {expected}")
+    return int(match.group(2))
+
+
+def external_id(value: Any, prefix: str) -> str:
+    """Serialize a database id as the documented prefixed target id."""
+
+    number = parse_external_id(value)
+    normalized = prefix.rstrip("_") + "_"
+    return f"{normalized}{number}"
+
+
+def target_id_fields(value: Any, prefix: str, *fields: str) -> dict[str, Any]:
+    """Return a small mapping useful when adapting SQL rows for target DTOs."""
+
+    result = dict(value) if isinstance(value, Mapping) else {}
+    for field in fields:
+        if field in result and result[field] is not None:
+            result[field] = external_id(result[field], prefix)
+    return result
+
 
 @dataclass(frozen=True)
 class ApiOperation:

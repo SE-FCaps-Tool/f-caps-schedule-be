@@ -6,7 +6,7 @@ import json
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -35,7 +35,8 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 
 
 class RoomAssignmentPayload(BaseModel):
-    room_id: int = Field(gt=0)
+    model_config = ConfigDict(populate_by_name=True)
+    room_id: int = Field(alias="roomId", gt=0)
 
 
 class RoomAssignmentItem(BaseModel):
