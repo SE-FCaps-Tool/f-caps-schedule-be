@@ -8,6 +8,7 @@ schedule state machine remains unchanged.
 from __future__ import annotations
 
 import re
+import secrets
 from datetime import UTC, date, datetime
 from io import BytesIO
 from typing import Annotated, Any, Literal
@@ -35,6 +36,7 @@ from app.response_models import (
     GroupResponse,
     ImportResponse,
     InvitationResponse,
+    LecturerImportResponse,
     ProjectDetailResponse,
     ProjectMutationResponse,
     QuotaResponse,
@@ -47,6 +49,7 @@ from app.response_models import (
     SessionResponse,
     TimeslotResponse,
 )
+from app.routes.master_data import password_hasher
 from app.services.semester_queries import (
     SEMESTER_LIFECYCLE_LOCK_KEY,
     academic_year_for_start,
@@ -796,6 +799,86 @@ def _workbook_rows(upload: UploadFile) -> dict[str, list[dict[str, Any]]]:
             for row in rows[1:] if any(value is not None for value in row)
         ]
     return result
+
+
+_LECTURER_IMPORT_MAX_FILE_BYTES = 5 * 1024 * 1024
+_LECTURER_IMPORT_MAX_ROWS = 2000
+
+
+def _lecturer_import_rows(upload: UploadFile) -> list[tuple[int, dict[str, Any]]]:
+    raw = upload.file.read(_LECTURER_IMPORT_MAX_FILE_BYTES + 1)
+    if len(raw) > _LECTURER_IMPORT_MAX_FILE_BYTES:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_FILE_TOO_LARGE", "message": "File exceeds the 5MB import limit."})
+    try:
+        workbook = load_workbook(BytesIO(raw), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_INVALID_FILE", "message": "Only a readable .xlsx file is supported."}) from exc
+    sheet = workbook.worksheets[0]
+    header_row: int | None = None
+    result: list[tuple[int, dict[str, Any]]] = []
+    for row_number, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        if header_row is None:
+            if row and _normalise_header(row[0]) == "stt" and len(row) > 3 and "email" in _normalise_header(row[3]):
+                header_row = row_number
+            continue
+        if not row or not any(cell is not None for cell in row):
+            continue
+        if len(result) >= _LECTURER_IMPORT_MAX_ROWS:
+            raise HTTPException(status_code=422, detail={"code": "IMPORT_TOO_MANY_ROWS", "message": f"Import is limited to {_LECTURER_IMPORT_MAX_ROWS} data rows."})
+        result.append((row_number, {
+            "lecturer_code": row[1] if len(row) > 1 else None,
+            "display_name": row[2] if len(row) > 2 else None,
+            "email": row[3] if len(row) > 3 else None,
+        }))
+    if header_row is None:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_INVALID_FILE", "message": "Expected the lecturers_template.xlsx header row (STT | Mã giảng viên | Họ và tên | Email)."})
+    return result
+
+
+@router.post("/lecturers/import", status_code=status.HTTP_201_CREATED, response_model=LecturerImportResponse)
+async def import_lecturers(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    _require(user, "ADMIN", "MANAGER")
+    rows = _lecturer_import_rows(file)
+    created = 0
+    errors: list[dict[str, Any]] = []
+    accounts: list[dict[str, Any]] = []
+    with db.begin():
+        for row_number, row in rows:
+            code = str(row.get("lecturer_code") or "").strip().upper()
+            display_name = str(row.get("display_name") or "").strip()
+            email = str(row.get("email") or "").strip().lower()
+            if not code or not display_name or not email:
+                errors.append({"row": row_number, "code": "REQUIRED_FIELD_MISSING", "message": "lecturer_code, display_name and email are all required."})
+                continue
+            if len(code) > 32 or len(display_name) > 160 or len(email) > 320 or "@" not in email:
+                errors.append({"row": row_number, "code": "FIELD_INVALID", "message": "lecturer_code/display_name/email exceed the allowed length or email is malformed."})
+                continue
+            temp_password = secrets.token_urlsafe(9)
+            try:
+                with db.begin_nested():
+                    account_id = db.execute(
+                        text("INSERT INTO accounts (email, display_name, password_hash) VALUES (:email, :display_name, :password_hash) RETURNING id"),
+                        {"email": email, "display_name": display_name, "password_hash": password_hasher.hash(temp_password)},
+                    ).scalar_one()
+                    db.execute(text("INSERT INTO account_roles (account_id, role) VALUES (:account_id, 'LECTURER')"), {"account_id": account_id})
+                    lecturer_id = db.execute(
+                        text("INSERT INTO lecturers (account_id, lecturer_code) VALUES (:account_id, :code) RETURNING id"),
+                        {"account_id": account_id, "code": normalize_code(code)},
+                    ).scalar_one()
+            except IntegrityError:
+                errors.append({"row": row_number, "code": "LECTURER_DUPLICATE", "message": "Email or lecturer code already exists."})
+                continue
+            created += 1
+            accounts.append({"row": row_number, "lecturer_id": lecturer_id, "lecturer_code": code, "email": email, "display_name": display_name, "temp_password": temp_password})
+        db.execute(
+            text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'LECTURERS_IMPORTED', 'lecturer', :entity_id, CAST(:after_json AS JSONB))"),
+            {"actor_id": _actor_id(db, user), "entity_id": "bulk", "after_json": _json({"created": created, "skipped": len(errors)})},
+        )
+    return {"created": created, "skipped": len(errors), "errors": errors, "accounts": accounts}
 
 
 @router.post("/projects/import", status_code=status.HTTP_201_CREATED, response_model=ImportResponse)
