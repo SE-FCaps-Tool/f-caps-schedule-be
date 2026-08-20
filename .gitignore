@@ -15,6 +15,7 @@ test-results/
 .agents/
 .codex/
 .claude/
+.codegraph/
 
 # Local agent/session artifacts
 .hs.json

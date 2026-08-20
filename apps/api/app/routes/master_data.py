@@ -1341,9 +1341,32 @@ def attach_round_resources(
     try:
         with db.begin():
             ensure_round_semester_writable(db, round_id)
-            if db.execute(text("SELECT 1 FROM rounds WHERE id = :id"), {"id": round_id}).scalar_one_or_none() is None:
+            round_type = db.execute(
+                text("SELECT type::text FROM rounds WHERE id = :id"),
+                {"id": round_id},
+            ).scalar_one_or_none()
+            if round_type is None:
                 raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
             for group_id in set(payload.group_ids):
+                if round_type == "REVIEW_1":
+                    already_reviewed = db.execute(
+                        text(
+                            "SELECT EXISTS ("
+                            "SELECT 1 FROM round_groups previous_rg "
+                            "JOIN rounds previous_round ON previous_round.id = previous_rg.round_id "
+                            "WHERE previous_rg.group_id = :group_id "
+                            "AND previous_rg.round_id <> :round_id "
+                            "AND previous_round.type = 'REVIEW_1' "
+                            "AND previous_round.status <> 'CANCELLED'"
+                            ")"
+                        ),
+                        {"group_id": group_id, "round_id": round_id},
+                    ).scalar_one()
+                    if already_reviewed:
+                        raise DomainError(
+                            "GROUP_ALREADY_REVIEWED",
+                            "This group already has a non-cancelled REVIEW_1 round.",
+                        )
                 db.execute(
                     text(
                         "INSERT INTO round_groups (round_id, group_id) VALUES (:round_id, :group_id) "
@@ -1382,7 +1405,8 @@ def attach_round_resources(
                 "room_types": sorted(room_types),
             }
     except DomainError as exc:
-        raise HTTPException(status_code=404, detail={"code": exc.code, "message": str(exc)}) from exc
+        status_code = 409 if exc.code == "GROUP_ALREADY_REVIEWED" else 404
+        raise HTTPException(status_code=status_code, detail={"code": exc.code, "message": str(exc)}) from exc
     except IntegrityError as exc:
         raise HTTPException(
             status_code=422,
@@ -1742,8 +1766,13 @@ def registration_dashboard(round_id: int, db: Db, user: User) -> dict[str, int]:
     return {key: int(value) for key, value in counts.items()}
 
 
-@router.get("/rounds/{round_id}/my-availability", response_model=MyAvailabilityResponse)
-def my_availability(round_id: int, db: Db, user: User) -> dict[str, object]:
+def _build_my_availability(
+    round_id: int,
+    db: Db,
+    user: User,
+    *,
+    enforce_registration_phase: bool = True,
+) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     round_row = db.execute(text("SELECT id, type, status::text AS status, group_selection_mode, registration_deadline, group_preference_deadline FROM rounds WHERE id = :round_id"), {"round_id": round_id}).mappings().one_or_none()
     if round_row is None:
@@ -1760,7 +1789,8 @@ def my_availability(round_id: int, db: Db, user: User) -> dict[str, object]:
         ).scalar_one_or_none()
         if accepted is None:
             raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "This round is not available to the Lecturer."})
-        require_registration_phase(db, round_id, RegistrationPhase.LECTURER)
+        if enforce_registration_phase:
+            require_registration_phase(db, round_id, RegistrationPhase.LECTURER)
         response["lecturer_id"] = lecturer_id
         response["selected_timeslot_ids"] = [row["timeslot_id"] for row in db.execute(text("SELECT timeslot_id FROM lecturer_availabilities WHERE round_id = :round_id AND lecturer_id = :lecturer_id AND state = 'AVAILABLE'"), {"round_id": round_id, "lecturer_id": lecturer_id}).mappings().all()]
     elif user.role == "STUDENT":
@@ -1770,13 +1800,21 @@ def my_availability(round_id: int, db: Db, user: User) -> dict[str, object]:
             raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "This round has no active group belonging to the Student."})
         if not round_row["group_selection_mode"]:
             raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
-        require_registration_phase(db, round_id, RegistrationPhase.GROUP)
+        if enforce_registration_phase:
+            require_registration_phase(db, round_id, RegistrationPhase.GROUP)
         response["groups"] = [dict(row) for row in groups]
         response["selected_by_group"] = {row["id"]: [item["timeslot_id"] for item in db.execute(text("SELECT timeslot_id FROM group_slot_preferences WHERE round_id = :round_id AND group_id = :group_id AND selected = TRUE"), {"round_id": round_id, "group_id": row["id"]}).mappings().all()] for row in groups}
     else:
         response["selected_by_lecturer"] = [dict(row) for row in db.execute(text("SELECT lecturer_id, timeslot_id, state, load_preference, source FROM lecturer_availabilities WHERE round_id = :round_id ORDER BY lecturer_id, timeslot_id"), {"round_id": round_id}).mappings().all()]
         response["selected_by_group"] = [dict(row) for row in db.execute(text("SELECT group_id, timeslot_id, selected, source FROM group_slot_preferences WHERE round_id = :round_id ORDER BY group_id, timeslot_id"), {"round_id": round_id}).mappings().all()]
     return response
+
+
+@router.get("/rounds/{round_id}/my-availability", response_model=MyAvailabilityResponse)
+def my_availability(round_id: int, db: Db, user: User) -> dict[str, object]:
+    # This is a read-only view; registration phase is enforced by the write
+    # endpoints, not by historical availability reads.
+    return _build_my_availability(round_id, db, user, enforce_registration_phase=False)
 
 
 @router.get("/my/rounds", response_model=list[MyRoundResponse])

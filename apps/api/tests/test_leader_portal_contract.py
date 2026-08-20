@@ -24,8 +24,8 @@ def test_leader_contract_queries_lock_replacement_and_ignore_cancelled_sessions(
     assert "FROM round_groups" in preference_source
     assert "FOR UPDATE" in preference_source
     assert preference_source.index("FOR UPDATE") < preference_source.index("DELETE FROM group_slot_preferences")
-    assert "lecturer_availabilities" in group_preferences_source
-    assert "supervisor_type IN ('MAIN', 'CO')" in group_preferences_source
+    assert "ts.active = TRUE" in group_preferences_source
+    assert "supervisor_type IN ('MAIN', 'CO')" not in group_preferences_source
 
 
 @pytest.mark.integration
@@ -188,7 +188,7 @@ def test_leader_dashboard_uses_singular_nullable_fe_contract(client):
             headers={"X-Test-Session": f"active-student:{leader_account_id}"},
         )
         assert preferences.status_code == 200, preferences.text
-        assert preferences.json()["data"]["timeslots"] == []
+        assert [item["timeslotId"] for item in preferences.json()["data"]["timeslots"]] == [preference_slot_id]
 
         with Session(engine) as db, db.begin():
             db.execute(

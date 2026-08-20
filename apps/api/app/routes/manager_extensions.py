@@ -27,8 +27,8 @@ from app.config import get_settings
 from app.database import get_db
 from app.domain.errors import DomainError
 from app.domain.master_data import normalize_code
-from app.domain.round_setup import validate_round_configuration
 from app.domain.registration_phase import resolve_registration_phase
+from app.domain.round_setup import validate_round_configuration
 from app.response_models import (
     ActionResponse,
     GroupDetailResponse,
@@ -108,6 +108,7 @@ class RoundUpdate(BaseModel):
     result_owner_mode: bool | None = None
     group_selection_mode: bool | None = None
     registration_deadline: datetime | None = None
+    group_preference_deadline: datetime | None = None
     h12_sessions_per_part: int | None = Field(default=None, gt=0)
     h12_sessions_per_day: int | None = Field(default=None, gt=0)
     h12_semester_quota: int | None = Field(default=None, gt=0)
@@ -329,14 +330,14 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
         return _load_round_detail(round_id, db)
     if values.get("start_date") and values.get("end_date") and values["end_date"] < values["start_date"]:
         raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
-    columns = {"start_date", "end_date", "session_duration_minutes", "reviewer_count", "result_owner_mode", "group_selection_mode", "registration_deadline", "h12_sessions_per_part", "h12_sessions_per_day", "h12_semester_quota", "max_groups_per_timeslot", "max_minutes_per_part", "max_minutes_per_day"}
+    columns = {"start_date", "end_date", "session_duration_minutes", "reviewer_count", "result_owner_mode", "group_selection_mode", "registration_deadline", "group_preference_deadline", "h12_sessions_per_part", "h12_sessions_per_day", "h12_semester_quota", "max_groups_per_timeslot", "max_minutes_per_part", "max_minutes_per_day"}
     assignments = [f"{key} = :{key}" for key in values if key in columns]
     if not assignments and "room_types" not in values:
         raise HTTPException(status_code=422, detail={"code": "ROUND_UPDATE_EMPTY", "message": "No editable round fields supplied."})
     values["id"] = round_id
     with db.begin():
         ensure_round_semester_writable(db, round_id)
-        current_round = db.execute(text("SELECT status, type, reviewer_count, result_owner_mode, start_date, end_date FROM rounds WHERE id = :id FOR UPDATE"), {"id": round_id}).mappings().one_or_none()
+        current_round = db.execute(text("SELECT status, type, reviewer_count, result_owner_mode, group_selection_mode, registration_deadline, group_preference_deadline, start_date, end_date FROM rounds WHERE id = :id FOR UPDATE"), {"id": round_id}).mappings().one_or_none()
         if current_round is None:
             raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
         if str(current_round["status"]) not in {"DRAFT", "OPEN_REGISTRATION"}:
@@ -345,6 +346,21 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
         merged_end = values.get("end_date", current_round["end_date"])
         if merged_start is not None and merged_end is not None and merged_end < merged_start:
             raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
+        merged_registration_deadline = values.get("registration_deadline", current_round["registration_deadline"])
+        merged_group_selection_mode = values.get("group_selection_mode", current_round["group_selection_mode"])
+        merged_group_preference_deadline = values.get("group_preference_deadline", current_round["group_preference_deadline"])
+        if merged_registration_deadline is not None and merged_registration_deadline.tzinfo is None:
+            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "registration_deadline must include a timezone offset."})
+        if merged_group_preference_deadline is not None and merged_group_preference_deadline.tzinfo is None:
+            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "group_preference_deadline must include a timezone offset."})
+        if merged_group_selection_mode and (merged_registration_deadline is None or merged_group_preference_deadline is None):
+            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "Both registration deadlines are required when group selection is enabled."})
+        if merged_registration_deadline is not None and merged_group_preference_deadline is not None and merged_group_preference_deadline <= merged_registration_deadline:
+            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "group_preference_deadline must be after registration_deadline."})
+        if merged_start is not None and merged_end is not None:
+            for field_name, deadline in (("registration_deadline", merged_registration_deadline), ("group_preference_deadline", merged_group_preference_deadline)):
+                if deadline is not None and not (merged_start <= deadline.date() <= merged_end):
+                    raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": f"{field_name} must fall within start_date and end_date."})
         try:
             validate_round_configuration({"type": str(current_round["type"]), "reviewer_count": values.get("reviewer_count", current_round["reviewer_count"]), "result_owner_mode": values.get("result_owner_mode", current_round["result_owner_mode"]), "groups": [1], "timeslots": [1], "rooms": [1]})
         except DomainError as exc:

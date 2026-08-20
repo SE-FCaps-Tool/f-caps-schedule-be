@@ -81,7 +81,7 @@ def manager_dashboard(db: Db, user: User, round_id: int | None = None, semester_
         text(
             "SELECT l.id, l.lecturer_code, a.display_name, COUNT(ls.id) AS session_count "
             "FROM lecturers l JOIN accounts a ON a.id = l.account_id LEFT JOIN council_members cm ON cm.lecturer_id = l.id "
-            "LEFT JOIN sessions ls ON ls.council_id = cm.council_id AND (:version_id IS NULL OR ls.schedule_version_id = :version_id) "
+            "LEFT JOIN sessions ls ON ls.council_id = cm.council_id AND (CAST(:version_id AS BIGINT) IS NULL OR ls.schedule_version_id = CAST(:version_id AS BIGINT)) "
             "LEFT JOIN schedule_versions lsv ON lsv.id = ls.schedule_version_id LEFT JOIN rounds lr ON lr.id = lsv.round_id "
             "WHERE (CAST(:semester_id AS INTEGER) IS NULL OR lr.semester_id = CAST(:semester_id AS INTEGER)) "
             "GROUP BY l.id, l.lecturer_code, a.display_name ORDER BY session_count DESC, l.lecturer_code LIMIT 10"

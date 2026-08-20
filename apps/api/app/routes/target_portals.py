@@ -101,14 +101,62 @@ def lecturer_supervised_projects(db: Db, user: User) -> dict[str, Any]:
     rows = db.execute(
         text(
             "SELECT p.id, p.code, p.title, p.status::text AS status, p.semester_id, "
-            "s.code AS semester_code, ps.supervisor_type "
+            "s.code AS semester_code, ps.supervisor_type, "
+            "grp.id AS group_id, grp.code AS group_code, grp.member_count, "
+            "grp.leader, grp.members "
             "FROM project_supervisors ps JOIN projects p ON p.id = ps.project_id "
-            "JOIN semesters s ON s.id = p.semester_id WHERE ps.lecturer_id = :lecturer_id "
+            "JOIN semesters s ON s.id = p.semester_id "
+            "LEFT JOIN LATERAL ( "
+            "  SELECT g.id, g.code, member_data.member_count, "
+            "         member_data.members, member_data.members -> 0 AS leader "
+            "  FROM groups g "
+            "  LEFT JOIN LATERAL ( "
+            "    SELECT COUNT(*)::int AS member_count, "
+            "           COALESCE(jsonb_agg( "
+            "             jsonb_build_object( "
+            "               'id', st.id, "
+            "               'code', st.student_code, "
+            "               'name', a.display_name, "
+            "               'role', gm.membership_role::text, "
+            "               'status', gm.status::text "
+            "             ) ORDER BY CASE WHEN gm.membership_role::text = 'LEADER' THEN 0 ELSE 1 END, st.id "
+            "           ), '[]'::jsonb) AS members "
+            "    FROM group_memberships gm "
+            "    JOIN students st ON st.id = gm.student_id "
+            "    JOIN accounts a ON a.id = st.account_id "
+            "    WHERE gm.group_id = g.id AND gm.status::text = 'ACTIVE' "
+            "  ) member_data ON TRUE "
+            "  WHERE g.project_id = p.id ORDER BY g.id LIMIT 1 "
+            ") grp ON TRUE "
+            "WHERE ps.lecturer_id = :lecturer_id "
             "ORDER BY s.id DESC, p.code"
         ),
         {"lecturer_id": lecturer_id},
     ).mappings().all()
-    return success_payload([dict(row) for row in rows], meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
+    projects = []
+    for row in rows:
+        project = dict(row)
+        group_id = project.pop("group_id", None)
+        group_code = project.pop("group_code", None)
+        member_count = project.pop("member_count", None)
+        leader = project.pop("leader", None)
+        members = project.pop("members", None)
+        if group_id is None:
+            project["group"] = None
+        else:
+            project["group"] = {
+                "id": group_id,
+                "code": group_code,
+                "member_count": int(member_count or 0),
+                "leader": (
+                    {key: leader.get(key) for key in ("id", "name", "code")}
+                    if isinstance(leader, dict)
+                    else None
+                ),
+                "members": members if isinstance(members, list) else [],
+            }
+        projects.append(project)
+    return success_payload(projects, meta={"page": 1, "pageSize": len(projects), "total": len(projects)})
 
 
 @router.get("/lecturer/me/remediations")

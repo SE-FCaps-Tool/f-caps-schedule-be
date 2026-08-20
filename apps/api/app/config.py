@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = "postgresql+psycopg://scheduler:scheduler@localhost:5432/scheduler"
     session_cookie_name: str = "scheduler_session"
-    session_idle_minutes: int = 15
-    session_absolute_hours: int = 8
+    session_idle_minutes: int = 60
+    session_absolute_hours: int = 168
     cors_origins: str = (
         "http://localhost:3000,http://localhost:5173,"
         "http://127.0.0.1:3000,http://127.0.0.1:5173"

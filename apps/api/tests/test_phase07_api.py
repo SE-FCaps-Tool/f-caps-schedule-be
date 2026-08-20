@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -69,6 +70,8 @@ def test_admin_account_lifecycle_is_audited(client):
 @pytest.mark.integration
 def test_round_configuration_conflict_scope_and_invitation_notification(client):
     manager_headers = {"X-Test-Session": "active-manager"}
+    registration_deadline = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
+    group_preference_deadline = (datetime.now(UTC) + timedelta(hours=4)).isoformat()
     seeded = client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     assert seeded.status_code == 201, seeded.text
     semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json() if item["code"] == "SE-2026-2027")
@@ -81,6 +84,8 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
             "room_types": ["NORMAL"],
             "result_owner_mode": True,
             "group_selection_mode": True,
+            "registration_deadline": registration_deadline,
+            "group_preference_deadline": group_preference_deadline,
             "session_duration_minutes": 30,
             "start_date": "2030-01-01",
             "end_date": "2030-03-01",
@@ -121,12 +126,42 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
         headers=lecturer_headers,
     )
     assert accepted.status_code == 200, accepted.text
+    draft_write = client.post(
+        f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
+        json={"selected_timeslot_ids": []},
+        headers=lecturer_headers,
+    )
+    assert draft_write.status_code == 409, draft_write.text
+    opened = client.post(
+        f"/api/v1/rounds/{round_id}/transition",
+        json={"target_status": "OPEN_REGISTRATION"},
+        headers=manager_headers,
+    )
+    assert opened.status_code == 200, opened.text
     accepted_write = client.post(
         f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
         json={"selected_timeslot_ids": []},
         headers=lecturer_headers,
     )
     assert accepted_write.status_code == 200, accepted_write.text
+    target_read = client.get(f"/api/v1/rounds/{round_id}/availability/me", headers=lecturer_headers)
+    assert target_read.status_code == 200, target_read.text
+    with Session(get_engine(get_settings().database_url)) as db, db.begin():
+        db.execute(
+            text(
+                "UPDATE rounds SET registration_deadline = :closed_at, "
+                "group_preference_deadline = :closed_at WHERE id = :round_id"
+            ),
+            {"closed_at": datetime.now(UTC) - timedelta(minutes=1), "round_id": round_id},
+        )
+    closed_target_read = client.get(f"/api/v1/rounds/{round_id}/availability/me", headers=lecturer_headers)
+    assert closed_target_read.status_code == 200, closed_target_read.text
+    closed_target_write = client.put(
+        f"/api/v1/rounds/{round_id}/availability/me",
+        json={"preferredLoad": "HIGH", "slots": []},
+        headers=lecturer_headers,
+    )
+    assert closed_target_write.status_code == 409, closed_target_write.text
     invitations = client.get("/api/v1/my/invitations", headers=lecturer_headers)
     assert invitations.status_code == 200, invitations.text
     assert any(item["round_id"] == round_id and item["lecturer_id"] == lecturer["id"] and item["status"] == "ACCEPTED" for item in invitations.json())

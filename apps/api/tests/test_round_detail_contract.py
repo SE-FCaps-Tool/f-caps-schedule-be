@@ -1,9 +1,19 @@
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_engine
+from app.routes.manager_extensions import RoundUpdate
+
+
+def test_round_update_payload_supports_group_preference_deadline():
+    deadline = datetime(2030, 1, 21, 16, 59, tzinfo=UTC)
+    payload = RoundUpdate(group_preference_deadline=deadline)
+
+    assert payload.group_preference_deadline == deadline
 
 
 @pytest.mark.integration

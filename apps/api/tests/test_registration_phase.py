@@ -235,6 +235,13 @@ def test_student_group_preferences_are_open_only_between_the_two_deadlines(clien
             )
         closed = client.put(path, json={"timeslotIds": []}, headers=headers)
         assert closed.status_code == 409, closed.text
+        closed_read = client.get(
+            f"/api/v1/rounds/{round_id}/availability/me",
+            headers=headers,
+        )
+        assert closed_read.status_code == 200, closed_read.text
+        closed_preferences_read = client.get(path, headers=headers)
+        assert closed_preferences_read.status_code == 200, closed_preferences_read.text
     finally:
         with Session(engine) as db, db.begin():
             db.execute(text("DELETE FROM rounds WHERE id = :round_id"), {"round_id": round_id})

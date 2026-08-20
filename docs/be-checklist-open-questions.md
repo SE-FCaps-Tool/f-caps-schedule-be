@@ -2,14 +2,6 @@
 
 Ngày lập: 2026-08-19
 
-## BE verification update — 2026-08-19
-
-Semester dùng đúng bốn trạng thái `PLANNING`, `ACTIVE`, `CLOSED`, `ARCHIVED` theo
-`capstone-fe-be-implementation-spec.md` và `manager-fe-migration-phases.md`. Migration
-`0026_semester_four_states` đã khôi phục enum; Round chỉ được tạo trong Semester `ACTIVE`,
-`ARCHIVED` là read-only, và `set-current` không nhận Semester đã archive. Các endpoint FE còn
-thiếu hoặc lệch envelope/route/field vẫn được liệt kê bên dưới, chưa được coi là đã hoàn tất.
-
 ## Mục đích file này
 
 FE đã build xong toàn bộ Manager / Lecturer / Project Leader theo
@@ -57,16 +49,21 @@ POST /api/v1/semesters/:semesterId/projects/import
 
 ### A4. CRUD phòng
 ```http
-GET  /api/v1/rooms
-POST /api/v1/rooms
+GET   /api/v1/rooms
+POST  /api/v1/rooms
 PATCH /api/v1/rooms/:roomId
 ```
 ```json
-{ "code": "SEM-01", "name": "Seminar 1", "type": "SEMINAR", "status": "ACTIVE" }
+{ "id": 1, "code": "SEM-01", "name": "Seminar 1", "capacity": 40, "type": "SEMINAR", "status": "ACTIVE" }
 ```
+`POST` body: `{code, name, capacity, type}` (bắt buộc chọn `RoomType` khi tạo — FE đã có field này
+trong dialog "Thêm phòng"). `PATCH` body: cùng field, tất cả optional, dùng để đổi `status`
+(ACTIVE/MAINTENANCE/INACTIVE) hoặc sửa `type`/`capacity`/`name`.
+`GET /rooms` FE lọc theo `type` **ở client** (không gửi query param) — nếu danh sách phòng lớn,
+cân nhắc BE hỗ trợ `?type=SEMINAR` để tránh tải hết về client.
 Spec §65-68 chỉ có "Available Rooms" (đọc, cần Round context). Cần thêm route CRUD độc lập
 (không phụ thuộc Round) để Manager tự quản lý danh sách phòng.
-📁 `app/(manager)/manager/rooms/**` (hiện đang dùng model cũ `code/name/capacity/active`, chưa map `RoomType`)
+📁 `app/(manager)/manager/rooms/**`, `components/rooms/**` (đã map đúng `RoomType`/`RoomStatus`, có filter theo loại phòng + field loại phòng khi tạo mới)
 
 ### A5. Manager nhập hộ lịch rảnh Lecturer / nguyện vọng Group
 Nếu vẫn cần tính năng này (BR-AVL-04 cũ), cần 2 endpoint kiểu:
@@ -114,6 +111,29 @@ GET /api/v1/lecturer/me/supervised-projects/:projectId/results
 ```
 Đề xuất: cùng shape với A8, dùng chung nếu hợp lý. Hiện §34 chỉ có field số ít `Latest Result`.
 📁 `app/(lecturer)/lecturer/supervised-groups/**`
+
+### A10. Lưới lịch rảnh theo từng slot của 1 giảng viên (Manager xem chi tiết ở Round Detail)
+```http
+GET /api/v1/rounds/:roundId/invitations/:invitationId/availability-grid
+```
+Spec §22 (Lecturer Tab — Manager) chỉ có bảng tổng hợp `Availability` dạng số lượng (đã có sẵn
+qua field `availabilitySlotCount` của `GET /rounds/:roundId/invitations`) — **không** có endpoint
+nào cho Manager xem giảng viên rảnh đúng slot nào. FE hiện đang tạm dùng lại endpoint cũ
+`GET /rounds/:roundId/my-availability` (route/shape khác convention spec — snake_case, không bọc
+`{data}`) để lấy `timeslots` + map `selected_by_lecturer` cho Sheet "Xem chi tiết" khi Manager bấm
+vào 1 giảng viên. Đề xuất response theo đúng convention spec:
+```json
+{
+  "data": {
+    "slots": [
+      { "id": "ts_01", "date": "2026-08-25", "startTime": "08:00", "endTime": "09:00", "available": true, "assigned": false }
+    ]
+  }
+}
+```
+Nếu BE build endpoint này, FE sẽ bỏ hẳn `my-availability` khỏi Round Detail (chỉ còn dùng ở
+Calendar — nơi khác, không thuộc phạm vi màn này).
+📁 `app/(manager)/manager/rounds/[roundId]/components/round-detail-page.tsx` (Sheet "Xem chi tiết" giảng viên, dòng ~373-384, ~838-857)
 
 ---
 
@@ -325,6 +345,14 @@ làm React key tốt hơn, không bắt buộc.
    danh sách (khi đó cần thêm endpoint liệt kê giảng viên hợp lệ).
 5. **Room CRUD thuộc Manager** — FE build route CRUD phòng (A4) dưới quyền Manager, không phải
    Admin. Nếu quyền quản lý phòng thực ra thuộc Admin, báo lại để FE đổi route group.
+6. **`meta.{page,pageSize,total}` thiếu ở response thực tế của các endpoint list** — Project list
+   (§16/§46), Group list (§11/§41), Round list (§19) hiện trả về `{data:[...]}` **không có `meta`**,
+   trong khi spec mô tả envelope phân trang chuẩn là `{data:[...], meta:{page,pageSize,total}}`.
+   FE đã sửa tạm bằng cách coi `meta` là optional và fallback hiển thị `data.length` thay vì
+   `meta.total` (không còn crash), nhưng số hiển thị sẽ sai nếu danh sách thực sự có phân trang
+   (chỉ đúng khi BE trả hết trong 1 trang). Cần BE bổ sung `meta` đúng theo spec ở 3 endpoint này
+   (và audit thêm các list endpoint khác có khả năng bị thiếu tương tự) để số liệu hiển thị đúng.
+   📁 `lib/api/services/fetchProjects.ts`, `fetchGroups.ts`, `fetchRounds.ts`
 
 ---
 

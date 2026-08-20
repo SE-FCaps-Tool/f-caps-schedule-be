@@ -12,6 +12,7 @@ import datetime as dt
 import json
 import math
 import os
+import random
 import re
 import subprocess
 from pathlib import Path
@@ -141,7 +142,13 @@ def main() -> None:
     parser.add_argument("workbook", type=Path)
     parser.add_argument("--database-url", default=os.getenv("DATABASE_URL"))
     parser.add_argument("--skip-if-imported", action="store_true")
+    parser.add_argument("--sample-fraction", type=float, default=1.0, help="Keep only this fraction of projects (and their linked review/defense rows).")
+    parser.add_argument("--sample-seed", type=int, default=42)
+    parser.add_argument("--output", type=Path, help="Also write the generated SQL to this file.")
+    parser.add_argument("--apply", action="store_true", help="Actually run the generated SQL against the database (destructive: truncates all tables first). Without this flag, the script only writes --output.")
     args = parser.parse_args()
+    if not 0 < args.sample_fraction <= 1.0:
+        raise SystemExit("--sample-fraction must be in (0, 1]")
     workbook_path = args.workbook.resolve()
     if not workbook_path.is_file():
         raise SystemExit(f"Workbook not found: {workbook_path}")
@@ -171,6 +178,11 @@ def main() -> None:
         for row in sheet_rows["Project"]
         if row["row_number"] >= 4 and (row["values"][2] or row["values"][3])
     ]
+    if args.sample_fraction < 1.0:
+        sample_size = max(1, round(len(project_rows) * args.sample_fraction))
+        sampled = random.Random(args.sample_seed).sample(project_rows, k=sample_size)
+        project_rows = sorted(sampled, key=lambda row: row["row_number"])
+
     project_by_review_code: dict[tuple[str, str], dict[str, Any]] = {}
     project_by_council_code: dict[tuple[str, str], list[dict[str, Any]]] = {
         ("Defense1", ""): [],
@@ -236,7 +248,8 @@ def main() -> None:
         "DO $$ DECLARE statement TEXT; BEGIN "
         "SELECT 'TRUNCATE TABLE ' || string_agg(format('%I.%I', table_schema, table_name), ', ') "
         "|| ' RESTART IDENTITY CASCADE' INTO statement FROM information_schema.tables "
-        "WHERE table_schema = 'public' AND table_name NOT IN ('alembic_version', 'schema_meta'); "
+        "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' "
+        "AND table_name NOT IN ('alembic_version', 'schema_meta'); "
         "EXECUTE statement; END $$;"
     )
 
@@ -453,8 +466,8 @@ def main() -> None:
             if values[8]:
                 add_sql(
                     lines,
-                    "INSERT INTO round_rooms (round_id, room_id) SELECT "
-                    f"{round_lookup}, id FROM rooms WHERE code = {sql(clean_code(values[8]))} "
+                    "INSERT INTO round_room_types (round_id, room_type) SELECT "
+                    f"{round_lookup}, room_type FROM rooms WHERE code = {sql(clean_code(values[8]))} "
                     "ON CONFLICT DO NOTHING",
                 )
             add_sql(
@@ -474,11 +487,35 @@ def main() -> None:
                     "WHERE NOT EXISTS (SELECT 1 FROM schedule_versions WHERE round_id = "
                     f"{round_lookup} AND version_no = 1)",
                 )
+                # A Session must reference a sealed Council (migration 0025_immutable_councils);
+                # build and seal one per review row before the Session row can be inserted.
+                council_reason = sql(f"excel:{sheet_name}:{row['row_number']}")
+                council_lookup = f"(SELECT id FROM councils WHERE round_id = {round_lookup} AND reason = {council_reason})"
+                add_sql(
+                    lines,
+                    "INSERT INTO councils (round_id, created_by, reason) SELECT "
+                    f"{round_lookup}, {admin_id}, {council_reason} "
+                    f"WHERE NOT EXISTS (SELECT 1 FROM councils WHERE round_id = {round_lookup} AND reason = {council_reason})",
+                )
+                for lecturer_code in (clean_code(values[9]), clean_code(values[10])):
+                    if lecturer_code:
+                        add_sql(
+                            lines,
+                            "INSERT INTO council_members (council_id, lecturer_id, assignment, snapshot_name) "
+                            f"SELECT {council_lookup}, l.id, 'REVIEWER'::assignment_role, l.lecturer_code "
+                            f"FROM lecturers l WHERE l.lecturer_code = {sql(lecturer_code)} "
+                            f"AND NOT EXISTS (SELECT 1 FROM council_members WHERE council_id = {council_lookup} AND lecturer_id = l.id)",
+                        )
+                add_sql(
+                    lines,
+                    f"UPDATE councils SET sealed_at = now() WHERE id = {council_lookup} AND sealed_at IS NULL",
+                )
                 add_sql(
                     lines,
                     "INSERT INTO sessions "
-                    "(schedule_version_id, group_id, timeslot_id, room_id, start_at, end_at, status) "
+                    "(schedule_version_id, group_id, timeslot_id, room_id, council_id, start_at, end_at, status) "
                     "SELECT sv.id, g.id, ts.id, rm.id, "
+                    f"{council_lookup}, "
                     f"{sql(start_time)}::timestamptz, {sql(end_time)}::timestamptz, 'SCHEDULED'::session_status "
                     "FROM schedule_versions sv JOIN groups g ON g.code = "
                     f"{sql(group_code)} JOIN projects p ON p.id = g.project_id AND p.semester_id = {semester_lookup} "
@@ -489,20 +526,6 @@ def main() -> None:
                     f"WHERE sv.round_id = {round_lookup} AND sv.version_no = 1 "
                     "ON CONFLICT (schedule_version_id, group_id) DO NOTHING",
                 )
-                for lecturer_code in (clean_code(values[9]), clean_code(values[10])):
-                    if lecturer_code:
-                        add_sql(
-                            lines,
-                            "INSERT INTO session_reviewers "
-                            "(session_id, schedule_version_id, lecturer_id, assignment, snapshot_name, start_at, end_at) "
-                            "SELECT s.id, sv.id, l.id, 'REVIEWER'::assignment_role, l.lecturer_code, "
-                            f"{sql(start_time)}::timestamptz, {sql(end_time)}::timestamptz FROM sessions s "
-                            "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
-                            f"JOIN groups g ON g.id = s.group_id AND g.code = {sql(group_code)} "
-                            f"JOIN lecturers l ON l.lecturer_code = {sql(lecturer_code)} "
-                            f"WHERE sv.round_id = {round_lookup} AND sv.version_no = 1 "
-                            "ON CONFLICT (session_id, lecturer_id) DO NOTHING",
-                        )
             add_sql(
                 lines,
                 "INSERT INTO excel_review_schedule_rows "
@@ -581,40 +604,46 @@ def main() -> None:
 
     lines.append("COMMIT;")
     sql_payload = "\n".join(lines) + "\n"
-    if args.database_url:
-        import psycopg
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(sql_payload, encoding="utf-8")
+    if args.apply:
+        if args.database_url:
+            import psycopg
 
-        with psycopg.connect(psycopg_url(args.database_url), autocommit=True) as connection:
-            connection.execute(sql_payload)
-    else:
-        command = [
-            "docker",
-            "compose",
-            "exec",
-            "-T",
-            "postgres",
-            "psql",
-            "-U",
-            "scheduler",
-            "-d",
-            "scheduler",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-X",
-            "-q",
-        ]
-        subprocess.run(
-            command,
-            input=sql_payload,
-            text=True,
-            encoding="utf-8",
-            check=True,
-            cwd=Path.cwd(),
-        )
+            with psycopg.connect(psycopg_url(args.database_url), autocommit=True) as connection:
+                connection.execute(sql_payload)
+        else:
+            command = [
+                "docker",
+                "compose",
+                "exec",
+                "-T",
+                "postgres",
+                "psql",
+                "-U",
+                "scheduler",
+                "-d",
+                "scheduler",
+                "-v",
+                "ON_ERROR_STOP=1",
+                "-X",
+                "-q",
+            ]
+            subprocess.run(
+                command,
+                input=sql_payload,
+                text=True,
+                encoding="utf-8",
+                check=True,
+                cwd=Path.cwd(),
+            )
     print(
         json.dumps(
             {
                 "source": str(workbook_path),
+                "sample_fraction": args.sample_fraction,
+                "output": str(args.output) if args.output else None,
                 "sheets": list(sheet_rows),
                 "projects": len(project_rows),
                 "lecturers": len(lecturer_codes),

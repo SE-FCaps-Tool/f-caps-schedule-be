@@ -23,9 +23,9 @@ from app.routes.master_data import (
     RoundDayCreate,
     RoundTransitionPayload,
     SlotCreate,
+    _build_my_availability,
     create_round_with_days,
     list_rounds,
-    my_availability,
     registration_dashboard,
     require_registration_phase,
     respond_to_invitation,
@@ -229,7 +229,10 @@ def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
             "SELECT p.id AS project_id, g.id AS group_id, g.status::text AS group_status, "
             "EXISTS (SELECT 1 FROM group_memberships gm WHERE gm.group_id = g.id AND gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS has_active_leader, "
             "EXISTS (SELECT 1 FROM project_supervisors ps WHERE ps.project_id = p.id AND ps.supervisor_type = 'MAIN') AS has_main_supervisor, "
-            "(SELECT COUNT(*) FROM group_memberships gm WHERE gm.group_id = g.id AND gm.status = 'ACTIVE') AS active_member_count "
+            "(SELECT COUNT(*) FROM group_memberships gm WHERE gm.group_id = g.id AND gm.status = 'ACTIVE') AS active_member_count, "
+            "EXISTS (SELECT 1 FROM round_groups previous_rg JOIN rounds previous_round ON previous_round.id = previous_rg.round_id "
+            "WHERE previous_rg.group_id = g.id AND previous_rg.round_id <> :round_id "
+            "AND previous_round.type = 'REVIEW_1' AND previous_round.status <> 'CANCELLED') AS has_prior_review_1 "
             "FROM projects p JOIN rounds r ON r.semester_id = p.semester_id "
             "LEFT JOIN groups g ON g.project_id = p.id "
             "WHERE r.id = :round_id AND p.status::text <> 'ARCHIVED' "
@@ -244,7 +247,12 @@ def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
         has_group = row["group_id"] is not None
         has_active_leader = bool(row["has_active_leader"]) if has_group else False
         has_main_supervisor = bool(row["has_main_supervisor"])
-        progression_allowed = has_group and _eligible(round_type, row["group_status"] or "")
+        has_prior_review_1 = bool(row["has_prior_review_1"]) if has_group else False
+        progression_allowed = (
+            has_group
+            and _eligible(round_type, row["group_status"] or "")
+            and not (round_type == "REVIEW_1" and has_prior_review_1)
+        )
         eligible = has_group and has_active_leader and has_main_supervisor and progression_allowed
         blocking_reasons = []
         if not has_group:
@@ -254,7 +262,11 @@ def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
         if not has_main_supervisor:
             blocking_reasons.append("No Main Supervisor")
         if has_group and not progression_allowed:
-            blocking_reasons.append("Progression incompatible")
+            blocking_reasons.append(
+                "Group already has a non-cancelled REVIEW_1 round."
+                if round_type == "REVIEW_1" and has_prior_review_1
+                else "Progression incompatible"
+            )
         warnings = []
         if has_group and (row["active_member_count"] or 0) < MIN_RECOMMENDED_MEMBERS:
             warnings.append({"code": "MEMBER_COUNT_BELOW_MIN", "message": "Group has fewer than recommended members."})
@@ -365,7 +377,9 @@ def close_registration(round_id: int, db: Db, user: User, payload: RegistrationA
 
 @router.get("/rounds/{round_id}/availability/me")
 def get_my_availability(round_id: int, db: Db, user: User) -> dict[str, Any]:
-    return success_payload(my_availability(round_id, db, user))
+    # Reading a submitted availability remains allowed after the registration
+    # window closes; only the PUT endpoint enforces the active phase.
+    return success_payload(_build_my_availability(round_id, db, user, enforce_registration_phase=False))
 
 
 @router.put("/rounds/{round_id}/availability/me")
@@ -424,29 +438,22 @@ def get_group_preferences(round_id: int, group_id: int, db: Db, user: User) -> d
         error_status = 403 if user.role == "STUDENT" else 422
         raise HTTPException(status_code=error_status, detail={"code": "GROUP_NOT_IN_ROUND", "message": "The group is not registered for this round."})
     if user.role == "STUDENT":
-        round_row = require_registration_phase(db, round_id, RegistrationPhase.GROUP)
+        # Reading previously submitted preferences remains allowed after the
+        # registration window closes. The PUT route keeps the phase guard.
+        round_row = db.execute(
+            text("SELECT group_selection_mode FROM rounds WHERE id = :round_id"),
+            {"round_id": round_id},
+        ).mappings().one_or_none()
+        if round_row is None:
+            raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
         if not round_row["group_selection_mode"]:
             raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
-    supervisor_slot_filter = ""
-    if user.role == "STUDENT":
-        supervisor_slot_filter = (
-            " AND NOT EXISTS ("
-            "SELECT 1 FROM groups supervisor_group "
-            "JOIN project_supervisors ps ON ps.project_id = supervisor_group.project_id "
-            "JOIN lecturer_availabilities la ON la.lecturer_id = ps.lecturer_id "
-            " AND la.round_id = :round_id AND la.timeslot_id = ts.id "
-            " AND la.state = 'AVAILABLE' "
-            "WHERE supervisor_group.id = :group_id "
-            " AND ps.supervisor_type IN ('MAIN', 'CO')"
-            ")"
-        )
     rows = db.execute(
         text(
             "SELECT ts.id AS timeslot_id, ts.start_at, ts.end_at, gsp.selected, gsp.source "
             "FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id "
             "LEFT JOIN group_slot_preferences gsp ON gsp.timeslot_id = ts.id AND gsp.round_id = :round_id AND gsp.group_id = :group_id "
             "WHERE rd.round_id = :round_id AND ts.active = TRUE"
-            + supervisor_slot_filter
             + " ORDER BY ts.start_at"
         ),
         {"round_id": round_id, "group_id": group_id},

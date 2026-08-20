@@ -59,8 +59,6 @@ def load_seed_fixture(
                 INSERT INTO accounts (email, display_name, password_hash)
                 VALUES (:email, :display_name, :password_hash)
                 ON CONFLICT (email) DO UPDATE SET
-                    display_name = EXCLUDED.display_name,
-                    password_hash = EXCLUDED.password_hash,
                     status = 'ACTIVE'
                 RETURNING id
                 """,
@@ -83,7 +81,7 @@ def load_seed_fixture(
                         """
                         INSERT INTO lecturers (account_id, lecturer_code)
                         VALUES (:account_id, :lecturer_code)
-                        ON CONFLICT (lecturer_code) DO UPDATE SET account_id = EXCLUDED.account_id
+                        ON CONFLICT (account_id) DO NOTHING
                         """
                     ),
                     {"account_id": account_id, "lecturer_code": account["lecturer_code"]},
@@ -94,7 +92,7 @@ def load_seed_fixture(
                         """
                         INSERT INTO students (account_id, student_code)
                         VALUES (:account_id, :student_code)
-                        ON CONFLICT (student_code) DO UPDATE SET account_id = EXCLUDED.account_id
+                        ON CONFLICT (account_id) DO NOTHING
                         """
                     ),
                     {"account_id": account_id, "student_code": account["student_code"]},

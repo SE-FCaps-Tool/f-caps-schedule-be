@@ -86,3 +86,17 @@ Alias ngắn cho current user dùng ở UI guard.
 - Lấy CSRF token từ cookie `scheduler_csrf` cho `POST/PATCH/DELETE`.
 - Không retry vô hạn khi `401`; chỉ thử hydrate lại một lần, sau đó chuyển về login.
 - `403` là lỗi permission/scope, không phải lỗi session hết hạn.
+
+### Thời hạn session hiện tại
+
+- Idle timeout: `60 phút` không có request hợp lệ.
+- Absolute timeout: `168 giờ` (7 ngày) kể từ lúc login.
+- Backend không dùng refresh token và không có endpoint `/auth/refresh`.
+- Khi session hết hạn, API trả `401`; FE cần xóa auth state và chuyển user về màn hình login.
+
+Có thể override bằng biến môi trường:
+
+```env
+SESSION_IDLE_MINUTES=60
+SESSION_ABSOLUTE_HOURS=168
+```

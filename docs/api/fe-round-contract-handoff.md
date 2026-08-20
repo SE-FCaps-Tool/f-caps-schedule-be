@@ -141,7 +141,7 @@ Request PUT không đổi:
 }
 ```
 
-Điều kiện mới cho Lecturer:
+Điều kiện mới cho Lecturer khi ghi (PUT):
 
 - Round phải là `OPEN_REGISTRATION`.
 - Giai đoạn hiện tại phải là `LECTURER`.
@@ -164,6 +164,10 @@ Success response PUT giữ nguyên shape:
 
 Manager/Admin vẫn có thể nhập thay ngoài cửa sổ Lecturer bằng endpoint quản lý
 hiện có.
+
+GET là thao tác đọc lịch sử: Lecturer đã được mời và chấp nhận vẫn xem được
+availability của mình sau khi phase chuyển sang `GROUP` hoặc đã đóng; chỉ PUT
+mới bị chặn bởi phase.
 
 ## 5. Leader Dashboard
 
@@ -283,7 +287,7 @@ Request PUT không đổi:
 }
 ```
 
-Điều kiện mới:
+Điều kiện mới khi ghi (PUT):
 
 - Round phải là `OPEN_REGISTRATION`.
 - Giai đoạn hiện tại phải là `GROUP`.
@@ -337,10 +341,10 @@ gửi `{"timeslotIds": []}` sẽ xóa toàn bộ lựa chọn. Chỉ ID của ti
 `active=true` và thuộc Round được chấp nhận; gửi ID ngoài tập này trả
 `422 AVAILABILITY_SLOT_INVALID` và không lưu một phần request.
 
-Khi đọc preference với tư cách Student, BE loại các slot mà supervisor chính hoặc
-đồng hướng dẫn của chính nhóm đã chọn `AVAILABLE`. BE chưa lọc thêm theo COI hoặc
-số reviewer khả dụng. FE hiển thị danh sách timeslot còn lại BE trả về và không tự
-tính các điều kiện này. Manager/Admin vẫn có thể xem toàn bộ slot để quản trị.
+Khi đọc preference với tư cách Student, GET vẫn cho xem các lựa chọn đã lưu sau
+khi phase chuyển sang `CLOSED`; chỉ PUT mới yêu cầu phase `GROUP`. GET chỉ trả
+timeslot active thuộc Round và không expose availability của giảng viên cho
+Student. Manager/Admin vẫn có thể xem toàn bộ availability để quản trị.
 
 ## 7. Lecturer Invitations
 
@@ -432,6 +436,7 @@ Các mã liên quan:
 | 403 | `AUTH_RESOURCE_SCOPE` | Không phải Lecturer/active Leader của resource |
 | 403 | `GROUP_NOT_IN_ROUND` | Leader đang truy cập nhóm không thuộc Round |
 | 422 | `GROUP_NOT_IN_ROUND` | Manager truy cập nhóm không thuộc Round |
+| 409 | `GROUP_ALREADY_REVIEWED` | Nhóm đã thuộc một Round `REVIEW_1` chưa bị hủy |
 | 422 | `VALIDATION_ERROR` | Request tạo Round hoặc deadline không hợp lệ |
 | 422 | `AVAILABILITY_SLOT_INVALID` | Preference chứa timeslot không active hoặc không thuộc Round |
 

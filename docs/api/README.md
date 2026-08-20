@@ -155,6 +155,7 @@ Chi tiết request/response theo nhóm:
 - [Kết quả, remediation, dashboard, reports, notification](results-reports.md)
 - [Request schemas, enum và response shapes dùng chung](schemas.md)
 - [Semester API — toàn bộ thay đổi và contract](semester-api-changes.md)
+- [Lecturer supervised projects — group, leader và members](lecturer-supervised-projects-fe-guide.md)
 
 ### Auth/system
 
