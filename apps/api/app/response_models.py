@@ -615,6 +615,10 @@ class ImportResponse(ResponseModel):
     errors: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class LecturerImportResponse(ImportResponse):
+    accounts: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class UnscheduledReportResponse(ResponseModel):
     round_id: int
     generated_at: datetime
