@@ -7,7 +7,7 @@ def test_manager_can_record_defense_result_and_advance_group(client):
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     semester_id = next(
         row["id"]
-        for row in client.get("/api/v1/semesters", headers=headers).json()
+        for row in client.get("/api/v1/semesters", headers=headers).json()["data"]
         if row["code"] == "SE-2026-2027"
     )
     round_response = client.post(
@@ -25,9 +25,9 @@ def test_manager_can_record_defense_result_and_advance_group(client):
     assert day.status_code == 201
     slot_id = day.json()["timeslot_ids"][0]
     group = next(item for item in client.get("/api/v1/groups", headers=headers).json() if item["status"] == "PENDING_D11" and item["leader_count"] == 1)
-    room = client.get("/api/v1/rooms", headers=headers).json()[1]
+    room = client.get("/api/v1/rooms", headers=headers).json()["data"][1]
     assert client.post(f"/api/v1/rounds/{round_id}/resources", json={"group_ids": [group["id"]], "timeslot_ids": [slot_id], "room_ids": [room["id"]]}, headers=headers).status_code == 200
-    for lecturer in client.get("/api/v1/lecturers", headers=headers).json()[:6]:
+    for lecturer in client.get("/api/v1/lecturers", headers=headers).json()["data"][:6]:
         assert client.post(f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability", json={"selected_timeslot_ids": [slot_id]}, headers=headers).status_code == 200
     run = client.post(f"/api/v1/rounds/{round_id}/schedule/run", json={"time_limit_seconds": 2}, headers=headers)
     assert run.status_code == 201, run.text

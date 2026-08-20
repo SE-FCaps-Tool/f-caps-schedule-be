@@ -24,7 +24,7 @@ def _prepare_round(client, headers: dict[str, str], day_date: str) -> tuple[int,
     assert seeded.status_code in {200, 201}, seeded.text
     semester = next(
         item
-        for item in client.get("/api/v1/semesters", headers=headers).json()
+        for item in client.get("/api/v1/semesters", headers=headers).json()["data"]
         if item["code"] == "SE-2026-2027"
     )
     created = client.post(
@@ -56,13 +56,13 @@ def _prepare_round(client, headers: dict[str, str], day_date: str) -> tuple[int,
         if item["status"] == "PENDING_D11" and item["leader_count"] == 1
     )
     rooms = client.get("/api/v1/rooms", headers=headers)
-    room_id = rooms.json()[0]["id"] if rooms.status_code == 200 and rooms.json() else None
+    room_id = rooms.json()["data"][0]["id"] if rooms.status_code == 200 and rooms.json()["data"] else None
     resources = {"group_ids": [group["id"]], "timeslot_ids": [slot_id]}
     if room_id is not None:
         resources["room_ids"] = [room_id]
     assigned = client.post(f"/api/v1/rounds/{round_id}/resources", json=resources, headers=headers)
     assert assigned.status_code == 200, assigned.text
-    lecturers = client.get("/api/v1/lecturers", headers=headers).json()
+    lecturers = client.get("/api/v1/lecturers", headers=headers).json()["data"]
     for lecturer in lecturers[:6]:
         availability = client.post(
             f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",

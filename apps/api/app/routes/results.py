@@ -1,11 +1,12 @@
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.api_contract import success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.domain.enums import DefenseType, GroupStatus, ResultOutcome
@@ -15,7 +16,6 @@ from app.domain.schedule_operations import require_change_reason
 from app.domain.transitions import transition_group
 from app.response_models import (
     ActionResponse,
-    RemediationResponse,
     ResultDetailResponse,
     ResultWriteResponse,
 )
@@ -148,32 +148,38 @@ def get_result(session_id: int, db: Db, user: User) -> dict[str, Any]:
     }
 
 
-@router.get("/remediation", response_model=list[RemediationResponse])
-def list_remediation_cases(db: Db, user: User) -> list[dict[str, Any]]:
+@router.get("/remediation")
+def list_remediation_cases(
+    db: Db,
+    user: User,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
+    offset = (page - 1) * page_size
     query = (
         "SELECT rc.id, rc.group_id, g.code AS group_code, rc.status, rc.due_at, "
-        "rc.verifier_lecturer_id, rc.note, r.type AS round_type "
+        "rc.verifier_lecturer_id, rc.note, r.type AS round_type, COUNT(*) OVER() AS total_count "
         "FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id "
         "JOIN session_results sr ON sr.id = rc.session_result_id "
         "JOIN sessions s ON s.id = sr.session_id "
         "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
         "JOIN rounds r ON r.id = sv.round_id"
     )
-    params: dict[str, object] = {}
+    params: dict[str, object] = {"limit": page_size, "offset": offset}
     if user.role == "LECTURER":
         query += " JOIN lecturers verifier ON verifier.id = rc.verifier_lecturer_id WHERE verifier.account_id = :account_id"
         params["account_id"] = user.account_id
     elif user.role == "STUDENT":
         query += " JOIN group_memberships gm ON gm.group_id = rc.group_id JOIN students student ON student.id = gm.student_id WHERE gm.status = 'ACTIVE' AND student.account_id = :account_id"
         params["account_id"] = user.account_id
-        query += " ORDER BY rc.due_at"
-    else:
-        query += " ORDER BY rc.due_at"
+    query += " ORDER BY rc.due_at LIMIT :limit OFFSET :offset"
     rows = [dict(row) for row in db.execute(text(query), params).mappings().all()]
+    total = rows[0]["total_count"] if rows else 0
     for row in rows:
+        row.pop("total_count", None)
         row["ui_status"] = "PENDING" if row["status"] == "OPEN" else row["status"]
-    return rows
+    return success_payload(rows, meta={"page": page, "pageSize": page_size, "total": total})
 
 
 @router.post("/sessions/{session_id}/result", status_code=status.HTTP_201_CREATED, response_model=ResultWriteResponse)

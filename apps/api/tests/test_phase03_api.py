@@ -4,7 +4,7 @@ import pytest
 
 
 def _close_current_semester(client, headers):
-    rows = client.get("/api/v1/semesters", headers=headers).json()
+    rows = client.get("/api/v1/semesters", headers=headers).json()["data"]
     active = next(row for row in rows if row["status"] == "ACTIVE")
     response = client.post(
         f"/api/v1/semesters/{active['id']}/transition",
@@ -147,7 +147,7 @@ def test_manager_only_endpoint_rejects_lecturer(client):
 @pytest.mark.integration
 def test_manager_can_create_round_day_and_manager_entered_availability(client):
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
-    semesters = client.get("/api/v1/semesters", headers={"X-Test-Session": "active-manager"}).json()
+    semesters = client.get("/api/v1/semesters", headers={"X-Test-Session": "active-manager"}).json()["data"]
     semester_id = next(item["id"] for item in semesters if item["code"] == "SE-2026-2027")
     created_round = client.post(
         "/api/v1/rounds",
@@ -177,7 +177,7 @@ def test_manager_can_create_round_day_and_manager_entered_availability(client):
         headers={"X-Test-Session": "active-manager"},
     )
     assert day.status_code == 201
-    lecturer_id = client.get("/api/v1/lecturers", headers={"X-Test-Session": "active-manager"}).json()[0]["id"]
+    lecturer_id = client.get("/api/v1/lecturers", headers={"X-Test-Session": "active-manager"}).json()["data"][0]["id"]
     availability = client.post(
         f"/api/v1/rounds/{round_id}/lecturers/{lecturer_id}/availability",
         json={"selected_timeslot_ids": day.json()["timeslot_ids"][:1], "load_preference": "HIGH"},
@@ -191,7 +191,7 @@ def test_manager_can_create_round_day_and_manager_entered_availability(client):
 def test_semester_projects_lists_scoped_projects_and_rejects_unknown_semester(client):
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     headers = {"X-Test-Session": "active-manager"}
-    semesters = client.get("/api/v1/semesters", headers=headers).json()
+    semesters = client.get("/api/v1/semesters", headers=headers).json()["data"]
     semester_id = next(item["id"] for item in semesters if item["code"] == "SE-2026-2027")
     major_id = client.get("/api/v1/majors", headers=headers).json()[0]["id"]
     project = client.post(
@@ -226,7 +226,7 @@ def test_semester_projects_lists_scoped_projects_and_rejects_unknown_semester(cl
 def test_group_mutation_validates_leader_and_rolls_back_atomically(client):
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     headers = {"X-Test-Session": "active-manager"}
-    semesters = client.get("/api/v1/semesters", headers=headers).json()
+    semesters = client.get("/api/v1/semesters", headers=headers).json()["data"]
     semester_id = next(item["id"] for item in semesters if item["code"] == "SE-2026-2027")
     majors = client.get("/api/v1/majors", headers=headers).json()
     before = len(client.get("/api/v1/groups", headers=headers).json())
@@ -261,7 +261,7 @@ def test_group_mutation_validates_leader_and_rolls_back_atomically(client):
 def test_group_can_be_created_before_project_and_assigned_later(client):
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     headers = {"X-Test-Session": "active-manager"}
-    semesters = client.get("/api/v1/semesters", headers=headers).json()
+    semesters = client.get("/api/v1/semesters", headers=headers).json()["data"]
     semester_id = next(item["id"] for item in semesters if item["code"] == "SE-2026-2027")
     majors = client.get("/api/v1/majors", headers=headers).json()
     students = client.get("/api/v1/students", headers=headers).json()[4:8]

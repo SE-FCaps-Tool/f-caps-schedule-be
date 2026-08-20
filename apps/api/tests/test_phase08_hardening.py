@@ -73,7 +73,7 @@ def test_round_operation_and_locked_round_unlock_are_authorized_and_audited(clie
     manager_headers = {"X-Test-Session": "active-manager"}
     admin_headers = {"X-Test-Session": "active-admin"}
     assert client.post("/api/v1/admin/seed-fixture", headers=admin_headers).status_code == 201
-    semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json() if item["code"] == "SE-2026-2027")
+    semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json()["data"] if item["code"] == "SE-2026-2027")
     round_response = client.post(
         "/api/v1/rounds",
         json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "room_types": ["NORMAL"], "session_duration_minutes": 30},

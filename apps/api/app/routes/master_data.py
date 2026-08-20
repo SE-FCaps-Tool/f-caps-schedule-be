@@ -352,21 +352,29 @@ class LeaderPayload(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
-@router.get("/semesters", response_model=list[SemesterResponse])
+@router.get("/semesters")
 def list_semesters(
     db: Db,
     user: User,
     search: str | None = None,
     status_filter: Literal["PLANNING", "ACTIVE", "CLOSED", "ARCHIVED"] | None = Query(default=None, alias="status"),
     academic_year: str | None = None,
-) -> list[dict[str, object]]:
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
+) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
-    return semester_rows(
+    rows = semester_rows(
         db,
         search=search,
         status=status_filter,
         academic_year=academic_year,
+        page=page,
+        page_size=page_size,
     )
+    total = rows[0]["total_count"] if rows else 0
+    for row in rows:
+        row.pop("total_count", None)
+    return success_payload(rows, meta={"page": page, "pageSize": page_size, "total": total})
 
 
 @router.get("/semesters/{semester_id}", response_model=SemesterResponse)
@@ -598,9 +606,16 @@ def list_semester_projects(
     return success_payload(items, meta={"page": page, "pageSize": page_size, "total": total})
 
 
-@router.get("/lecturers", response_model=list[LecturerResponse])
-def list_lecturers(db: Db, user: User) -> list[dict[str, object]]:
+@router.get("/lecturers")
+def list_lecturers(
+    db: Db,
+    user: User,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
+) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
+    offset = (page - 1) * page_size
     rows = db.execute(
         text(
             "SELECT l.id, l.lecturer_code, l.account_id, a.email, a.display_name, "
@@ -610,15 +625,22 @@ def list_lecturers(db: Db, user: User) -> list[dict[str, object]]:
             "jsonb_build_object('project_id', cd.project_id, 'reason', cd.reason) "
             "ORDER BY cd.project_id"
             ") FILTER (WHERE cd.id IS NOT NULL), '[]'::jsonb"
-            ") AS conflicts "
+            ") AS conflicts, "
+            "COUNT(*) OVER() AS total_count "
             "FROM lecturers l "
             "JOIN accounts a ON a.id = l.account_id "
             "LEFT JOIN conflict_declarations cd ON cd.lecturer_id = l.id "
+            "WHERE (CAST(:search AS text) IS NULL OR l.lecturer_code ILIKE '%' || CAST(:search AS text) || '%' "
+            "OR a.display_name ILIKE '%' || CAST(:search AS text) || '%' OR a.email ILIKE '%' || CAST(:search AS text) || '%') "
             "GROUP BY l.id, l.lecturer_code, l.account_id, a.email, a.display_name, a.status "
-            "ORDER BY l.lecturer_code"
-        )
-    ).mappings()
-    return [dict(row) for row in rows]
+            "ORDER BY l.lecturer_code "
+            "LIMIT :limit OFFSET :offset"
+        ),
+        {"search": search, "limit": page_size, "offset": offset},
+    ).mappings().all()
+    total = rows[0]["total_count"] if rows else 0
+    items = [{k: v for k, v in dict(row).items() if k != "total_count"} for row in rows]
+    return success_payload(items, meta={"page": page, "pageSize": page_size, "total": total})
 
 
 @router.post("/lecturers", status_code=status.HTTP_201_CREATED, response_model=LecturerResponse)
@@ -660,13 +682,30 @@ def create_lecturer(payload: LecturerCreate, db: Db, user: User) -> dict[str, ob
     return dict(row)
 
 
-@router.get("/rooms", response_model=list[RoomResponse])
-def list_rooms(db: Db, user: User) -> list[dict[str, object]]:
+@router.get("/rooms")
+def list_rooms(
+    db: Db,
+    user: User,
+    search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
+) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
+    offset = (page - 1) * page_size
     rows = db.execute(
-        text("SELECT id, code, name, capacity, active, room_type FROM rooms ORDER BY code")
-    ).mappings()
-    return [dict(row) for row in rows]
+        text(
+            "SELECT id, code, name, capacity, active, room_type, COUNT(*) OVER() AS total_count "
+            "FROM rooms "
+            "WHERE (CAST(:search AS text) IS NULL OR code ILIKE '%' || CAST(:search AS text) || '%' "
+            "OR name ILIKE '%' || CAST(:search AS text) || '%') "
+            "ORDER BY code "
+            "LIMIT :limit OFFSET :offset"
+        ),
+        {"search": search, "limit": page_size, "offset": offset},
+    ).mappings().all()
+    total = rows[0]["total_count"] if rows else 0
+    items = [{k: v for k, v in dict(row).items() if k != "total_count"} for row in rows]
+    return success_payload(items, meta={"page": page, "pageSize": page_size, "total": total})
 
 
 @router.post("/rooms", status_code=status.HTTP_201_CREATED, response_model=RoomResponse)

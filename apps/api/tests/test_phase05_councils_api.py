@@ -16,7 +16,7 @@ def _prepare_published_session(client, day_date: str) -> dict:
     seeded = client.post("/api/v1/admin/seed-fixture", headers=admin)
     assert seeded.status_code in (200, 201), seeded.text
     semester = next(
-        row for row in client.get("/api/v1/semesters", headers=manager).json() if row["code"] == "SE-2026-2027"
+        row for row in client.get("/api/v1/semesters", headers=manager).json()["data"] if row["code"] == "SE-2026-2027"
     )
     round_response = client.post(
         "/api/v1/rounds",
@@ -41,14 +41,14 @@ def _prepare_published_session(client, day_date: str) -> dict:
     group = next(
         item for item in client.get("/api/v1/groups", headers=manager).json() if item["status"] == "PENDING_D11" and item["leader_count"] == 1
     )
-    rooms = client.get("/api/v1/rooms", headers=manager).json()
+    rooms = client.get("/api/v1/rooms", headers=manager).json()["data"]
     resource_response = client.post(
         f"/api/v1/rounds/{round_id}/resources",
         json={"group_ids": [group["id"]], "timeslot_ids": [timeslot_id], "room_ids": [rooms[0]["id"]]},
         headers=manager,
     )
     assert resource_response.status_code == 200, resource_response.text
-    lecturers = client.get("/api/v1/lecturers", headers=manager).json()
+    lecturers = client.get("/api/v1/lecturers", headers=manager).json()["data"]
     for lecturer in lecturers[:6]:
         availability = client.post(
             f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",

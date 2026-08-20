@@ -7,7 +7,7 @@ def test_manager_can_run_activate_and_publish_a_schedule_version(client):
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     semester_id = next(
         item["id"]
-        for item in client.get("/api/v1/semesters", headers=headers).json()
+        for item in client.get("/api/v1/semesters", headers=headers).json()["data"]
         if item["code"] == "SE-2026-2027"
     )
     round_response = client.post(
@@ -35,13 +35,13 @@ def test_manager_can_run_activate_and_publish_a_schedule_version(client):
     timeslot_id = day_response.json()["timeslot_ids"][0]
     groups = client.get("/api/v1/groups", headers=headers).json()
     selected_group = next(item for item in groups if item["status"] == "PENDING_D11" and item["leader_count"] == 1)
-    rooms = client.get("/api/v1/rooms", headers=headers).json()
+    rooms = client.get("/api/v1/rooms", headers=headers).json()["data"]
     client.post(
         f"/api/v1/rounds/{round_id}/resources",
         json={"group_ids": [selected_group["id"]], "timeslot_ids": [timeslot_id], "room_ids": [rooms[0]["id"]]},
         headers=headers,
     )
-    for lecturer in client.get("/api/v1/lecturers", headers=headers).json()[:6]:
+    for lecturer in client.get("/api/v1/lecturers", headers=headers).json()["data"][:6]:
         response = client.post(
             f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
             json={"selected_timeslot_ids": [timeslot_id]},
@@ -74,13 +74,13 @@ def test_manager_can_run_activate_and_publish_a_schedule_version(client):
 def test_controlled_change_creates_a_new_version_without_rewriting_source(client):
     headers = {"X-Test-Session": "active-manager"}
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
-    semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=headers).json() if item["code"] == "SE-2026-2027")
+    semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=headers).json()["data"] if item["code"] == "SE-2026-2027")
     round_id = client.post("/api/v1/rounds", json={"semester_id": semester_id, "type": "DEFENSE_1_1", "reviewer_count": 3, "room_types": ["NORMAL"], "session_duration_minutes": 30}, headers=headers).json()["id"]
     day = client.post(f"/api/v1/rounds/{round_id}/days", json={"day_date": "2033-03-01", "slots": [{"start_at": "2033-03-01T09:00:00+07:00", "end_at": "2033-03-01T09:30:00+07:00"}]}, headers=headers).json()
     group = next(item for item in client.get("/api/v1/groups", headers=headers).json() if item["status"] == "PENDING_D11" and item["leader_count"] == 1)
-    room = client.get("/api/v1/rooms", headers=headers).json()[0]
+    room = client.get("/api/v1/rooms", headers=headers).json()["data"][0]
     client.post(f"/api/v1/rounds/{round_id}/resources", json={"group_ids": [group["id"]], "timeslot_ids": [day["timeslot_ids"][0]], "room_ids": [room["id"]]}, headers=headers)
-    for lecturer in client.get("/api/v1/lecturers", headers=headers).json()[:6]:
+    for lecturer in client.get("/api/v1/lecturers", headers=headers).json()["data"][:6]:
         client.post(f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability", json={"selected_timeslot_ids": day["timeslot_ids"]}, headers=headers)
     original = client.post(f"/api/v1/rounds/{round_id}/schedule/run", json={"time_limit_seconds": 2}, headers=headers).json()
     version_id = original["version_id"]

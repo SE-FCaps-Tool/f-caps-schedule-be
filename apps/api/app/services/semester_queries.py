@@ -92,12 +92,18 @@ def semester_rows(
     search: str | None = None,
     status: str | None = None,
     academic_year: str | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
 ) -> list[dict[str, Any]]:
     academic_year = validate_academic_year(academic_year)
+    paginate = page is not None and page_size is not None
+    limit_clause = "LIMIT :limit OFFSET :offset" if paginate else ""
+    total_count_column = "COUNT(*) OVER() AS total_count," if paginate else ""
     rows = db.execute(
         text(
-            """
-            SELECT s.id, s.code, s.name, s.note, s.start_date, s.end_date,
+            f"""
+            SELECT {total_count_column}
+                   s.id, s.code, s.name, s.note, s.start_date, s.end_date,
                    s.academic_year, s.status, s.created_at, s.updated_at,
                    s.created_by AS created_by_id,
                    created.email AS created_by_email,
@@ -129,6 +135,7 @@ def semester_rows(
               AND (CAST(:status AS TEXT) IS NULL OR s.status::text = CAST(:status AS TEXT))
               AND (CAST(:academic_year AS TEXT) IS NULL OR s.academic_year = CAST(:academic_year AS TEXT))
             ORDER BY s.code, s.id
+            {limit_clause}
             """
         ),
         {
@@ -137,6 +144,8 @@ def semester_rows(
             "search_pattern": f"%{search.strip()}%" if search and search.strip() else None,
             "status": status,
             "academic_year": academic_year,
+            "limit": page_size,
+            "offset": (page - 1) * page_size if paginate else None,
         },
     ).mappings().all()
     return [_serialize(row) for row in rows]

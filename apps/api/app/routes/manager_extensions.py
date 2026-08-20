@@ -13,7 +13,7 @@ from io import BytesIO
 from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel, ConfigDict, Field
@@ -32,7 +32,6 @@ from app.domain.round_setup import validate_round_configuration
 from app.response_models import (
     ActionResponse,
     GroupDetailResponse,
-    GroupProgressResponse,
     GroupResponse,
     ImportResponse,
     InvitationResponse,
@@ -711,9 +710,16 @@ def list_reschedule_requests(db: Db, user: User, status_filter: str | None = Non
     return [dict(row) for row in rows]
 
 
-@router.get("/reports/group-progress", response_model=list[GroupProgressResponse])
-def group_progress_report(semester_id: int, db: Db, user: User) -> list[dict[str, Any]]:
+@router.get("/reports/group-progress")
+def group_progress_report(
+    semester_id: int,
+    db: Db,
+    user: User,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
+    offset = (page - 1) * page_size
     rows = db.execute(
         text(
             "WITH latest_results AS ("
@@ -743,14 +749,18 @@ def group_progress_report(semester_id: int, db: Db, user: User) -> list[dict[str
             "MAX(lr.verifier_lecturer_id) FILTER (WHERE lr.type = 'DEFENSE_1_1' AND lr.rn = 1) AS result_verifier_lecturer_id, "
             "MAX(lm.remediation_status) FILTER (WHERE lm.rn = 1) AS remediation_status, "
             "MAX(lm.due_at) FILTER (WHERE lm.rn = 1) AS remediation_due_at, "
-            "MAX(lm.verifier_lecturer_id) FILTER (WHERE lm.rn = 1) AS remediation_verifier_lecturer_id "
+            "MAX(lm.verifier_lecturer_id) FILTER (WHERE lm.rn = 1) AS remediation_verifier_lecturer_id, "
+            "COUNT(*) OVER() AS total_count "
             "FROM historical_groups hg JOIN groups g ON g.id = hg.group_id LEFT JOIN latest_results lr ON lr.group_id = hg.group_id "
             "LEFT JOIN latest_remediation lm ON lm.group_id = hg.group_id "
-            "GROUP BY hg.group_id, g.code, hg.project_name, g.status ORDER BY g.code"
+            "GROUP BY hg.group_id, g.code, hg.project_name, g.status ORDER BY g.code "
+            "LIMIT :limit OFFSET :offset"
         ),
-        {"semester_id": semester_id},
+        {"semester_id": semester_id, "limit": page_size, "offset": offset},
     ).mappings().all()
-    return [dict(row) for row in rows]
+    total = rows[0]["total_count"] if rows else 0
+    items = [{k: v for k, v in dict(row).items() if k != "total_count"} for row in rows]
+    return success_payload(items, meta={"page": page, "pageSize": page_size, "total": total})
 
 
 @router.get("/results", response_model=list[ResultResponse])

@@ -74,7 +74,7 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     group_preference_deadline = (datetime.now(UTC) + timedelta(hours=4)).isoformat()
     seeded = client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     assert seeded.status_code == 201, seeded.text
-    semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json() if item["code"] == "SE-2026-2027")
+    semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json()["data"] if item["code"] == "SE-2026-2027")
     round_response = client.post(
         "/api/v1/rounds",
         json={
@@ -108,7 +108,7 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     incomplete_transition = client.post(f"/api/v1/rounds/{round_id}/transition", json={"target_status": "SCHEDULING"}, headers=manager_headers)
     assert incomplete_transition.status_code == 422, incomplete_transition.text
 
-    lecturer = client.get("/api/v1/lecturers", headers=manager_headers).json()[0]
+    lecturer = client.get("/api/v1/lecturers", headers=manager_headers).json()["data"][0]
     invited = client.post(f"/api/v1/rounds/{round_id}/invitations", json={"lecturer_ids": [lecturer["id"]]}, headers=manager_headers)
     assert invited.status_code == 200, invited.text
     lecturer_headers = {"X-Test-Session": f"active-lecturer:{lecturer['account_id']}"}
@@ -185,7 +185,7 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     assert conflict.status_code == 200, conflict.text
     lecturers = client.get("/api/v1/lecturers", headers=manager_headers)
     assert lecturers.status_code == 200, lecturers.text
-    lecturer_details = next(item for item in lecturers.json() if item["id"] == lecturer["id"])
+    lecturer_details = next(item for item in lecturers.json()["data"] if item["id"] == lecturer["id"])
     assert lecturer_details["account_id"] == lecturer["account_id"]
     assert lecturer_details["email"]
     assert lecturer_details["display_name"]
@@ -198,7 +198,7 @@ def test_worker_creates_availability_reminder_from_shared_event_source(client):
     manager_headers = {"X-Test-Session": "active-manager"}
     seeded = client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     assert seeded.status_code == 201, seeded.text
-    semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json() if item["code"] == "SE-2026-2027")
+    semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json()["data"] if item["code"] == "SE-2026-2027")
     deadline = (datetime.now(UTC) + timedelta(hours=12)).isoformat()
     round_response = client.post(
         "/api/v1/rounds",
@@ -207,7 +207,7 @@ def test_worker_creates_availability_reminder_from_shared_event_source(client):
     )
     assert round_response.status_code == 201, round_response.text
     round_id = round_response.json()["id"]
-    lecturer = client.get("/api/v1/lecturers", headers=manager_headers).json()[0]
+    lecturer = client.get("/api/v1/lecturers", headers=manager_headers).json()["data"][0]
     assert client.post(f"/api/v1/rounds/{round_id}/invitations", json={"lecturer_ids": [lecturer["id"]]}, headers=manager_headers).status_code == 200
     lecturer_headers = {"X-Test-Session": f"active-lecturer:{lecturer['account_id']}"}
     assert client.post(f"/api/v1/rounds/{round_id}/invitations/{lecturer['id']}/response", json={"response": "ACCEPTED"}, headers=lecturer_headers).status_code == 200

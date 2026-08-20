@@ -8,10 +8,10 @@ def test_manager_can_assign_supervisors_to_existing_target_project(client):
     client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
     headers = {"X-Test-Session": "active-manager"}
     semester = next(
-        item for item in client.get("/api/v1/semesters", headers=headers).json()
+        item for item in client.get("/api/v1/semesters", headers=headers).json()["data"]
         if item["code"] == "SE-2026-2027"
     )
-    lecturers = client.get("/api/v1/lecturers", headers=headers).json()
+    lecturers = client.get("/api/v1/lecturers", headers=headers).json()["data"]
     assert lecturers
     main_id = lecturers[0]["id"]
     co_id = lecturers[1]["id"] if len(lecturers) > 1 else main_id
