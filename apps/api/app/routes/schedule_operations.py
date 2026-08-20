@@ -75,10 +75,13 @@ class ScheduleRunPayload(BaseModel):
 
 class SessionEditPayload(BaseModel):
     timeslot_id: int | None = Field(default=None, gt=0)
-    room_id: int | None = Field(default=None, gt=0)
     reviewer_ids: list[int] | None = None
     result_owner_id: int | None = Field(default=None, gt=0)
     reason: str = Field(min_length=1, max_length=1000)
+
+
+class ControlledChangePayload(SessionEditPayload):
+    room_id: int | None = Field(default=None, gt=0)
 
 
 class RescheduleRequestPayload(BaseModel):
@@ -436,7 +439,7 @@ def _edited_rows(
     changed = {
         **target,
         "timeslot_id": next_slot_id,
-        "room_id": payload.room_id or target["room_id"],
+        "room_id": getattr(payload, "room_id", None) or target["room_id"],
         "start_at": slot[1],
         "end_at": slot[2],
         "reviewer_ids": tuple(payload.reviewer_ids) if payload.reviewer_ids is not None else target["reviewer_ids"],
@@ -589,23 +592,31 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
     try:
         with db.begin():
             ensure_round_semester_writable(db, round_id)
-            round_status = db.execute(
-                text("SELECT status FROM rounds WHERE id = :round_id FOR UPDATE"),
+            round_row = db.execute(
+                text("SELECT status, reviewer_count FROM rounds WHERE id = :round_id FOR UPDATE"),
                 {"round_id": round_id},
-            ).scalar_one_or_none()
-            if round_status is None:
+            ).mappings().one_or_none()
+            if round_row is None:
                 raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
-            if str(round_status) in {"PUBLISHED", "ONGOING", "COMPLETED", "LOCKED", "CANCELLED"}:
-                raise DomainError(
-                    "SCHEDULE_RERUN_FORBIDDEN",
-                    "A published or terminal round must use the controlled-change workflow.",
-                )
-            if str(round_status) == "POSTPONED":
-                raise DomainError("ROUND_POSTPONED", "A postponed round must be reopened before scheduling.")
-            if str(round_status) != "SCHEDULING":
-                db.execute(
-                    text("UPDATE rounds SET status = 'SCHEDULING' WHERE id = :round_id"),
+            current_status = RoundStatus(round_row["status"])
+            if current_status is not RoundStatus.SCHEDULING:
+                next_status = transition_round(current_status, RoundStatus("SCHEDULING"))
+                counts = db.execute(
+                    text(
+                        "SELECT "
+                        "(SELECT COUNT(*) FROM round_groups WHERE round_id = :round_id) AS groups, "
+                        "(SELECT COUNT(*) FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id WHERE rd.round_id = :round_id) AS timeslots, "
+                        "(SELECT COUNT(*) FROM round_invitations WHERE round_id = :round_id AND status = 'ACCEPTED') AS accepted_reviewers, "
+                        "(SELECT COUNT(DISTINCT lecturer_id) FROM lecturer_availabilities WHERE round_id = :round_id AND state = 'AVAILABLE') AS available_reviewers"
+                    ),
                     {"round_id": round_id},
+                ).mappings().one()
+                reviewer_count = counts["accepted_reviewers"] or counts["available_reviewers"]
+                if not counts["groups"] or not counts["timeslots"] or reviewer_count < round_row["reviewer_count"]:
+                    raise DomainError("ROUND_INPUTS_INCOMPLETE", "Round needs groups, timeslots and enough available Reviewers before scheduling.")
+                db.execute(
+                    text("UPDATE rounds SET status = CAST(:status AS round_status) WHERE id = :round_id"),
+                    {"status": next_status.value, "round_id": round_id},
                 )
             context, groups, timeslots, reviewers = _round_input(db, round_id)
             if not groups or not timeslots or not reviewers:
@@ -1010,7 +1021,7 @@ def controlled_change(
     *,
     version_id: int,
     session_id: int,
-    payload: SessionEditPayload,
+    payload: ControlledChangePayload,
     db: Db,
     user: User,
 ) -> dict[str, Any]:

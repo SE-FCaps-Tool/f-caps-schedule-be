@@ -21,7 +21,11 @@ from app.domain.master_data import (
     validate_group_members,
     validate_project_supervisors,
 )
-from app.domain.registration_phase import RegistrationPhase, resolve_registration_phase
+from app.domain.registration_phase import (
+    RegistrationPhase,
+    effective_registration_deadline,
+    resolve_registration_phase,
+)
 from app.domain.round_setup import validate_round_configuration
 from app.domain.seed import seed_fixture_v1
 from app.domain.status_compat import project_from_legacy
@@ -200,12 +204,6 @@ class RoundCreate(BaseModel):
             self.start_date <= self.group_preference_deadline.date() <= self.end_date
         ):
             raise ValueError("group_preference_deadline must fall within start_date and end_date")
-        if self.group_selection_mode:
-            if self.registration_deadline is None or self.group_preference_deadline is None:
-                raise ValueError("both registration deadlines are required when group_selection_mode is enabled")
-        if self.registration_deadline is not None and self.group_preference_deadline is not None:
-            if self.group_preference_deadline <= self.registration_deadline:
-                raise ValueError("group_preference_deadline must be after registration_deadline")
         return self
 
 
@@ -1491,7 +1489,7 @@ def submit_lecturer_availability(
         ).scalar_one_or_none()
         if accepted is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "A Lecturer may edit availability only after accepting the round invitation."})
-        require_registration_phase(db, round_id, RegistrationPhase.LECTURER)
+        require_registration_phase(db, round_id, RegistrationPhase.REGISTRATION)
         db.commit()
     try:
         with db.begin():
@@ -1577,7 +1575,7 @@ def submit_group_availability(
     if not round_row["group_selection_mode"]:
         raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
     if user.role == "STUDENT":
-        require_registration_phase(db, round_id, RegistrationPhase.GROUP)
+        require_registration_phase(db, round_id, RegistrationPhase.REGISTRATION)
     db.commit()
     try:
         with db.begin():
@@ -1710,12 +1708,22 @@ def respond_to_invitation(
     if user.role == "LECTURER" and lecturer_id_for_account(db, user.account_id) != lecturer_id:
         raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "A Lecturer may respond only to their own invitation."})
     round_row = db.execute(
-        text("SELECT registration_deadline FROM rounds WHERE id = :round_id"), {"round_id": round_id}
+        text(
+            "SELECT registration_deadline, group_preference_deadline "
+            "FROM rounds WHERE id = :round_id"
+        ),
+        {"round_id": round_id},
     ).mappings().one_or_none()
     if round_row is None:
         raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
     ensure_round_semester_writable(db, round_id)
-    deadline = round_row["registration_deadline"]
+    deadline = (
+        effective_registration_deadline(
+            round_row["registration_deadline"], round_row["group_preference_deadline"]
+        )
+        if round_row["registration_deadline"] is not None
+        else None
+    )
     try:
         stored_response = "DECLINED" if payload.response == "REJECTED" else payload.response
         invitation_response(
@@ -1790,7 +1798,7 @@ def _build_my_availability(
         if accepted is None:
             raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "This round is not available to the Lecturer."})
         if enforce_registration_phase:
-            require_registration_phase(db, round_id, RegistrationPhase.LECTURER)
+            require_registration_phase(db, round_id, RegistrationPhase.REGISTRATION)
         response["lecturer_id"] = lecturer_id
         response["selected_timeslot_ids"] = [row["timeslot_id"] for row in db.execute(text("SELECT timeslot_id FROM lecturer_availabilities WHERE round_id = :round_id AND lecturer_id = :lecturer_id AND state = 'AVAILABLE'"), {"round_id": round_id, "lecturer_id": lecturer_id}).mappings().all()]
     elif user.role == "STUDENT":
@@ -1801,7 +1809,7 @@ def _build_my_availability(
         if not round_row["group_selection_mode"]:
             raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
         if enforce_registration_phase:
-            require_registration_phase(db, round_id, RegistrationPhase.GROUP)
+            require_registration_phase(db, round_id, RegistrationPhase.REGISTRATION)
         response["groups"] = [dict(row) for row in groups]
         response["selected_by_group"] = {row["id"]: [item["timeslot_id"] for item in db.execute(text("SELECT timeslot_id FROM group_slot_preferences WHERE round_id = :round_id AND group_id = :group_id AND selected = TRUE"), {"round_id": round_id, "group_id": row["id"]}).mappings().all()] for row in groups}
     else:

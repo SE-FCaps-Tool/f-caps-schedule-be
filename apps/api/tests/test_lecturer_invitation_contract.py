@@ -42,6 +42,7 @@ def test_lecturer_invitations_matches_frontend_nested_contract(monkeypatch):
                 "round_name": "Defense 1.1",
                 "round_type": "DEFENSE_1_1",
                 "registration_deadline": deadline,
+                "group_preference_deadline": None,
             }
         ]
     )
@@ -82,6 +83,7 @@ def test_lecturer_invitations_uses_round_type_when_legacy_round_name_is_null(mon
                 "round_name": None,
                 "round_type": "REVIEW_1",
                 "registration_deadline": datetime(2026, 8, 20, tzinfo=UTC),
+                "group_preference_deadline": None,
             }
         ]
     )
@@ -104,6 +106,7 @@ def test_lecturer_invitations_marks_overdue_pending_invitation_as_expired(monkey
                 "round_name": "Review 1",
                 "round_type": "REVIEW_1",
                 "registration_deadline": datetime(2020, 1, 1, tzinfo=UTC),
+                "group_preference_deadline": None,
             }
         ]
     )

@@ -347,16 +347,11 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
         if merged_start is not None and merged_end is not None and merged_end < merged_start:
             raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
         merged_registration_deadline = values.get("registration_deadline", current_round["registration_deadline"])
-        merged_group_selection_mode = values.get("group_selection_mode", current_round["group_selection_mode"])
         merged_group_preference_deadline = values.get("group_preference_deadline", current_round["group_preference_deadline"])
         if merged_registration_deadline is not None and merged_registration_deadline.tzinfo is None:
             raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "registration_deadline must include a timezone offset."})
         if merged_group_preference_deadline is not None and merged_group_preference_deadline.tzinfo is None:
             raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "group_preference_deadline must include a timezone offset."})
-        if merged_group_selection_mode and (merged_registration_deadline is None or merged_group_preference_deadline is None):
-            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "Both registration deadlines are required when group selection is enabled."})
-        if merged_registration_deadline is not None and merged_group_preference_deadline is not None and merged_group_preference_deadline <= merged_registration_deadline:
-            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "group_preference_deadline must be after registration_deadline."})
         if merged_start is not None and merged_end is not None:
             for field_name, deadline in (("registration_deadline", merged_registration_deadline), ("group_preference_deadline", merged_group_preference_deadline)):
                 if deadline is not None and not (merged_start <= deadline.date() <= merged_end):

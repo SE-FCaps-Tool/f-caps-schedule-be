@@ -95,11 +95,17 @@ def process_availability_reminders(db: Session) -> int:
     """Remind accepted Reviewers and active group Leaders before registration closes."""
     lecturer_rows = db.execute(
         text(
-            "SELECT r.id AS round_id, r.registration_deadline, ri.lecturer_id, l.account_id "
+            "SELECT r.id AS round_id, "
+            "COALESCE(GREATEST(r.registration_deadline, r.group_preference_deadline), "
+            "r.registration_deadline, r.group_preference_deadline) AS effective_registration_deadline, "
+            "ri.lecturer_id, l.account_id "
             "FROM rounds r JOIN round_invitations ri ON ri.round_id = r.id "
             "JOIN lecturers l ON l.id = ri.lecturer_id "
-            "WHERE ri.status = 'ACCEPTED' AND r.registration_deadline > now() "
-            "AND r.registration_deadline <= now() + interval '2 days' "
+            "WHERE ri.status = 'ACCEPTED' "
+            "AND COALESCE(GREATEST(r.registration_deadline, r.group_preference_deadline), "
+            "r.registration_deadline, r.group_preference_deadline) > now() "
+            "AND COALESCE(GREATEST(r.registration_deadline, r.group_preference_deadline), "
+            "r.registration_deadline, r.group_preference_deadline) <= now() + interval '2 days' "
             "AND NOT EXISTS (SELECT 1 FROM lecturer_availabilities la "
             "WHERE la.round_id = r.id AND la.lecturer_id = ri.lecturer_id)"
         )
@@ -110,17 +116,23 @@ def process_availability_reminders(db: Session) -> int:
             db,
             "AVAILABILITY_REMINDER",
             key,
-            {"round_id": row["round_id"], "lecturer_id": row["lecturer_id"], "deadline": row["registration_deadline"], "recipient_id": row["account_id"]},
+            {"round_id": row["round_id"], "lecturer_id": row["lecturer_id"], "deadline": row["effective_registration_deadline"], "recipient_id": row["account_id"]},
             row["account_id"],
         )
     leader_rows = db.execute(
         text(
-            "SELECT r.id AS round_id, r.registration_deadline, gm.group_id, st.account_id "
+            "SELECT r.id AS round_id, "
+            "COALESCE(GREATEST(r.registration_deadline, r.group_preference_deadline), "
+            "r.registration_deadline, r.group_preference_deadline) AS effective_registration_deadline, "
+            "gm.group_id, st.account_id "
             "FROM rounds r JOIN round_groups rg ON rg.round_id = r.id "
             "JOIN group_memberships gm ON gm.group_id = rg.group_id AND gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER' "
             "JOIN students st ON st.id = gm.student_id "
-            "WHERE r.group_selection_mode = TRUE AND r.registration_deadline > now() "
-            "AND r.registration_deadline <= now() + interval '2 days' "
+            "WHERE r.group_selection_mode = TRUE "
+            "AND COALESCE(GREATEST(r.registration_deadline, r.group_preference_deadline), "
+            "r.registration_deadline, r.group_preference_deadline) > now() "
+            "AND COALESCE(GREATEST(r.registration_deadline, r.group_preference_deadline), "
+            "r.registration_deadline, r.group_preference_deadline) <= now() + interval '2 days' "
             "AND NOT EXISTS (SELECT 1 FROM group_slot_preferences gp "
             "WHERE gp.round_id = r.id AND gp.group_id = rg.group_id)"
         )
@@ -131,7 +143,7 @@ def process_availability_reminders(db: Session) -> int:
             db,
             "GROUP_AVAILABILITY_REMINDER",
             key,
-            {"round_id": row["round_id"], "group_id": row["group_id"], "deadline": row["registration_deadline"], "recipient_id": row["account_id"]},
+            {"round_id": row["round_id"], "group_id": row["group_id"], "deadline": row["effective_registration_deadline"], "recipient_id": row["account_id"]},
             row["account_id"],
         )
     db.commit()

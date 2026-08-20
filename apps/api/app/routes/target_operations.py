@@ -13,8 +13,8 @@ from app.api_contract import success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.routes.schedule_operations import (
+    ControlledChangePayload,
     RescheduleRequestPayload,
-    SessionEditPayload,
     controlled_change,
     postpone_session,
 )
@@ -46,14 +46,14 @@ def _version_for_session(session_id: int, db: Session) -> int:
 @router.post("/sessions/{session_id}/actions/change-room")
 def change_session_room(session_id: int, payload: ChangeRoomPayload, db: Db, user: User) -> dict[str, Any]:
     version_id = _version_for_session(session_id, db)
-    edit = SessionEditPayload(room_id=payload.room_id, reason=payload.reason)
+    edit = ControlledChangePayload(room_id=payload.room_id, reason=payload.reason)
     return success_payload(controlled_change(version_id=version_id, session_id=session_id, payload=edit, db=db, user=user))
 
 
 @router.post("/sessions/{session_id}/actions/replace-reviewer")
 def replace_session_reviewer(session_id: int, payload: ReplaceReviewerPayload, db: Db, user: User) -> dict[str, Any]:
     version_id = _version_for_session(session_id, db)
-    edit = SessionEditPayload(reviewer_ids=payload.reviewer_ids, result_owner_id=payload.result_owner_id, reason=payload.reason)
+    edit = ControlledChangePayload(reviewer_ids=payload.reviewer_ids, result_owner_id=payload.result_owner_id, reason=payload.reason)
     return success_payload(controlled_change(version_id=version_id, session_id=session_id, payload=edit, db=db, user=user))
 
 

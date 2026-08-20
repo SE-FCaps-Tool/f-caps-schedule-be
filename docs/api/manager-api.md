@@ -305,7 +305,7 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 ### `GET /sessions/{session_id}/replacement-suggestions`
 
 - **Role:** `ADMIN`, `MANAGER`.
-- **Response:** tối đa 50 item `{ timeslot_id, room_id, reviewer_ids, replaces }` — đã lọc qua validator, có thể prefill `SessionEditPayload` (vẫn phải gửi `reason`, backend validate lại).
+- **Response:** tối đa 50 item `{ timeslot_id, room_id, reviewer_ids, replaces }` — đã lọc qua validator, có thể prefill controlled-change payload (vẫn phải gửi `reason`, backend validate lại).
 
 ### `POST /schedule/versions/{version_id}/sessions/{session_id}/result-owner`
 
@@ -330,7 +330,7 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 
 - **Role:** `ADMIN`, `MANAGER`.
 - Chỉ sửa version `VALID` hiện tại (draft-edit, trước khi publish).
-- **Body [`SessionEditPayload`](schemas.md#sessioneditpayload):** `{ timeslot_id?, room_id?, reviewer_ids?, result_owner_id?, reason }` — field nào không gửi giữ nguyên giá trị cũ; `reason` luôn bắt buộc.
+- **Body [`SessionEditPayload`](schemas.md#sessioneditpayload):** `{ timeslot_id?, reviewer_ids?, result_owner_id?, reason }` — draft edit không nhận `room_id`; room assignment thuộc post-activation flow; field nào không gửi giữ nguyên giá trị cũ; `reason` luôn bắt buộc.
 - Backend chạy lại **H1, H2, H3** (chặn cứng) và kiểm tra reviewer/Result Owner; các vi phạm ràng buộc mềm khác chỉ cảnh báo (BR-SCH-04).
 - **`200`:** `{ session_id, version_id, status: "UPDATED" }`.
 - **`422 HARD_CONSTRAINT_VIOLATION`** (`detail.violations: []`).
@@ -340,7 +340,7 @@ ngoài học kỳ được chọn lọt vào dashboard hoặc report.
 
 - **Role:** `ADMIN`, `MANAGER`.
 - Chỉ dùng cho version đã `PUBLISHED` (BR-PUB-02: sau công bố vẫn được đổi thành viên hội đồng trong lúc đợt diễn ra). Không mutate version published — tạo version mới `VALID`, copy session/result liên quan, ghi change record.
-- **Body:** cùng `SessionEditPayload`.
+- **Body:** controlled-change payload `{ timeslot_id?, room_id?, reviewer_ids?, result_owner_id?, reason }`; `room_id` chỉ có hiệu lực trong flow này.
 - Người thay thế phải thỏa toàn bộ **H1, H2, H3, H6, H8** (BR-PUB-03). Thay đổi không ảnh hưởng kết quả các phiên đã hoàn thành trước đó (BR-PUB-05 — result gắn cứng với hội đồng tại thời điểm phiên diễn ra).
 - **`200`:** `{ version_id, source_version_id, session_id, status: "VALID" }`.
 - **`422 CONTROLLED_CHANGE_REQUIRES_PUBLISHED` / `COMPLETED_SESSION_IMMUTABLE` / `HARD_CONSTRAINT_VIOLATION`.**

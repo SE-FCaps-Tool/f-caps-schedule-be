@@ -273,14 +273,16 @@ Ba mảng đều bắt buộc và phải có ít nhất một ID.
 ```json
 {
   "timeslot_id": 10,
-  "room_id": 3,
   "reviewer_ids": [12, 13],
   "result_owner_id": 12,
-  "reason": "Resolve room maintenance conflict"
+  "reason": "Resolve reviewer availability conflict"
 }
 ```
 
-Tất cả field trừ `reason` là optional; `timeslot_id`, `room_id`, `result_owner_id` nếu có phải > 0; `reviewer_ids` là mảng integer; `reason` 1–1000 và luôn bắt buộc.
+Đây là payload cho draft edit; tất cả field trừ `reason` là optional; `timeslot_id`
+và `result_owner_id` nếu có phải > 0; `reviewer_ids` là mảng integer; `reason`
+1–1000 và luôn bắt buộc. Room chỉ được gán trong post-activation room-assignment
+flow hoặc controlled-change payload.
 
 ### Reschedule schemas
 

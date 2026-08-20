@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.api_contract import success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.domain.registration_phase import effective_registration_deadline
 from app.services.access import lecturer_id_for_account, student_id_for_account
 
 router = APIRouter(prefix="/api/v1", tags=["target-portals"])
@@ -20,8 +21,8 @@ Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
 
 
-def _invitation_status(status: str, registration_deadline: datetime | None) -> str:
-    if status == "PENDING" and registration_deadline is not None and registration_deadline < datetime.now(UTC):
+def _invitation_status(status: str, deadline: datetime | None) -> str:
+    if status == "PENDING" and deadline is not None and deadline < datetime.now(UTC):
         return "EXPIRED"
     return status
 
@@ -50,7 +51,8 @@ def lecturer_invitations(db: Db, user: User) -> dict[str, Any]:
     rows = db.execute(
         text(
             "SELECT ri.round_id, ri.lecturer_id, ri.status::text AS status, ri.responded_at, "
-            "r.name AS round_name, r.type::text AS round_type, r.registration_deadline "
+            "r.name AS round_name, r.type::text AS round_type, "
+            "r.registration_deadline, r.group_preference_deadline "
             "FROM round_invitations ri JOIN rounds r ON r.id = ri.round_id "
             "WHERE ri.lecturer_id = :lecturer_id "
             "ORDER BY r.id DESC"
@@ -66,9 +68,16 @@ def lecturer_invitations(db: Db, user: User) -> dict[str, Any]:
                 "id": str(row["round_id"]),
                 "name": row["round_name"] or row["round_type"],
                 "type": row["round_type"],
-                "registrationDeadline": row["registration_deadline"],
+                "registrationDeadline": effective_registration_deadline(
+                    row["registration_deadline"], row["group_preference_deadline"]
+                ) if row["registration_deadline"] is not None else None,
             },
-            "status": _invitation_status(row["status"], row["registration_deadline"]),
+            "status": _invitation_status(
+                row["status"],
+                effective_registration_deadline(
+                    row["registration_deadline"], row["group_preference_deadline"]
+                ) if row["registration_deadline"] is not None else None,
+            ),
             "respondedAt": row["responded_at"],
         }
         for row in rows
@@ -88,7 +97,8 @@ def lecturer_sessions(db: Db, user: User) -> dict[str, Any]:
             "JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id "
             "JOIN projects p ON p.id = g.project_id LEFT JOIN rooms rm ON rm.id = s.room_id "
             "JOIN council_members cm ON cm.council_id = s.council_id "
-            "WHERE cm.lecturer_id = :lecturer_id ORDER BY s.start_at, s.id"
+            "WHERE cm.lecturer_id = :lecturer_id AND sv.status IN ('ACTIVE', 'PUBLISHED') "
+            "ORDER BY s.start_at, s.id"
         ),
         {"lecturer_id": lecturer_id},
     ).mappings().all()
@@ -244,7 +254,7 @@ def leader_dashboard(db: Db, user: User) -> dict[str, Any]:
     current_round = db.execute(
         text(
             "SELECT r.id, r.name, r.type::text AS type, r.status::text AS status, "
-            "r.group_selection_mode, r.group_preference_deadline "
+            "r.group_selection_mode, r.registration_deadline, r.group_preference_deadline "
             "FROM round_groups rg JOIN rounds r ON r.id = rg.round_id "
             "WHERE rg.group_id = :group_id AND r.status::text = 'OPEN_REGISTRATION' "
             "ORDER BY r.id DESC LIMIT 1"
@@ -335,7 +345,9 @@ def leader_dashboard(db: Db, user: User) -> dict[str, Any]:
             "coSupervisor": supervisor_by_type.get("CO"),
             "currentRound": round_payload,
             "preferenceStatus": preference_status,
-            "deadline": current_round["group_preference_deadline"] if current_round is not None else None,
+            "deadline": effective_registration_deadline(
+                current_round["registration_deadline"], current_round["group_preference_deadline"]
+            ) if current_round is not None and current_round["registration_deadline"] is not None else None,
             "upcomingSession": _local_session(upcoming),
             "latestResult": result_payload,
             "remediation": None
@@ -359,7 +371,8 @@ def leader_sessions(db: Db, user: User) -> dict[str, Any]:
             "FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
             "JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id "
             "LEFT JOIN projects p ON p.id = g.project_id LEFT JOIN rooms rm ON rm.id = s.room_id "
-            "WHERE s.group_id = ANY(:group_ids) ORDER BY s.start_at, s.id"
+            "WHERE s.group_id = ANY(:group_ids) AND sv.status IN ('ACTIVE', 'PUBLISHED') "
+            "ORDER BY s.start_at, s.id"
         ),
         {"group_ids": group_ids or [0]},
     ).mappings().all()

@@ -6,12 +6,16 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_engine
-from app.domain.registration_phase import RegistrationPhase, resolve_registration_phase
+from app.domain.registration_phase import (
+    RegistrationPhase,
+    effective_registration_deadline,
+    resolve_registration_phase,
+)
 from app.routes.master_data import RoundCreate
 from app.routes.target_round_contract import TargetRoundCreate
 
 
-def test_registration_phases_are_sequential_at_deadline_boundaries():
+def test_registration_phase_uses_the_later_legacy_deadline_inclusively():
     lecturer_deadline = datetime(2030, 1, 10, tzinfo=UTC)
     group_deadline = datetime(2030, 1, 12, tzinfo=UTC)
 
@@ -26,19 +30,19 @@ def test_registration_phases_are_sequential_at_deadline_boundaries():
         registration_deadline=lecturer_deadline,
         group_preference_deadline=group_deadline,
         now=lecturer_deadline,
-    ) is RegistrationPhase.LECTURER
+    ) is RegistrationPhase.REGISTRATION
     assert resolve_registration_phase(
         round_status="OPEN_REGISTRATION",
         registration_deadline=lecturer_deadline,
         group_preference_deadline=group_deadline,
         now=lecturer_deadline + timedelta(seconds=1),
-    ) is RegistrationPhase.GROUP
+    ) is RegistrationPhase.REGISTRATION
     assert resolve_registration_phase(
         round_status="OPEN_REGISTRATION",
         registration_deadline=lecturer_deadline,
         group_preference_deadline=group_deadline,
         now=group_deadline,
-    ) is RegistrationPhase.GROUP
+    ) is RegistrationPhase.REGISTRATION
     assert resolve_registration_phase(
         round_status="OPEN_REGISTRATION",
         registration_deadline=lecturer_deadline,
@@ -58,42 +62,67 @@ def test_manual_lecturer_handoff_opens_group_phase_before_deadline():
         group_preference_deadline=group_deadline,
         lecturer_registration_closed_at=now,
         now=now,
-    ) is RegistrationPhase.GROUP
+    ) is RegistrationPhase.REGISTRATION
 
 
-def test_round_create_requires_group_deadline_after_lecturer_deadline():
-    with pytest.raises(ValueError, match="groupPreferenceDeadline must be after registrationDeadline"):
-        TargetRoundCreate.model_validate(
-            {
-                "name": "Review",
-                "type": "REVIEW_1",
-                "durationMinutes": 60,
-                "reviewerCount": 2,
-                "maxGroupsPerTimeslot": 3,
-                "registrationDeadline": "2030-01-10T23:59:00+07:00",
-                "groupSelectionMode": True,
-                "groupPreferenceDeadline": "2030-01-10T22:00:00+07:00",
-                "resultOwnerMode": False,
-                "roomTypes": ["NORMAL"],
-                "days": [{"date": "2030-01-20", "slots": [{"startTime": "08:00", "endTime": "09:00"}]}],
-            }
-        )
+def test_effective_registration_deadline_handles_legacy_and_new_rounds():
+    lecturer_deadline = datetime(2030, 1, 10, tzinfo=UTC)
+    group_deadline = datetime(2030, 1, 12, tzinfo=UTC)
+
+    assert effective_registration_deadline(lecturer_deadline, group_deadline) == group_deadline
+    assert effective_registration_deadline(lecturer_deadline, None) == lecturer_deadline
 
 
-def test_legacy_round_create_enforces_sequential_deadlines():
-    with pytest.raises(ValueError, match="both registration deadlines are required"):
-        RoundCreate.model_validate(
-            {
-                "semester_id": 1,
-                "type": "REVIEW_1",
-                "reviewer_count": 2,
-                "group_selection_mode": True,
-                "session_duration_minutes": 60,
-                "room_types": ["NORMAL"],
-                "start_date": "2030-01-01",
-                "end_date": "2030-03-01",
-            }
-        )
+def test_group_selection_disabled_round_uses_registration_deadline_only():
+    deadline = datetime(2030, 1, 10, tzinfo=UTC)
+
+    assert resolve_registration_phase(
+        round_status="OPEN_REGISTRATION",
+        registration_deadline=deadline,
+        group_preference_deadline=None,
+        now=deadline,
+    ) is RegistrationPhase.REGISTRATION
+    assert resolve_registration_phase(
+        round_status="OPEN_REGISTRATION",
+        registration_deadline=deadline,
+        group_preference_deadline=None,
+        now=deadline + timedelta(seconds=1),
+    ) is RegistrationPhase.CLOSED
+
+
+def test_round_create_allows_a_shared_deadline_without_group_deadline():
+    payload = TargetRoundCreate.model_validate(
+        {
+            "name": "Review",
+            "type": "REVIEW_1",
+            "durationMinutes": 60,
+            "reviewerCount": 2,
+            "maxGroupsPerTimeslot": 3,
+            "registrationDeadline": "2030-01-10T23:59:00+07:00",
+            "groupSelectionMode": True,
+            "resultOwnerMode": False,
+            "roomTypes": ["NORMAL"],
+            "days": [{"date": "2030-01-20", "slots": [{"startTime": "08:00", "endTime": "09:00"}]}],
+        }
+    )
+    assert payload.group_preference_deadline is None
+
+
+def test_legacy_round_create_allows_missing_group_deadline():
+    payload = RoundCreate.model_validate(
+        {
+            "semester_id": 1,
+            "type": "REVIEW_1",
+            "reviewer_count": 2,
+            "group_selection_mode": True,
+            "session_duration_minutes": 60,
+            "registration_deadline": "2030-01-10T23:59:00+07:00",
+            "room_types": ["NORMAL"],
+            "start_date": "2030-01-01",
+            "end_date": "2030-03-01",
+        }
+    )
+    assert payload.group_preference_deadline is None
 
 
 @pytest.mark.integration
@@ -117,11 +146,11 @@ def test_manager_can_handoff_open_round_to_group_registration(client):
             f"/api/v1/rounds/{round_id}/actions/open-group-registration",
             headers={"X-Test-Session": "active-manager"},
         )
-        assert response.status_code == 200, response.text
-        assert response.json()["data"]["registrationPhase"] == "GROUP"
+        assert response.status_code == 409, response.text
+        assert response.json()["error"]["code"] == "REGISTRATION_PARALLEL_MODE"
         detail = client.get(f"/api/v1/rounds/{round_id}", headers={"X-Test-Session": "active-manager"})
         assert detail.status_code == 200, detail.text
-        assert detail.json()["data"]["registrationPhase"] == "GROUP"
+        assert detail.json()["data"]["registrationPhase"] == "REGISTRATION"
         closed = client.post(
             f"/api/v1/rounds/{round_id}/actions/close-registration",
             headers={"X-Test-Session": "active-manager"},
@@ -130,7 +159,7 @@ def test_manager_can_handoff_open_round_to_group_registration(client):
         assert closed.json()["data"]["status"] == "REGISTRATION_CLOSED"
         with Session(engine) as db:
             closed_at = db.execute(text("SELECT lecturer_registration_closed_at FROM rounds WHERE id = :round_id"), {"round_id": round_id}).scalar_one()
-        assert closed_at is not None
+        assert closed_at is None
     finally:
         with Session(engine) as db, db.begin():
             db.execute(text("DELETE FROM rounds WHERE id = :round_id"), {"round_id": round_id})
@@ -156,7 +185,7 @@ def test_round_create_rejects_mixed_timezone_deadlines_as_validation_error():
 
 
 @pytest.mark.integration
-def test_student_group_preferences_are_open_only_between_the_two_deadlines(client):
+def test_student_group_preferences_share_the_registration_window(client):
     assert client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"}).status_code == 201
     engine = get_engine(get_settings().database_url)
     now = datetime.now(UTC)
@@ -194,20 +223,40 @@ def test_student_group_preferences_are_open_only_between_the_two_deadlines(clien
             text("INSERT INTO round_groups (round_id, group_id) VALUES (:round_id, :group_id)"),
             {"round_id": round_id, "group_id": leader["group_id"]},
         )
+        lecturer = db.execute(
+            text(
+                "SELECT ri.lecturer_id, l.account_id FROM round_invitations ri "
+                "JOIN lecturers l ON l.id = ri.lecturer_id "
+                "WHERE ri.status = 'ACCEPTED' LIMIT 1"
+            )
+        ).mappings().one()
+        db.execute(
+            text(
+                "INSERT INTO round_invitations (round_id, lecturer_id, status, responded_at) "
+                "VALUES (:round_id, :lecturer_id, 'ACCEPTED', now())"
+            ),
+            {"round_id": round_id, "lecturer_id": lecturer["lecturer_id"]},
+        )
 
     headers = {"X-Test-Session": f"active-student:{leader['account_id']}"}
     path = f"/api/v1/rounds/{round_id}/groups/{leader['group_id']}/preferences"
     try:
-        lecturer_phase = client.put(path, json={"timeslotIds": []}, headers=headers)
-        assert lecturer_phase.status_code == 409, lecturer_phase.text
+        registration_phase = client.put(path, json={"timeslotIds": []}, headers=headers)
+        assert registration_phase.status_code == 200, registration_phase.text
+        lecturer_submission = client.post(
+            f"/api/v1/rounds/{round_id}/lecturers/{lecturer['lecturer_id']}/availability",
+            json={"selected_timeslot_ids": []},
+            headers={"X-Test-Session": f"active-lecturer:{lecturer['account_id']}"},
+        )
+        assert lecturer_submission.status_code == 200, lecturer_submission.text
 
         with Session(engine) as db, db.begin():
             db.execute(
                 text("UPDATE rounds SET registration_deadline = :deadline WHERE id = :round_id"),
                 {"deadline": now - timedelta(seconds=1), "round_id": round_id},
             )
-        group_phase = client.put(path, json={"timeslotIds": []}, headers=headers)
-        assert group_phase.status_code == 200, group_phase.text
+        still_open = client.put(path, json={"timeslotIds": []}, headers=headers)
+        assert still_open.status_code == 200, still_open.text
         assert client.get(path, headers=headers).status_code == 200
         assert client.get(path, headers={"X-Test-Session": "active-lecturer"}).status_code == 403
         member_view = client.get(
@@ -229,10 +278,7 @@ def test_student_group_preferences_are_open_only_between_the_two_deadlines(clien
                 text("INSERT INTO round_groups (round_id, group_id) VALUES (:round_id, :group_id)"),
                 {"round_id": round_id, "group_id": leader["group_id"]},
             )
-            db.execute(
-                text("UPDATE rounds SET group_preference_deadline = :deadline WHERE id = :round_id"),
-                {"deadline": now - timedelta(seconds=1), "round_id": round_id},
-            )
+            db.execute(text("UPDATE rounds SET group_preference_deadline = :deadline WHERE id = :round_id"), {"deadline": now - timedelta(seconds=1), "round_id": round_id})
         closed = client.put(path, json={"timeslotIds": []}, headers=headers)
         assert closed.status_code == 409, closed.text
         closed_read = client.get(

@@ -73,22 +73,17 @@ từ hai deadline:
 status != OPEN_REGISTRATION
   → INACTIVE
 
-status == OPEN_REGISTRATION && now <= registrationDeadline
-  → LECTURER
-
 status == OPEN_REGISTRATION
-&& registrationDeadline < now
-&& now <= groupPreferenceDeadline
-  → GROUP
+&& now <= max(registrationDeadline, groupPreferenceDeadline when present)
+  → REGISTRATION
 
-now > groupPreferenceDeadline
+now > the effective registration deadline
   → CLOSED
 ```
 
 Giá trị đúng tại biên:
 
-- `now == registrationDeadline`: vẫn là giai đoạn Lecturer.
-- `now == groupPreferenceDeadline`: vẫn là giai đoạn Group.
+- `now == effective registration deadline`: vẫn là giai đoạn Registration.
 
 FE có thể dùng `status` và hai deadline từ Round Detail để ẩn/hiện UI, nhưng BE
 luôn kiểm tra lại và là nguồn quyết định cuối cùng.
@@ -114,8 +109,9 @@ Các field liên quan không đổi tên:
 Validation mới:
 
 - Deadline phải có timezone offset, ví dụ `+07:00` hoặc `Z`.
-- Khi `groupSelectionMode=true`, cả hai deadline đều bắt buộc.
-- `groupPreferenceDeadline` phải lớn hơn `registrationDeadline`.
+- `registrationDeadline` là deadline dùng chung cho Lecturer và Leader.
+- `groupPreferenceDeadline` là field tùy chọn để tương thích dữ liệu cũ; nếu có,
+  deadline hiệu lực là thời điểm muộn hơn giữa hai field.
 - Khi `groupSelectionMode=false`, không có giai đoạn Student chọn preference.
 
 Request sai trả `422 VALIDATION_ERROR` theo error envelope chuẩn.
@@ -144,7 +140,7 @@ Request PUT không đổi:
 Điều kiện mới cho Lecturer khi ghi (PUT):
 
 - Round phải là `OPEN_REGISTRATION`.
-- Giai đoạn hiện tại phải là `LECTURER`.
+- Giai đoạn hiện tại phải là `REGISTRATION`.
 - Invitation phải là `ACCEPTED`.
 - Lecturer chỉ sửa availability của chính mình.
 
@@ -166,7 +162,7 @@ Manager/Admin vẫn có thể nhập thay ngoài cửa sổ Lecturer bằng endp
 hiện có.
 
 GET là thao tác đọc lịch sử: Lecturer đã được mời và chấp nhận vẫn xem được
-availability của mình sau khi phase chuyển sang `GROUP` hoặc đã đóng; chỉ PUT
+availability của mình sau khi phase đã đóng; chỉ PUT
 mới bị chặn bởi phase.
 
 ## 5. Leader Dashboard
@@ -243,8 +239,9 @@ Quy tắc chọn dữ liệu:
 - `currentRound` chỉ là Round gắn với nhóm và đang `OPEN_REGISTRATION`; nếu có
   nhiều Round phù hợp, BE lấy Round có ID lớn nhất. Round ở trạng thái khác không
   được trả trong field này.
-- `deadline` là `groupPreferenceDeadline` của `currentRound`, hoặc `null` khi
-  không có `currentRound`.
+- `deadline` là deadline đăng ký hiệu lực của `currentRound` (muộn hơn giữa
+  `registrationDeadline` và `groupPreferenceDeadline` nếu field cũ có giá trị),
+  hoặc `null` khi không có `currentRound`.
 - `preferenceStatus = NOT_REQUIRED` khi không có Round đang mở hoặc Round không
   bật `groupSelectionMode`; bằng `SUBMITTED` khi đã tồn tại ít nhất một preference
   `selected=true`; còn lại là `PENDING`.
@@ -290,7 +287,7 @@ Request PUT không đổi:
 Điều kiện mới khi ghi (PUT):
 
 - Round phải là `OPEN_REGISTRATION`.
-- Giai đoạn hiện tại phải là `GROUP`.
+- Giai đoạn hiện tại phải là `REGISTRATION`.
 - `groupSelectionMode=true`.
 - Current Student phải là active Leader của nhóm.
 - Nhóm phải được gắn vào Round.
@@ -342,7 +339,7 @@ gửi `{"timeslotIds": []}` sẽ xóa toàn bộ lựa chọn. Chỉ ID của ti
 `422 AVAILABILITY_SLOT_INVALID` và không lưu một phần request.
 
 Khi đọc preference với tư cách Student, GET vẫn cho xem các lựa chọn đã lưu sau
-khi phase chuyển sang `CLOSED`; chỉ PUT mới yêu cầu phase `GROUP`. GET chỉ trả
+ khi phase chuyển sang `CLOSED`; chỉ PUT mới yêu cầu phase `REGISTRATION`. GET chỉ trả
 timeslot active thuộc Round và không expose availability của giảng viên cho
 Student. Manager/Admin vẫn có thể xem toàn bộ availability để quản trị.
 
@@ -421,7 +418,7 @@ Target endpoints trả lỗi theo dạng:
 {
   "error": {
     "code": "REGISTRATION_PHASE_INVALID",
-    "message": "This action requires the GROUP registration phase; current phase is LECTURER.",
+    "message": "This action requires the REGISTRATION registration phase; current phase is CLOSED.",
     "details": {}
   }
 }
@@ -432,6 +429,7 @@ Các mã liên quan:
 | HTTP | Code | Ý nghĩa FE |
 |---|---|---|
 | 409 | `REGISTRATION_PHASE_INVALID` | Chưa tới hoặc đã hết giai đoạn cho actor hiện tại |
+| 409 | `REGISTRATION_PARALLEL_MODE` | Action mở Group registration đã deprecated vì Lecturer và Leader đăng ký song song |
 | 409 | `GROUP_SELECTION_DISABLED` | Round không bật chức năng nhóm chọn slot |
 | 403 | `AUTH_RESOURCE_SCOPE` | Không phải Lecturer/active Leader của resource |
 | 403 | `GROUP_NOT_IN_ROUND` | Leader đang truy cập nhóm không thuộc Round |
@@ -447,8 +445,7 @@ hoặc trạng thái Round có thể vừa chuyển trong lúc màn hình đang 
 
 - Round Detail đọc `response.data.data`.
 - Không map snake_case cho Round Detail.
-- Form Lecturer chỉ enable trong phase `LECTURER`.
-- Form Leader chỉ enable trong phase `GROUP`.
+- Form Lecturer và Leader cùng enable trong phase `REGISTRATION`.
 - Đồng hồ FE chỉ phục vụ UX; không thay thế validation từ BE.
 - Khi nhận `409 REGISTRATION_PHASE_INVALID`, khóa form và refetch Round Detail.
 - Không hiển thị UI Group Preference khi `groupSelectionMode=false`.
@@ -457,6 +454,8 @@ hoặc trạng thái Round có thể vừa chuyển trong lúc màn hình đang 
 - PUT Group Preference gửi toàn bộ selection hiện tại; gửi mảng rỗng để bỏ chọn
   tất cả.
 - Không gửi deadline thiếu timezone offset.
+- Không gọi `POST /api/v1/rounds/:roundId/actions/open-group-registration`; endpoint
+  vẫn tồn tại để tương thích nhưng luôn trả `409 REGISTRATION_PARALLEL_MODE`.
 - Đọc invitation từ `response.data.data` và dùng `invitation.round.id` trực
   tiếp cho endpoint phản hồi.
 - Không gửi Bearer token; dùng cookie session và gửi CSRF header cho POST phản

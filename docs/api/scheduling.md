@@ -161,7 +161,7 @@ and repoints only the affected Session.
 - **Role:** `ADMIN`, `MANAGER`.
 - **Response `200`:** tối đa 50 suggestion, mỗi item gồm `timeslot_id`, `room_id`, `reviewer_ids`, `replaces`. Solver không đề xuất room nên `room_id` là `null` ở bước này.
 - Ví dụ: `{ "timeslot_id": 11, "room_id": null, "reviewer_ids": [13, 14], "replaces": [12] }`.
-- Suggestions đã được filter qua schedule validator; FE có thể dùng để prefill `SessionEditPayload` nhưng vẫn phải gửi `reason` và backend sẽ validate lại.
+- Suggestions đã được filter qua schedule validator; FE có thể dùng để prefill controlled-change payload nhưng vẫn phải gửi `reason` và backend sẽ validate lại.
 
 ## 8. Hoãn, reschedule và round operation
 

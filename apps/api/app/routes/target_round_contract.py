@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from app.api_contract import external_id, parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
-from app.domain.registration_phase import RegistrationPhase, resolve_registration_phase
 from app.routes.manager_extensions import resend_invitation
 from app.routes.master_data import (
     AvailabilitySubmit,
@@ -27,7 +26,6 @@ from app.routes.master_data import (
     create_round_with_days,
     list_rounds,
     registration_dashboard,
-    require_registration_phase,
     respond_to_invitation,
     submit_group_availability,
     submit_lecturer_availability,
@@ -134,12 +132,8 @@ class TargetRoundCreate(BaseModel):
             raise ValueError("resultOwnerMode is only available for DEFENSE_1_1 and DEFENSE_2")
         if self.registration_deadline.tzinfo is None:
             raise ValueError("registrationDeadline must include a timezone offset")
-        if self.group_selection_mode and self.group_preference_deadline is None:
-            raise ValueError("groupPreferenceDeadline is required when groupSelectionMode is enabled")
         if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:
             raise ValueError("groupPreferenceDeadline must include a timezone offset")
-        if self.group_selection_mode and self.group_preference_deadline <= self.registration_deadline:
-            raise ValueError("groupPreferenceDeadline must be after registrationDeadline")
         if any(room_type not in {"NORMAL", "SEMINAR", "LAB"} for room_type in self.room_types):
             raise ValueError("roomTypes must contain only NORMAL, SEMINAR, or LAB")
 
@@ -334,40 +328,16 @@ def open_registration(round_id: int, db: Db, user: User, payload: RegistrationAc
 
 @router.post("/rounds/{round_id}/actions/open-group-registration")
 def open_group_registration(round_id: int, db: Db, user: User) -> dict[str, Any]:
-    """Manually hand the open round from lecturer availability to student preferences."""
+    """Deprecated: lecturer and group registration now run in parallel."""
 
     _manager(user)
-    with db.begin():
-        row = db.execute(
-            text(
-                "SELECT status::text AS status, group_selection_mode, registration_deadline, "
-                "group_preference_deadline, lecturer_registration_closed_at "
-                "FROM rounds WHERE id = :round_id FOR UPDATE"
-            ),
-            {"round_id": round_id},
-        ).mappings().one_or_none()
-        if row is None:
-            raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
-        if row["status"] != "OPEN_REGISTRATION":
-            raise HTTPException(status_code=409, detail={"code": "ROUND_STATUS_INVALID", "message": "Round must be OPEN_REGISTRATION."})
-        if not row["group_selection_mode"]:
-            raise HTTPException(status_code=409, detail={"code": "GROUP_SELECTION_DISABLED", "message": "Group slot selection is disabled for this round."})
-        if row["group_preference_deadline"] is None:
-            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "groupPreferenceDeadline is required."})
-        phase = resolve_registration_phase(
-            round_status=row["status"],
-            registration_deadline=row["registration_deadline"],
-            group_preference_deadline=row["group_preference_deadline"],
-            lecturer_registration_closed_at=row["lecturer_registration_closed_at"],
-            now=datetime.now(ZoneInfo("UTC")),
-        )
-        if phase is RegistrationPhase.CLOSED:
-            raise HTTPException(status_code=409, detail={"code": "REGISTRATION_CLOSED", "message": "The group preference deadline has passed."})
-        db.execute(
-            text("UPDATE rounds SET lecturer_registration_closed_at = COALESCE(lecturer_registration_closed_at, now()) WHERE id = :round_id"),
-            {"round_id": round_id},
-        )
-    return success_payload({"roundId": external_id(round_id, "rnd"), "status": "OPEN_REGISTRATION", "registrationPhase": "GROUP"})
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "REGISTRATION_PARALLEL_MODE",
+            "message": "Lecturer and group registration run in parallel; this endpoint is deprecated.",
+        },
+    )
 
 
 @router.post("/rounds/{round_id}/actions/close-registration")
