@@ -69,3 +69,23 @@ def test_target_round_create_rejects_slot_duration_mismatch():
 
     with pytest.raises(ValidationError, match="slot duration"):
         TargetRoundCreate.model_validate(payload)
+
+
+def test_target_round_create_accepts_timeframe_without_explicit_days():
+    payload = _spec_round_payload() | {
+        "durationMinutes": 45,
+        "timeframeId": 12,
+        "startDate": "2026-08-25",
+        "endDate": "2026-08-27",
+        "registrationDeadline": "2026-08-26T23:59:00+07:00",
+        "groupPreferenceDeadline": "2026-08-27T23:59:00+07:00",
+    }
+    payload.pop("days")
+
+    model = TargetRoundCreate.model_validate(payload)
+    legacy, days = model.to_legacy(1)
+
+    assert legacy.timeframe_id == 12
+    assert legacy.start_date.isoformat() == "2026-08-25"
+    assert legacy.end_date.isoformat() == "2026-08-27"
+    assert days == []

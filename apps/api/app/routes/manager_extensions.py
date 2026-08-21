@@ -48,7 +48,7 @@ from app.response_models import (
     SessionResponse,
     TimeslotResponse,
 )
-from app.routes.master_data import password_hasher
+from app.routes.master_data import _insert_timeframe_slots, password_hasher
 from app.services.semester_queries import (
     SEMESTER_LIFECYCLE_LOCK_KEY,
     academic_year_for_start,
@@ -56,6 +56,7 @@ from app.services.semester_queries import (
     ensure_semester_writable,
     semester_or_404,
 )
+from app.services.timeframe_service import load_timeframe_template
 
 _PHASE3_PROVENANCE_TABLE = "schedule_assignments"
 router = APIRouter(prefix="/api/v1", tags=["manager-ui-compatibility"])
@@ -119,6 +120,7 @@ class RoundUpdate(BaseModel):
     max_minutes_per_part: int | None = Field(default=None, alias="maxMinutesPerPart", gt=0)
     max_minutes_per_day: int | None = Field(default=None, alias="maxMinutesPerDay", gt=0)
     room_types: list[Literal["NORMAL", "SEMINAR", "LAB"]] | None = Field(default=None, alias="roomTypes")
+    timeframe_id: int | None = Field(default=None, alias="timeframeId", gt=0)
 
 
 class TimeslotUpdate(BaseModel):
@@ -314,12 +316,18 @@ def _round_detail_payload(raw: dict[str, Any]) -> dict[str, Any]:
             "registration_phase": registration_phase.value,
             "result_owner_mode": raw["result_owner_mode"],
             "room_types": raw["room_types"],
+            "timeframe_id": str(raw["timeframe_id"]) if raw.get("timeframe_id") is not None else None,
+            "timeframe_version_id": str(raw["timeframe_version_id"]) if raw.get("timeframe_version_id") is not None else None,
             "days": list(days_by_date.values()),
         }
     )
 
 
-@router.get("/rounds/{round_id}", response_model=RoundDetailEnvelopeResponse)
+@router.get(
+    "/rounds/{round_id}",
+    response_model=RoundDetailEnvelopeResponse,
+    response_model_exclude_none=True,
+)
 def get_round_detail(round_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     return _round_detail_payload(_load_round_detail(round_id, db))
@@ -333,14 +341,14 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
         return _round_detail_payload(_load_round_detail(round_id, db))
     if values.get("start_date") and values.get("end_date") and values["end_date"] < values["start_date"]:
         raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
-    columns = {"start_date", "end_date", "session_duration_minutes", "reviewer_count", "result_owner_mode", "group_selection_mode", "registration_deadline", "group_preference_deadline", "h12_sessions_per_part", "h12_sessions_per_day", "h12_semester_quota", "max_groups_per_timeslot", "max_minutes_per_part", "max_minutes_per_day"}
+    columns = {"start_date", "end_date", "session_duration_minutes", "reviewer_count", "result_owner_mode", "group_selection_mode", "registration_deadline", "group_preference_deadline", "h12_sessions_per_part", "h12_sessions_per_day", "h12_semester_quota", "max_groups_per_timeslot", "max_minutes_per_part", "max_minutes_per_day", "timeframe_id"}
     assignments = [f"{key} = :{key}" for key in values if key in columns]
     if not assignments and "room_types" not in values:
         raise HTTPException(status_code=422, detail={"code": "ROUND_UPDATE_EMPTY", "message": "No editable round fields supplied."})
     values["id"] = round_id
     with db.begin():
         ensure_round_semester_writable(db, round_id)
-        current_round = db.execute(text("SELECT status, type, reviewer_count, result_owner_mode, group_selection_mode, registration_deadline, group_preference_deadline, start_date, end_date FROM rounds WHERE id = :id FOR UPDATE"), {"id": round_id}).mappings().one_or_none()
+        current_round = db.execute(text("SELECT status, type, reviewer_count, result_owner_mode, group_selection_mode, registration_deadline, group_preference_deadline, start_date, end_date, session_duration_minutes, timeframe_id, timeframe_version_id FROM rounds WHERE id = :id FOR UPDATE"), {"id": round_id}).mappings().one_or_none()
         if current_round is None:
             raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
         if str(current_round["status"]) not in {"DRAFT", "OPEN_REGISTRATION"}:
@@ -359,6 +367,56 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
             for field_name, deadline in (("registration_deadline", merged_registration_deadline), ("group_preference_deadline", merged_group_preference_deadline)):
                 if deadline is not None and not (merged_start <= deadline.date() <= merged_end):
                     raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": f"{field_name} must fall within start_date and end_date."})
+        requested_timeframe = values.get("timeframe_id", current_round["timeframe_id"])
+        timeframe_changed = "timeframe_id" in values and values["timeframe_id"] != current_round["timeframe_id"]
+        if "timeframe_id" in values and values["timeframe_id"] is None and current_round["timeframe_id"] is not None:
+            raise HTTPException(status_code=409, detail={"code": "ROUND_TIMEFRAME_UNBIND_NOT_ALLOWED", "message": "A Round with generated Timeframe slots cannot be unbound from its Timeframe."})
+        timeframe_version_id = current_round["timeframe_version_id"]
+        generated_timeframe = None
+        regenerate_timeframe = False
+        if requested_timeframe is not None:
+            if timeframe_changed or current_round["timeframe_id"] is None:
+                timeframe_version_id, generated_timeframe = load_timeframe_template(
+                    db,
+                    timeframe_id=int(requested_timeframe),
+                )
+            else:
+                timeframe_version_id, generated_timeframe = load_timeframe_template(
+                    db,
+                    timeframe_id=int(requested_timeframe),
+                    version_id=int(current_round["timeframe_version_id"]),
+                )
+            merged_duration = values.get("session_duration_minutes", current_round["session_duration_minutes"])
+            if merged_duration != generated_timeframe.group_duration_minutes:
+                raise HTTPException(status_code=422, detail={"code": "TIMEFRAME_SESSION_DURATION_MISMATCH", "message": "Round duration must equal the Timeframe group duration."})
+            regenerate_timeframe = timeframe_changed or "start_date" in values or "end_date" in values
+        if regenerate_timeframe:
+            if str(current_round["status"]) != "DRAFT":
+                raise HTTPException(status_code=409, detail={"code": "ROUND_TIMEFRAME_LOCKED", "message": "Timeframe-generated slots can only be regenerated while the Round is DRAFT."})
+            dependent_slots = db.execute(
+                text(
+                    "SELECT (SELECT COUNT(*) FROM lecturer_availabilities WHERE round_id = :id) "
+                    "+ (SELECT COUNT(*) FROM group_slot_preferences WHERE round_id = :id)"
+                ),
+                {"id": round_id},
+            ).scalar_one()
+            if int(dependent_slots) > 0:
+                raise HTTPException(status_code=409, detail={"code": "ROUND_TIMEFRAME_REGENERATION_BLOCKED", "message": "Cannot regenerate Timeframe slots after availability or group preferences exist."})
+            db.execute(text("DELETE FROM round_days WHERE round_id = :id"), {"id": round_id})
+            if generated_timeframe is None:
+                raise HTTPException(status_code=422, detail={"code": "TIMEFRAME_NOT_FOUND", "message": "The selected Timeframe does not have a usable revision."})
+            merged_start = values.get("start_date", current_round["start_date"])
+            merged_end = values.get("end_date", current_round["end_date"])
+            _insert_timeframe_slots(
+                db,
+                round_id=round_id,
+                start_date=merged_start,
+                end_date=merged_end,
+                generated=generated_timeframe,
+            )
+        if timeframe_changed:
+            values["timeframe_version_id"] = timeframe_version_id
+            assignments.append("timeframe_version_id = :timeframe_version_id")
         try:
             validate_round_configuration({"type": str(current_round["type"]), "reviewer_count": values.get("reviewer_count", current_round["reviewer_count"]), "result_owner_mode": values.get("result_owner_mode", current_round["result_owner_mode"]), "groups": [1], "timeslots": [1], "rooms": [1]})
         except DomainError as exc:

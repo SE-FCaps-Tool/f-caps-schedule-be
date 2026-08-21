@@ -1,5 +1,6 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal, Self
+from zoneinfo import ZoneInfo
 
 from argon2 import PasswordHasher
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -73,6 +74,7 @@ from app.services.semester_queries import (
     semester_or_404,
     semester_rows,
 )
+from app.services.timeframe_service import load_timeframe_template
 
 router = APIRouter(prefix="/api/v1", tags=["management"])
 Db = Annotated[Session, Depends(get_db)]
@@ -159,6 +161,8 @@ class SemesterTransitionPayload(BaseModel):
 
 
 class RoundCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     semester_id: int = Field(gt=0)
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
@@ -177,6 +181,7 @@ class RoundCreate(BaseModel):
     max_groups_per_timeslot: int | None = Field(default=None, gt=0)
     max_minutes_per_part: int | None = Field(default=None, gt=0)
     max_minutes_per_day: int | None = Field(default=None, gt=0)
+    timeframe_id: int | None = Field(default=None, alias="timeframeId", gt=0)
     soft_weights: dict[str, int] = Field(default_factory=dict)
     room_types: list[Literal["NORMAL", "SEMINAR", "LAB"]] = Field(min_length=1)
 
@@ -233,6 +238,54 @@ class SlotCreate(BaseModel):
 class RoundDayCreate(BaseModel):
     day_date: date
     slots: list[SlotCreate] = Field(min_length=1)
+
+
+_ROUND_TIMEFRAME_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def _insert_timeframe_slots(
+    db: Session,
+    *,
+    round_id: int,
+    start_date: date,
+    end_date: date,
+    generated: Any,
+) -> None:
+    """Materialize every Timeframe groupSlot as one Round timeslot per day."""
+    current = start_date
+    while current <= end_date:
+        day_id = db.execute(
+            text(
+                "INSERT INTO round_days (round_id, day_date) "
+                "VALUES (:round_id, :day_date) RETURNING id"
+            ),
+            {"round_id": round_id, "day_date": current},
+        ).scalar_one()
+        for block in generated.blocks:
+            for slot in block.group_slots:
+                start_at = datetime.combine(
+                    current,
+                    slot.start_time,
+                    tzinfo=_ROUND_TIMEFRAME_TIMEZONE,
+                )
+                end_at = datetime.combine(
+                    current,
+                    slot.end_time,
+                    tzinfo=_ROUND_TIMEFRAME_TIMEZONE,
+                )
+                db.execute(
+                    text(
+                        "INSERT INTO timeslots (round_day_id, start_at, end_at, part) "
+                        "VALUES (:round_day_id, :start_at, :end_at, :part)"
+                    ),
+                    {
+                        "round_day_id": day_id,
+                        "start_at": start_at,
+                        "end_at": end_at,
+                        "part": "AM" if slot.start_time.hour < 13 else "PM",
+                    },
+                )
+        current += timedelta(days=1)
 
 
 class AvailabilitySubmit(BaseModel):
@@ -1200,6 +1253,7 @@ def list_rounds(db: Db, user: User, semester_id: int | None = None) -> list[dict
                     group_preference_deadline,
                     h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
                     max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights,
+                    timeframe_id, timeframe_version_id,
                     COALESCE((SELECT array_agg(rrt.room_type::text ORDER BY rrt.room_type::text)
                               FROM round_room_types rrt WHERE rrt.round_id = rounds.id), ARRAY[]::text[]) AS room_types
              FROM rounds WHERE (CAST(:semester_id AS BIGINT) IS NULL OR semester_id = CAST(:semester_id AS BIGINT)) ORDER BY id DESC
@@ -1226,6 +1280,11 @@ def create_round_with_days(
 ) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
     try:
+        if payload.timeframe_id is not None and days:
+            raise DomainError(
+                "ROUND_TIMEFRAME_DAYS_CONFLICT",
+                "Provide either timeframeId or explicit days, not both.",
+            )
         validate_round_configuration(
             {
                 "type": payload.type,
@@ -1248,6 +1307,18 @@ def create_round_with_days(
                     "SEMESTER_NOT_ACTIVE",
                     "Evaluation Rounds may only be created in an ACTIVE semester.",
                 )
+            timeframe_version_id: int | None = None
+            generated_timeframe = None
+            if payload.timeframe_id is not None:
+                timeframe_version_id, generated_timeframe = load_timeframe_template(
+                    db,
+                    timeframe_id=payload.timeframe_id,
+                )
+                if payload.session_duration_minutes != generated_timeframe.group_duration_minutes:
+                    raise DomainError(
+                        "TIMEFRAME_SESSION_DURATION_MISMATCH",
+                        "Round duration must equal the Timeframe group duration.",
+                    )
             row = db.execute(
                 text(
                     """
@@ -1256,29 +1327,45 @@ def create_round_with_days(
                          group_preference_deadline,
                          session_duration_minutes, start_date, end_date, registration_deadline,
                          h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
-                         max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights, created_by
+                         max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights,
+                         timeframe_id, timeframe_version_id, created_by
                     ) VALUES (
                         :semester_id, :name, :description, :type, :reviewer_count, :result_owner_mode, :group_selection_mode,
                          :group_preference_deadline,
                          :session_duration_minutes, :start_date, :end_date, :registration_deadline,
                          :h12_sessions_per_part, :h12_sessions_per_day, :h12_semester_quota,
-                         :max_groups_per_timeslot, :max_minutes_per_part, :max_minutes_per_day, CAST(:soft_weights AS JSONB), :created_by
+                         :max_groups_per_timeslot, :max_minutes_per_part, :max_minutes_per_day,
+                         CAST(:soft_weights AS JSONB), :timeframe_id, :timeframe_version_id, :created_by
                     )
                     RETURNING id, semester_id, name, description, type, status, reviewer_count, result_owner_mode, group_selection_mode,
                                session_duration_minutes, start_date, end_date, registration_deadline,
                                group_preference_deadline,
                                h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota,
-                               max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights
+                                max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights,
+                                timeframe_id, timeframe_version_id
                     """
                 ),
-                {**payload.model_dump(), "soft_weights": _json(payload.soft_weights), "created_by": _actor_id(db, user)},
+                {
+                    **payload.model_dump(),
+                    "soft_weights": _json(payload.soft_weights),
+                    "timeframe_version_id": timeframe_version_id,
+                    "created_by": _actor_id(db, user),
+                },
             ).mappings().one()
             for room_type in payload.room_types:
                 db.execute(
                     text("INSERT INTO round_room_types (round_id, room_type) VALUES (:round_id, CAST(:room_type AS room_type)) ON CONFLICT DO NOTHING"),
                     {"round_id": row["id"], "room_type": room_type},
                 )
-            if days:
+            if generated_timeframe is not None:
+                _insert_timeframe_slots(
+                    db,
+                    round_id=int(row["id"]),
+                    start_date=payload.start_date,
+                    end_date=payload.end_date,
+                    generated=generated_timeframe,
+                )
+            elif days:
                 for day in days:
                     if not (payload.start_date <= day.day_date <= payload.end_date):
                         raise DomainError("TIMESLOT_OUT_OF_RANGE", "A round day must fall within start_date and end_date.")
@@ -1300,7 +1387,7 @@ def create_round_with_days(
                             },
                         )
             row = {**dict(row), "room_types": list(payload.room_types)}
-            db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'ROUND_CREATED', 'round', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(row["id"]), "after_json": _json(payload.model_dump())})
+            db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'ROUND_CREATED', 'round', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(row["id"]), "after_json": _json({**payload.model_dump(), "timeframeVersionId": timeframe_version_id})})
     except DomainError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
     except IntegrityError as exc:

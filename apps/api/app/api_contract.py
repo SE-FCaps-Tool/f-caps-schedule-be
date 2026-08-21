@@ -90,12 +90,17 @@ def _op(
     roles: tuple[str, ...] = ("MANAGER",),
     paginated: bool = False,
     alias_of: str | None = None,
+    success_status: int | None = None,
 ) -> ApiOperation:
     return ApiOperation(
         method=method,
         path=path,
         request_body_schema="none" if method == "GET" else "json",
-        success_status=201 if method == "POST" and path.endswith("/invitations") else 200,
+        success_status=(
+            success_status
+            if success_status is not None
+            else 201 if method == "POST" and path.endswith("/invitations") else 200
+        ),
         success_schema=schema,
         roles=roles,
         paginated=paginated,
@@ -172,6 +177,15 @@ TARGET_OPERATIONS: tuple[ApiOperation, ...] = (
 # explicitly declared in the implementation spec.
 CHECKLIST_OPERATIONS: tuple[ApiOperation, ...] = (
     _op("GET", "/api/v1/semesters/{semesterId}/remediations", schema="array", paginated=True),
+    _op("POST", "/api/v1/timeframes/preview"),
+    _op("POST", "/api/v1/timeframes/manual/preview"),
+    _op("POST", "/api/v1/timeframes", success_status=201),
+    _op("POST", "/api/v1/timeframes/manual", success_status=201),
+    _op("GET", "/api/v1/timeframes", schema="array"),
+    _op("GET", "/api/v1/timeframes/{timeframeId}"),
+    _op("PATCH", "/api/v1/timeframes/{timeframeId}"),
+    _op("PATCH", "/api/v1/timeframes/{timeframeId}/manual"),
+    _op("DELETE", "/api/v1/timeframes/{timeframeId}"),
 )
 
 

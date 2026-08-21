@@ -9,7 +9,7 @@ transition so older response fields remain backward compatible.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -253,6 +253,8 @@ class RoundResponse(ResponseModel):
     max_groups_per_timeslot: int | None = None
     max_minutes_per_part: int | None = None
     max_minutes_per_day: int | None = None
+    timeframe_id: int | None = None
+    timeframe_version_id: int | None = None
     soft_weights: dict[str, int] = Field(default_factory=dict)
     room_types: list[str] = Field(default_factory=list)
 
@@ -356,6 +358,8 @@ class RoundDetailContractResponse(ResponseModel):
     group_preference_deadline: datetime | None = Field(default=None, alias="groupPreferenceDeadline")
     result_owner_mode: bool = Field(alias="resultOwnerMode")
     room_types: list[str] = Field(default_factory=list, alias="roomTypes")
+    timeframe_id: str | None = Field(default=None, alias="timeframeId")
+    timeframe_version_id: str | None = Field(default=None, alias="timeframeVersionId")
     days: list[RoundDetailDayContractResponse] = Field(default_factory=list)
 
 
@@ -830,3 +834,122 @@ class RoundDayCreateResponse(ResponseModel):
     round_id: int
     day_id: int
     timeslot_ids: list[int] = Field(default_factory=list)
+
+
+class TimeframeRevisionResponse(ResponseModel):
+    id: int
+    version_number: int = Field(alias="versionNumber")
+    status: str
+    start_time: time = Field(alias="startTime")
+    end_time: time = Field(alias="endTime")
+    block_duration_minutes: int | None = Field(alias="blockDurationMinutes")
+    group_duration_minutes: int = Field(alias="groupDurationMinutes")
+    break_between_blocks_minutes: int | None = Field(alias="breakBetweenBlocksMinutes")
+    manual_timelines: list[TimeframeManualTimelineResponse] | None = Field(
+        default=None,
+        alias="manualTimelines",
+    )
+    break_windows: list[TimeframeBreakWindowResponse] = Field(
+        default_factory=list,
+        alias="breakWindows",
+    )
+    change_reason: str | None = Field(default=None, alias="changeReason")
+    created_by: int | None = Field(default=None, alias="createdBy")
+    created_at: datetime = Field(alias="createdAt")
+
+
+class TimeframeGroupSlotResponse(ResponseModel):
+    sequence_number: int = Field(alias="sequenceNumber")
+    start_time: time = Field(alias="startTime")
+    end_time: time = Field(alias="endTime")
+
+
+class TimeframeManualTimelineResponse(ResponseModel):
+    start_time: time = Field(alias="startTime")
+    end_time: time = Field(alias="endTime")
+    groups_per_slot: int = Field(alias="groupsPerSlot")
+
+
+class TimeframeBreakWindowResponse(ResponseModel):
+    name: str
+    start_time: time = Field(alias="startTime")
+    end_time: time = Field(alias="endTime")
+
+
+class TimeframeBlockResponse(ResponseModel):
+    sequence_number: int = Field(alias="sequenceNumber")
+    start_time: time = Field(alias="startTime")
+    end_time: time = Field(alias="endTime")
+    duration_minutes: int = Field(alias="durationMinutes")
+    groups_per_block: int = Field(alias="groupsPerBlock")
+    group_duration_minutes: int = Field(alias="groupDurationMinutes")
+    group_slots: list[TimeframeGroupSlotResponse] = Field(alias="groupSlots")
+
+
+class TimeframeResponse(ResponseModel):
+    id: int
+    name: str
+    type: str
+    archived_at: datetime | None = Field(default=None, alias="archivedAt")
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+    version: dict[str, Any]
+    revisions: list[TimeframeRevisionResponse] = Field(default_factory=list)
+    start_time: time = Field(alias="startTime")
+    end_time: time = Field(alias="endTime")
+    block_duration_minutes: int | None = Field(alias="blockDurationMinutes")
+    group_duration_minutes: int = Field(alias="groupDurationMinutes")
+    break_between_blocks_minutes: int | None = Field(alias="breakBetweenBlocksMinutes")
+    manual_timelines: list[TimeframeManualTimelineResponse] | None = Field(
+        default=None,
+        alias="manualTimelines",
+    )
+    break_windows: list[TimeframeBreakWindowResponse] = Field(
+        default_factory=list,
+        alias="breakWindows",
+    )
+    blocks_per_day: int = Field(alias="blocksPerDay")
+    groups_per_block: int | None = Field(alias="groupsPerBlock")
+    capacity_per_day: int = Field(alias="capacityPerDay")
+    unused_minutes: int = Field(alias="unusedMinutes")
+    break_window_minutes: int = Field(alias="breakWindowMinutes")
+    applied_block_break_minutes: int = Field(alias="appliedBlockBreakMinutes")
+    total_break_minutes: int = Field(alias="totalBreakMinutes")
+    blocks: list[TimeframeBlockResponse] = Field(default_factory=list)
+
+
+class TimeframeEnvelopeResponse(ResponseModel):
+    data: TimeframeResponse
+
+
+class TimeframeListEnvelopeResponse(ResponseModel):
+    data: list[TimeframeResponse] = Field(default_factory=list)
+    meta: dict[str, int]
+
+
+class TimeframePreviewResponse(ResponseModel):
+    start_time: time = Field(alias="startTime")
+    end_time: time = Field(alias="endTime")
+    block_duration_minutes: int | None = Field(alias="blockDurationMinutes")
+    group_duration_minutes: int = Field(alias="groupDurationMinutes")
+    break_between_blocks_minutes: int | None = Field(alias="breakBetweenBlocksMinutes")
+    manual_timelines: list[TimeframeManualTimelineResponse] | None = Field(
+        default=None,
+        alias="manualTimelines",
+    )
+    break_windows: list[TimeframeBreakWindowResponse] = Field(
+        default_factory=list,
+        alias="breakWindows",
+    )
+    blocks_per_day: int = Field(alias="blocksPerDay")
+    groups_per_block: int | None = Field(alias="groupsPerBlock")
+    capacity_per_day: int = Field(alias="capacityPerDay")
+    unused_minutes: int = Field(alias="unusedMinutes")
+    break_window_minutes: int = Field(alias="breakWindowMinutes")
+    applied_block_break_minutes: int = Field(alias="appliedBlockBreakMinutes")
+    total_break_minutes: int = Field(alias="totalBreakMinutes")
+    blocks: list[TimeframeBlockResponse] = Field(default_factory=list)
+
+
+class TimeframePreviewEnvelopeResponse(ResponseModel):
+    data: TimeframePreviewResponse

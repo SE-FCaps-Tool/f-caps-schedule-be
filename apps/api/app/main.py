@@ -31,6 +31,7 @@ from .routes.target_results_remediation import router as target_results_remediat
 from .routes.target_room_publish import router as target_room_publish_router
 from .routes.target_round_contract import router as target_round_contract_router
 from .routes.target_schedule_contract import router as target_schedule_contract_router
+from .routes.target_timeframe_contract import router as target_timeframe_contract_router
 from .services.route_telemetry import record_route_usage
 
 
@@ -120,6 +121,7 @@ def create_app() -> FastAPI:
     app.include_router(target_group_project_router)
     app.include_router(target_round_contract_router)
     app.include_router(target_schedule_contract_router)
+    app.include_router(target_timeframe_contract_router)
     app.include_router(target_room_publish_router)
     app.include_router(target_operations_router)
     app.include_router(target_results_remediation_router)

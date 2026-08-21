@@ -113,10 +113,32 @@ class TargetRoundCreate(BaseModel):
     group_preference_deadline: datetime | None = Field(default=None, alias="groupPreferenceDeadline")
     result_owner_mode: bool = Field(alias="resultOwnerMode")
     room_types: list[str] = Field(alias="roomTypes", min_length=1)
-    days: list[TargetRoundDay] = Field(min_length=1)
+    timeframe_id: int | None = Field(default=None, alias="timeframeId", gt=0)
+    start_date: date | None = Field(default=None, alias="startDate")
+    end_date: date | None = Field(default=None, alias="endDate")
+    days: list[TargetRoundDay] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_days(self) -> TargetRoundCreate:
+        if self.timeframe_id is None and not self.days:
+            raise ValueError("Either timeframeId or days must be supplied")
+        if self.timeframe_id is not None and self.days:
+            raise ValueError("Provide either timeframeId or days, not both")
+        if self.timeframe_id is not None:
+            if self.start_date is None or self.end_date is None:
+                raise ValueError("startDate and endDate are required with timeframeId")
+            if self.end_date < self.start_date:
+                raise ValueError("endDate must be on or after startDate")
+            for deadline_name, deadline in (
+                ("registrationDeadline", self.registration_deadline),
+                ("groupPreferenceDeadline", self.group_preference_deadline),
+            ):
+                if deadline is not None and not (
+                    self.start_date <= deadline.date() <= self.end_date
+                ):
+                    raise ValueError(
+                        f"{deadline_name} must fall within startDate and endDate"
+                    )
         expected_reviewers = {
             "REVIEW_1": 2,
             "REVIEW_2": 2,
@@ -171,6 +193,10 @@ class TargetRoundCreate(BaseModel):
             for day in self.days
         ]
         boundary_dates = [day.day_date for day in self.days]
+        if self.start_date is not None:
+            boundary_dates.append(self.start_date)
+        if self.end_date is not None:
+            boundary_dates.append(self.end_date)
         boundary_dates.append(self.registration_deadline.date())
         if self.group_preference_deadline is not None:
             boundary_dates.append(self.group_preference_deadline.date())
@@ -189,6 +215,7 @@ class TargetRoundCreate(BaseModel):
             registration_deadline=self.registration_deadline.isoformat(),
             max_groups_per_timeslot=self.max_groups_per_timeslot,
             room_types=self.room_types,
+            timeframe_id=self.timeframe_id,
         )
         return legacy, days
 
