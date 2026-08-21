@@ -64,6 +64,41 @@ return response.data.data;
 
 Không cần adapter snake_case ở FE.
 
+### Cập nhật Round
+
+```http
+PATCH /api/v1/rounds/:roundId
+```
+
+Path dùng cùng format với `GET /api/v1/rounds/:roundId`, không truyền
+`semester_id` query và không dùng `round_id` khác tên trên URL. Body nhận các
+field camelCase tương ứng với Round Detail; mọi field đều optional:
+
+```json
+{
+  "durationMinutes": 75,
+  "reviewerCount": 2,
+  "groupSelectionMode": true,
+  "groupPreferenceDeadline": "2030-01-21T16:59:00Z",
+  "roomTypes": ["NORMAL"]
+}
+```
+
+Response `200` dùng chính xác cùng envelope và shape với GET:
+
+```json
+{
+  "data": {
+    "id": "85",
+    "durationMinutes": 75
+  }
+}
+```
+
+Round chỉ được cập nhật khi ở trạng thái `DRAFT` hoặc `OPEN_REGISTRATION`.
+Sau khi PATCH, FE có thể dùng trực tiếp response; không cần adapter snake_case
+hoặc gọi lại GET chỉ để đổi shape.
+
 ## 2. Hai giai đoạn đăng ký tuần tự
 
 Round vẫn dùng một trạng thái `OPEN_REGISTRATION`. BE suy ra giai đoạn hiện tại

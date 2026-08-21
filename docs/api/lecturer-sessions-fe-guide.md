@@ -194,3 +194,115 @@ Ngoài ra, response hiện không trả reviewer/council member details. FE ch�
 - [ ] Parse `startAt`/`endAt` theo timezone thay vì cắt chuỗi thủ công.
 - [ ] Có loading, empty, `401`, `403`, network error và retry state.
 - [ ] Không thêm pagination UI dựa trên `meta` ở phiên bản API hiện tại.
+
+## 10. Flow trước khi có Lecturer Session
+
+Session chỉ xuất hiện sau khi round được chạy scheduler. Flow chuẩn của màn hình
+Lecturer là:
+
+```text
+Manager gửi invitation
+→ Lecturer xem invitation
+→ Lecturer accept invitation
+→ Lecturer chọn availability
+→ Group Leader chọn timeslot cho group
+→ Manager chạy scheduler
+→ Lecturer xem session tại GET /lecturer/me/sessions
+```
+
+Lecturer phải accept invitation trước khi submit availability. Nếu chưa accept,
+backend từ chối request chọn availability.
+
+### 10.1 Xem invitation
+
+```http
+GET /api/v1/lecturer/me/invitations
+```
+
+Backend tự lấy Lecturer từ session hiện tại. FE không truyền `lecturerId`.
+
+### 10.2 Accept hoặc decline invitation
+
+```http
+POST /api/v1/rounds/{roundId}/invitations/me/respond
+Content-Type: application/json
+```
+
+Accept:
+
+```json
+{
+  "decision": "ACCEPTED"
+}
+```
+
+Decline:
+
+```json
+{
+  "decision": "DECLINED",
+  "reason": "Không thể tham gia round này"
+}
+```
+
+Chỉ sau response `ACCEPTED` FE mới nên mở form availability.
+
+### 10.3 Lecturer chọn availability
+
+```http
+PUT /api/v1/rounds/{roundId}/availability/me
+Content-Type: application/json
+```
+
+```json
+{
+  "preferredLoad": "MEDIUM",
+  "slots": [
+    { "timeslotId": 101, "available": true },
+    { "timeslotId": 102, "available": false }
+  ]
+}
+```
+
+Request này chỉ dành cho role `LECTURER` và chỉ hợp lệ sau khi invitation đã ở
+trạng thái `ACCEPTED`.
+
+### 10.4 Student/Group Leader chọn slot cho group
+
+Đây không phải availability cá nhân của Student. Active Group Leader chọn slot
+phù hợp cho toàn group:
+
+```http
+PUT /api/v1/rounds/{roundId}/groups/{groupId}/preferences
+Content-Type: application/json
+```
+
+```json
+{
+  "timeslotIds": [101, 103]
+}
+```
+
+Chỉ active Group Leader được sửa preference của group. Khi
+`groupSelectionMode = true`, scheduler chỉ chọn slot nằm trong preference của
+group đó.
+
+### 10.5 Scheduler dùng dữ liệu của hai phía
+
+Một candidate chỉ hợp lệ khi đồng thời thỏa:
+
+```text
+group selected slot
+∩
+accepted Lecturer availability
+```
+
+Sau khi scheduler tạo và publish schedule, Lecturer mới đọc lịch chính thức từ
+`GET /api/v1/lecturer/me/sessions`.
+
+FE nên xử lý các trạng thái chính:
+
+- `PENDING`: hiển thị nút Accept/Decline, chưa hiển thị form availability.
+- `ACCEPTED`: hiển thị form availability.
+- `DECLINED` hoặc `EXPIRED`: khóa form availability.
+- Availability submit trước khi accept: hiển thị lỗi và yêu cầu accept invitation.

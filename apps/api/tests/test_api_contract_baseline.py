@@ -4,7 +4,7 @@ from app.api_contract import TARGET_OPERATIONS, error_payload, success_payload
 def test_target_registry_contains_unique_complete_operations():
     keys = [(operation.method, operation.path) for operation in TARGET_OPERATIONS]
 
-    assert len(TARGET_OPERATIONS) == 53
+    assert len(TARGET_OPERATIONS) == 54
     assert len(set(keys)) == len(keys)
     for operation in TARGET_OPERATIONS:
         assert operation.method in {"GET", "POST", "PUT", "PATCH", "DELETE"}

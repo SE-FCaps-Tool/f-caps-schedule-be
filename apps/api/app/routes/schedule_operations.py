@@ -125,6 +125,100 @@ def _actor_id(db: Session, user: CurrentUser) -> int | None:
     ).scalar_one_or_none()
 
 
+def _validate_scheduler_inputs(db: Session, round_id: int, required_reviewer_count: int) -> None:
+    """Raise a precise error before moving a round into scheduler state."""
+    group_rows = db.execute(
+        text(
+            "SELECT g.id, g.project_id, "
+            "COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_count "
+            "FROM round_groups rg JOIN groups g ON g.id = rg.group_id "
+            "LEFT JOIN group_memberships gm ON gm.group_id = g.id "
+            "WHERE rg.round_id = :round_id GROUP BY g.id, g.project_id ORDER BY g.id"
+        ),
+        {"round_id": round_id},
+    ).mappings().all()
+    if not group_rows:
+        raise DomainError(
+            "ROUND_GROUPS_REQUIRED",
+            "Register at least one group in this round before running the scheduler.",
+        )
+
+    timeslot_ids = list(
+        db.execute(
+            text(
+                "SELECT ts.id FROM timeslots ts "
+                "JOIN round_days rd ON rd.id = ts.round_day_id "
+                "WHERE rd.round_id = :round_id AND ts.active = TRUE ORDER BY ts.id"
+            ),
+            {"round_id": round_id},
+        ).scalars()
+    )
+    if not timeslot_ids:
+        raise DomainError(
+            "ROUND_TIMESLOTS_REQUIRED",
+            "Add at least one active timeslot to this round before running the scheduler.",
+        )
+
+    missing_projects = [int(row["id"]) for row in group_rows if row["project_id"] is None]
+    if missing_projects:
+        raise DomainError(
+            "ROUND_GROUP_PROJECT_REQUIRED",
+            f"Groups {missing_projects} have no project assigned. Assign a project before scheduling.",
+        )
+
+    invalid_leaders = [
+        {"group_id": int(row["id"]), "active_leader_count": int(row["leader_count"])}
+        for row in group_rows
+        if int(row["leader_count"]) != 1
+    ]
+    if invalid_leaders:
+        raise DomainError(
+            "ROUND_GROUP_LEADER_INVALID",
+            "Each scheduled group must have exactly one active Project Leader. "
+            f"Invalid groups: {invalid_leaders}.",
+        )
+
+    accepted_reviewers = set(
+        db.execute(
+            text(
+                "SELECT lecturer_id FROM round_invitations "
+                "WHERE round_id = :round_id AND status = 'ACCEPTED'"
+            ),
+            {"round_id": round_id},
+        ).scalars()
+    )
+    available_reviewers = set(
+        db.execute(
+            text(
+                "SELECT DISTINCT lecturer_id FROM lecturer_availabilities "
+                "WHERE round_id = :round_id AND state = 'AVAILABLE' "
+                "AND timeslot_id = ANY(:timeslot_ids)"
+            ),
+            {"round_id": round_id, "timeslot_ids": timeslot_ids},
+        ).scalars()
+    )
+
+    if accepted_reviewers:
+        if len(accepted_reviewers) < required_reviewer_count:
+            raise DomainError(
+                "ROUND_REVIEWERS_ACCEPTANCE_REQUIRED",
+                f"This {required_reviewer_count}-Reviewer round has only {len(accepted_reviewers)} accepted invitation(s). "
+                f"Accept {required_reviewer_count - len(accepted_reviewers)} more Reviewer invitation(s).",
+            )
+        available_accepted = accepted_reviewers & available_reviewers
+        if len(available_accepted) < required_reviewer_count:
+            raise DomainError(
+                "ROUND_REVIEWER_AVAILABILITY_REQUIRED",
+                f"Only {len(available_accepted)} of {required_reviewer_count} accepted Reviewer(s) have availability on an active round timeslot. "
+                "Collect availability for the accepted Reviewers before scheduling.",
+            )
+    elif len(available_reviewers) < required_reviewer_count:
+        raise DomainError(
+            "ROUND_REVIEWERS_INSUFFICIENT",
+            f"This round requires {required_reviewer_count} Reviewer(s), but only {len(available_reviewers)} Lecturer(s) have availability on an active round timeslot.",
+        )
+
+
 def _queue_schedule_changed(
     db: Session,
     recipient_ids: set[int],
@@ -601,26 +695,18 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
             current_status = RoundStatus(round_row["status"])
             if current_status is not RoundStatus.SCHEDULING:
                 next_status = transition_round(current_status, RoundStatus("SCHEDULING"))
-                counts = db.execute(
-                    text(
-                        "SELECT "
-                        "(SELECT COUNT(*) FROM round_groups WHERE round_id = :round_id) AS groups, "
-                        "(SELECT COUNT(*) FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id WHERE rd.round_id = :round_id) AS timeslots, "
-                        "(SELECT COUNT(*) FROM round_invitations WHERE round_id = :round_id AND status = 'ACCEPTED') AS accepted_reviewers, "
-                        "(SELECT COUNT(DISTINCT lecturer_id) FROM lecturer_availabilities WHERE round_id = :round_id AND state = 'AVAILABLE') AS available_reviewers"
-                    ),
-                    {"round_id": round_id},
-                ).mappings().one()
-                reviewer_count = counts["accepted_reviewers"] or counts["available_reviewers"]
-                if not counts["groups"] or not counts["timeslots"] or reviewer_count < round_row["reviewer_count"]:
-                    raise DomainError("ROUND_INPUTS_INCOMPLETE", "Round needs groups, timeslots and enough available Reviewers before scheduling.")
+                _validate_scheduler_inputs(db, round_id, round_row["reviewer_count"])
                 db.execute(
                     text("UPDATE rounds SET status = CAST(:status AS round_status) WHERE id = :round_id"),
                     {"status": next_status.value, "round_id": round_id},
                 )
             context, groups, timeslots, reviewers = _round_input(db, round_id)
-            if not groups or not timeslots or not reviewers:
-                raise DomainError("ROUND_INPUTS_INCOMPLETE", "Round needs groups, timeslots and at least one available Reviewer before scheduling.")
+            if not groups:
+                raise DomainError("ROUND_GROUPS_REQUIRED", "Register at least one group in this round before running the scheduler.")
+            if not timeslots:
+                raise DomainError("ROUND_TIMESLOTS_REQUIRED", "Add at least one active timeslot to this round before running the scheduler.")
+            if not reviewers:
+                raise DomainError("ROUND_REVIEWERS_INSUFFICIENT", "No Reviewer is available on an active round timeslot.")
             result = solve_schedule(
                 context,
                 groups=groups,
@@ -729,8 +815,12 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
         }
     except (DomainError, IntegrityError) as exc:
         if isinstance(exc, DomainError):
+            message = str(exc)
+            prefix = f"{exc.code}: "
+            if message.startswith(prefix):
+                message = message[len(prefix) :]
             raise HTTPException(
-                status_code=422, detail={"code": exc.code, "message": str(exc)}
+                status_code=422, detail={"code": exc.code, "message": message}
             ) from exc
         raise HTTPException(
             status_code=409,

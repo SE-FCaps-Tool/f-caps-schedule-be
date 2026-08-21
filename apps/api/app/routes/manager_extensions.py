@@ -43,7 +43,6 @@ from app.response_models import (
     RescheduleRequestResponse,
     ResultResponse,
     RoundDetailEnvelopeResponse,
-    RoundDetailResponse,
     RoundGroupResponse,
     SemesterResponse,
     SessionResponse,
@@ -103,21 +102,23 @@ class GroupUpdate(BaseModel):
 
 
 class RoundUpdate(BaseModel):
-    start_date: date | None = None
-    end_date: date | None = None
-    session_duration_minutes: int | None = Field(default=None, gt=0, le=480)
-    reviewer_count: int | None = Field(default=None, gt=0)
-    result_owner_mode: bool | None = None
-    group_selection_mode: bool | None = None
-    registration_deadline: datetime | None = None
-    group_preference_deadline: datetime | None = None
-    h12_sessions_per_part: int | None = Field(default=None, gt=0)
-    h12_sessions_per_day: int | None = Field(default=None, gt=0)
-    h12_semester_quota: int | None = Field(default=None, gt=0)
-    max_groups_per_timeslot: int | None = Field(default=None, gt=0)
-    max_minutes_per_part: int | None = Field(default=None, gt=0)
-    max_minutes_per_day: int | None = Field(default=None, gt=0)
-    room_types: list[Literal["NORMAL", "SEMINAR", "LAB"]] | None = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    start_date: date | None = Field(default=None, alias="startDate")
+    end_date: date | None = Field(default=None, alias="endDate")
+    session_duration_minutes: int | None = Field(default=None, alias="durationMinutes", gt=0, le=480)
+    reviewer_count: int | None = Field(default=None, alias="reviewerCount", gt=0)
+    result_owner_mode: bool | None = Field(default=None, alias="resultOwnerMode")
+    group_selection_mode: bool | None = Field(default=None, alias="groupSelectionMode")
+    registration_deadline: datetime | None = Field(default=None, alias="registrationDeadline")
+    group_preference_deadline: datetime | None = Field(default=None, alias="groupPreferenceDeadline")
+    h12_sessions_per_part: int | None = Field(default=None, alias="h12SessionsPerPart", gt=0)
+    h12_sessions_per_day: int | None = Field(default=None, alias="h12SessionsPerDay", gt=0)
+    h12_semester_quota: int | None = Field(default=None, alias="h12SemesterQuota", gt=0)
+    max_groups_per_timeslot: int | None = Field(default=None, alias="maxGroupsPerTimeslot", gt=0)
+    max_minutes_per_part: int | None = Field(default=None, alias="maxMinutesPerPart", gt=0)
+    max_minutes_per_day: int | None = Field(default=None, alias="maxMinutesPerDay", gt=0)
+    room_types: list[Literal["NORMAL", "SEMINAR", "LAB"]] | None = Field(default=None, alias="roomTypes")
 
 
 class TimeslotUpdate(BaseModel):
@@ -324,12 +325,12 @@ def get_round_detail(round_id: int, db: Db, user: User) -> dict[str, Any]:
     return _round_detail_payload(_load_round_detail(round_id, db))
 
 
-@router.patch("/rounds/{round_id}", response_model=RoundDetailResponse)
+@router.patch("/rounds/{round_id}", response_model=RoundDetailEnvelopeResponse)
 def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     values = payload.model_dump(exclude_unset=True)
     if not values:
-        return _load_round_detail(round_id, db)
+        return _round_detail_payload(_load_round_detail(round_id, db))
     if values.get("start_date") and values.get("end_date") and values["end_date"] < values["start_date"]:
         raise HTTPException(status_code=422, detail={"code": "ROUND_DATE_INVALID", "message": "end_date must be after start_date."})
     columns = {"start_date", "end_date", "session_duration_minutes", "reviewer_count", "result_owner_mode", "group_selection_mode", "registration_deadline", "group_preference_deadline", "h12_sessions_per_part", "h12_sessions_per_day", "h12_semester_quota", "max_groups_per_timeslot", "max_minutes_per_part", "max_minutes_per_day"}
@@ -373,7 +374,7 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
             db.execute(text("DELETE FROM round_room_types WHERE round_id = :id"), {"id": round_id})
             for room_type in sorted(set(room_types)):
                 db.execute(text("INSERT INTO round_room_types (round_id, room_type) VALUES (:round_id, CAST(:room_type AS room_type))"), {"round_id": round_id, "room_type": room_type})
-    return _load_round_detail(round_id, db)
+    return _round_detail_payload(_load_round_detail(round_id, db))
 
 
 @router.patch("/projects/{project_id}", response_model=ProjectMutationResponse)

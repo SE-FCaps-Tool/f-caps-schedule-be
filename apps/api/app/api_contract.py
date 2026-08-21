@@ -103,7 +103,7 @@ def _op(
     )
 
 
-# 53 target method/path declarations from the implementation spec.  Keep this
+# 54 target method/path declarations from the implementation spec.  Keep this
 # list explicit so a missing operation is visible in review and OpenAPI checks.
 TARGET_OPERATIONS: tuple[ApiOperation, ...] = (
     # Group/project resources.
@@ -121,6 +121,7 @@ TARGET_OPERATIONS: tuple[ApiOperation, ...] = (
     _op("POST", "/api/v1/semesters/{semesterId}/projects"),
     # Round lifecycle, registration, invitation, availability.
     _op("GET", "/api/v1/rounds/{roundId}"),
+    _op("PATCH", "/api/v1/rounds/{roundId}"),
     _op("GET", "/api/v1/rounds/{roundId}/eligible-projects", schema="array", paginated=True),
     _op("GET", "/api/v1/rounds/{roundId}/groups/{groupId}/preferences"),
     _op("PUT", "/api/v1/rounds/{roundId}/groups/{groupId}/preferences"),

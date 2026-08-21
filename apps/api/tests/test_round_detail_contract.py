@@ -16,6 +16,22 @@ def test_round_update_payload_supports_group_preference_deadline():
     assert payload.group_preference_deadline == deadline
 
 
+def test_round_update_payload_accepts_frontend_contract_aliases():
+    payload = RoundUpdate(
+        durationMinutes=75,
+        reviewerCount=2,
+        groupSelectionMode=True,
+        roomTypes=["NORMAL"],
+    )
+
+    assert payload.model_dump(exclude_unset=True) == {
+        "session_duration_minutes": 75,
+        "reviewer_count": 2,
+        "group_selection_mode": True,
+        "room_types": ["NORMAL"],
+    }
+
+
 @pytest.mark.integration
 def test_round_detail_matches_frontend_contract_and_groups_active_slots(client):
     headers = {"X-Test-Session": "active-manager"}
@@ -104,6 +120,22 @@ def test_round_detail_matches_frontend_contract_and_groups_active_slots(client):
                 ],
             }
         }
+
+        patch_response = client.patch(
+            f"/api/v1/rounds/{round_id}",
+            headers=headers,
+            json={"durationMinutes": 75},
+        )
+        assert patch_response.status_code == 200, patch_response.text
+
+        get_after_patch = client.get(f"/api/v1/rounds/{round_id}", headers=headers)
+        assert get_after_patch.status_code == 200, get_after_patch.text
+        assert patch_response.json() == get_after_patch.json()
+        assert patch_response.json()["data"]["durationMinutes"] == 75
+
+        empty_patch_response = client.patch(f"/api/v1/rounds/{round_id}", headers=headers, json={})
+        assert empty_patch_response.status_code == 200, empty_patch_response.text
+        assert empty_patch_response.json() == get_after_patch.json()
     finally:
         with Session(engine) as db, db.begin():
             db.execute(text("DELETE FROM rounds WHERE id = :id"), {"id": round_id})
