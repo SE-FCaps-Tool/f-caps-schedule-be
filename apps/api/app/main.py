@@ -22,6 +22,7 @@ from .routes.manager_extensions import router as manager_extensions_router
 from .routes.master_data import router as master_data_router
 from .routes.operations import router as operations_router
 from .routes.results import router as results_router
+from .routes.committee_contract import router as committee_contract_router
 from .routes.room_assignment import router as room_assignment_router
 from .routes.schedule_operations import router as schedule_operations_router
 from .routes.target_group_project import router as target_group_project_router
@@ -122,6 +123,7 @@ def create_app() -> FastAPI:
     app.include_router(target_round_contract_router)
     app.include_router(target_schedule_contract_router)
     app.include_router(target_timeframe_contract_router)
+    app.include_router(committee_contract_router)
     app.include_router(target_room_publish_router)
     app.include_router(target_operations_router)
     app.include_router(target_results_remediation_router)

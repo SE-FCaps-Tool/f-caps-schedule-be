@@ -41,19 +41,19 @@ def test_round_rejects_skipping_required_lifecycle_state():
 @pytest.mark.parametrize(
     ("defense", "outcome", "expected"),
     [
-        (DefenseType.DEFENSE_1_1, ResultOutcome.LEVEL_1, GroupStatus.ELIGIBLE_D12),
-        (DefenseType.DEFENSE_1_1, ResultOutcome.LEVEL_2, GroupStatus.D12_CONDITIONAL),
-        (DefenseType.DEFENSE_1_1, ResultOutcome.LEVEL_3, GroupStatus.PENDING_D2),
-        (DefenseType.DEFENSE_1_1, ResultOutcome.LEVEL_4, GroupStatus.FAILED),
-            (DefenseType.DEFENSE_1_2, ResultOutcome.COMPLETED, GroupStatus.COMPLETED),
+        (DefenseType.REVIEW_3, ResultOutcome.LEVEL_1, GroupStatus.ELIGIBLE_D12),
+        (DefenseType.REVIEW_3, ResultOutcome.LEVEL_2, GroupStatus.D12_CONDITIONAL),
+        (DefenseType.REVIEW_3, ResultOutcome.LEVEL_3, GroupStatus.PENDING_D2),
+        (DefenseType.REVIEW_3, ResultOutcome.LEVEL_4, GroupStatus.FAILED),
+            (DefenseType.DEFENSE_1, ResultOutcome.COMPLETED, GroupStatus.COMPLETED),
         (DefenseType.DEFENSE_2, ResultOutcome.PASS, GroupStatus.COMPLETED),
         (DefenseType.DEFENSE_2, ResultOutcome.FAIL, GroupStatus.FAILED),
     ],
 )
 def test_defense_result_transitions_group(defense, outcome, expected):
     current = {
-        DefenseType.DEFENSE_1_1: GroupStatus.PENDING_D11,
-        DefenseType.DEFENSE_1_2: GroupStatus.ELIGIBLE_D12,
+        DefenseType.REVIEW_3: GroupStatus.PENDING_D11,
+        DefenseType.DEFENSE_1: GroupStatus.ELIGIBLE_D12,
         DefenseType.DEFENSE_2: GroupStatus.PENDING_D2,
     }[defense]
     assert transition_group(current, defense, outcome) is expected
@@ -68,16 +68,16 @@ def test_d12_remediation_can_reenter_eligible_d12_but_review_does_not_change_gro
     ) is GroupStatus.ELIGIBLE_D12
 
 
-def test_defense_1_2_accepts_completion_only_and_rejects_failure_outcome():
+def test_defense_1_accepts_completion_only_and_rejects_failure_outcome():
     assert transition_group(
-        GroupStatus.ELIGIBLE_D12, DefenseType.DEFENSE_1_2, ResultOutcome.COMPLETED
+        GroupStatus.ELIGIBLE_D12, DefenseType.DEFENSE_1, ResultOutcome.COMPLETED
     ) is GroupStatus.COMPLETED
     with pytest.raises(DomainError, match="GROUP_RESULT_NOT_ALLOWED"):
-        transition_group(GroupStatus.ELIGIBLE_D12, DefenseType.DEFENSE_1_2, ResultOutcome.FAIL)
+        transition_group(GroupStatus.ELIGIBLE_D12, DefenseType.DEFENSE_1, ResultOutcome.FAIL)
 
 
 def test_invalid_group_result_has_stable_error_code():
     with pytest.raises(DomainError, match="GROUP_RESULT_NOT_ALLOWED"):
         transition_group(GroupStatus.COMPLETED, DefenseType.DEFENSE_2, ResultOutcome.PASS)
     with pytest.raises(DomainError, match="GROUP_RESULT_NOT_ALLOWED"):
-        transition_group(GroupStatus.PENDING_D11, DefenseType.DEFENSE_1_1, ResultOutcome.PASS)
+        transition_group(GroupStatus.PENDING_D11, DefenseType.REVIEW_3, ResultOutcome.PASS)

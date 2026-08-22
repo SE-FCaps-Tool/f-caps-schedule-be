@@ -22,13 +22,13 @@ def test_result_owner_is_required_only_for_defense_when_mode_is_enabled():
             assignments=[AssignmentRole.RESULT_OWNER],
         )
     assert validate_result_owner_mode(
-        DefenseType.DEFENSE_1_2,
+        DefenseType.DEFENSE_1,
         enabled=True,
         assignments=[],
     ) is True
     with pytest.raises(DomainError, match="RESULT_OWNER_NOT_ALLOWED"):
         validate_result_owner_mode(
-            DefenseType.DEFENSE_1_2,
+            DefenseType.DEFENSE_1,
             enabled=True,
             assignments=[AssignmentRole.RESULT_OWNER],
         )

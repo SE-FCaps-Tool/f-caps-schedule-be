@@ -57,7 +57,7 @@ def test_database_rejects_overlapping_room_sessions_in_one_schedule_version():
         group_two_id = cursor.fetchone()[0]
         cursor.execute(
             "INSERT INTO rounds (semester_id, type, session_duration_minutes, created_by) "
-            "VALUES (%s, 'DEFENSE_1_1', 30, %s) RETURNING id",
+            "VALUES (%s, 'REVIEW_3', 30, %s) RETURNING id",
             (semester_id, account_id),
         )
         round_id = cursor.fetchone()[0]

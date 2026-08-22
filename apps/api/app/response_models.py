@@ -604,8 +604,8 @@ class GroupProgressResponse(ResponseModel):
     group_status: str | None = None
     review_1: str | None = None
     review_2: str | None = None
-    defense_1_1: str | None = None
-    defense_1_2: str | None = None
+    review_3: str | None = None
+    defense_1: str | None = None
     defense_2: str | None = None
     result_verifier_lecturer_id: int | None = None
     remediation_status: str | None = None
@@ -953,3 +953,68 @@ class TimeframePreviewResponse(ResponseModel):
 
 class TimeframePreviewEnvelopeResponse(ResponseModel):
     data: TimeframePreviewResponse
+
+
+class CommitteeMemberResponse(ResponseModel):
+    lecturer_id: int = Field(alias="lecturerId")
+    lecturer_code: str | None = Field(default=None, alias="lecturerCode")
+    display_name: str | None = Field(default=None, alias="displayName")
+    role: str
+    sequence_number: int = Field(alias="sequenceNumber")
+    role_label: str = Field(alias="roleLabel")
+
+
+class CommitteeResponse(ResponseModel):
+    id: int
+    code: str
+    member_count: int = Field(alias="memberCount")
+    created_by: int | None = Field(default=None, alias="createdBy")
+    created_at: datetime | None = Field(default=None, alias="createdAt")
+    members: list[CommitteeMemberResponse] = Field(default_factory=list)
+
+
+class CommitteeEnvelopeResponse(ResponseModel):
+    data: CommitteeResponse
+
+
+class CommitteeListEnvelopeResponse(ResponseModel):
+    data: list[CommitteeResponse] = Field(default_factory=list)
+    meta: dict[str, int]
+
+
+class CommitteePreviewGroupErrorResponse(ResponseModel):
+    code: str
+    message: str
+
+
+class CommitteePreviewGroupResponse(ResponseModel):
+    code: str
+    member_count: int = Field(alias="memberCount")
+    ok: bool
+    members: list[CommitteeMemberResponse] = Field(default_factory=list)
+    errors: list[CommitteePreviewGroupErrorResponse] = Field(default_factory=list)
+
+
+class CommitteePreviewResponse(ResponseModel):
+    groups: list[CommitteePreviewGroupResponse] = Field(default_factory=list)
+
+
+class CommitteePreviewEnvelopeResponse(ResponseModel):
+    data: CommitteePreviewResponse
+
+
+class CommitteeBulkCreateResponse(ImportResponse):
+    committees: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CommitteeBulkCreateEnvelopeResponse(ResponseModel):
+    data: CommitteeBulkCreateResponse
+
+
+class CommitteeBulkDeleteResponse(ResponseModel):
+    deleted: int
+    deleted_ids: list[int] = Field(alias="deletedIds")
+
+
+class CommitteeBulkDeleteEnvelopeResponse(ResponseModel):
+    data: CommitteeBulkDeleteResponse

@@ -79,7 +79,7 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
         "/api/v1/rounds",
         json={
             "semester_id": semester_id,
-            "type": "DEFENSE_1_1",
+            "type": "REVIEW_3",
             "reviewer_count": 3,
             "room_types": ["NORMAL"],
             "result_owner_mode": True,

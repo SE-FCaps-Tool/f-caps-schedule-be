@@ -12,7 +12,7 @@ def test_manager_can_record_defense_result_and_advance_group(client):
     )
     round_response = client.post(
         "/api/v1/rounds",
-        json={"semester_id": semester_id, "type": "DEFENSE_1_1", "reviewer_count": 3, "room_types": ["NORMAL"], "session_duration_minutes": 30},
+        json={"semester_id": semester_id, "type": "REVIEW_3", "reviewer_count": 3, "room_types": ["NORMAL"], "session_duration_minutes": 30},
         headers=headers,
     )
     assert round_response.status_code == 201
@@ -34,6 +34,6 @@ def test_manager_can_record_defense_result_and_advance_group(client):
     detail = client.get(f"/api/v1/schedule/versions/{run.json()['version_id']}", headers=headers)
     assert detail.status_code == 200
     session_id = detail.json()["sessions"][0]["id"]
-    result = client.post(f"/api/v1/sessions/{session_id}/result", json={"outcome": "LEVEL_1", "note": "Pass to Defense 1.2"}, headers=headers)
+    result = client.post(f"/api/v1/sessions/{session_id}/result", json={"outcome": "LEVEL_1", "note": "Pass to Defense 1"}, headers=headers)
     assert result.status_code == 201, result.text
     assert result.json()["group_status"] == "ELIGIBLE_D12"

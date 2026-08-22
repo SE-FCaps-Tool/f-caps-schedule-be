@@ -333,7 +333,7 @@ def main() -> None:
         "Review1": ("REVIEW_1", 2),
         "Review2": ("REVIEW_2", 2),
         "Review3": ("REVIEW_3", 2),
-        "Defense1": ("DEFENSE_1_1", 5),
+        "Defense1": ("DEFENSE_1", 5),
         "Defense2": ("DEFENSE_2", 5),
     }
     admin_id = "(SELECT id FROM accounts WHERE email = 'admin1@gmail.com')"

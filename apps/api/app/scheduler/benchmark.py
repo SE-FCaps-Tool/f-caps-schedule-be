@@ -20,7 +20,7 @@ def build_target_fixture() -> tuple[RoundInput, list[int], list[tuple[int, datet
         slot_reviewers = [reviewers[(slot_index * 3 + offset) % len(reviewers)] for offset in range(3)]
         availability.update((reviewer_id, slot_index + 1) for reviewer_id in slot_reviewers)
     context = RoundInput(
-        round_type="DEFENSE_1_1",
+        round_type="REVIEW_3",
         expected_reviewer_count=3,
         group_status={group_id: "PENDING_D11" for group_id in groups},
         group_project=group_project,

@@ -39,8 +39,8 @@ def test_lecturer_invitations_matches_frontend_nested_contract(monkeypatch):
                 "lecturer_id": 7,
                 "status": "ACCEPTED",
                 "responded_at": responded_at,
-                "round_name": "Defense 1.1",
-                "round_type": "DEFENSE_1_1",
+                "round_name": "Review 3",
+                "round_type": "REVIEW_3",
                 "registration_deadline": deadline,
                 "group_preference_deadline": None,
             }
@@ -58,8 +58,8 @@ def test_lecturer_invitations_matches_frontend_nested_contract(monkeypatch):
                 "id": "inv_85_7",
                 "round": {
                     "id": "85",
-                    "name": "Defense 1.1",
-                    "type": "DEFENSE_1_1",
+                    "name": "Review 3",
+                    "type": "REVIEW_3",
                     "registrationDeadline": "2026-08-20T16:59:00+00:00",
                 },
                 "status": "ACCEPTED",

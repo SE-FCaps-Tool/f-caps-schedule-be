@@ -18,7 +18,7 @@ def test_group_absent_is_not_a_result_writable_session(monkeypatch):
             "group_status": "PENDING_D11",
             "version_id": 20,
             "round_id": 30,
-            "type": "DEFENSE_1_1",
+            "type": "REVIEW_3",
             "result_owner_mode": False,
             "reviewer_ids": set(),
             "owner_ids": set(),

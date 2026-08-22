@@ -22,7 +22,7 @@ def _prepare_published_session(client, day_date: str) -> dict:
         "/api/v1/rounds",
         json={
             "semester_id": semester["id"],
-            "type": "DEFENSE_1_1",
+            "type": "REVIEW_3",
             "reviewer_count": 3,
             "room_types": ["NORMAL"],
             "session_duration_minutes": 30,

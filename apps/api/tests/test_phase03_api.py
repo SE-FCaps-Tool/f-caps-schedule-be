@@ -153,7 +153,7 @@ def test_manager_can_create_round_day_and_manager_entered_availability(client):
         "/api/v1/rounds",
         json={
             "semester_id": semester_id,
-            "type": "DEFENSE_1_1",
+            "type": "REVIEW_3",
             "reviewer_count": 3,
             "room_types": ["NORMAL"],
             "result_owner_mode": True,

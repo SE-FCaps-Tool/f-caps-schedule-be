@@ -3,8 +3,8 @@ from app.domain.errors import DomainError
 _ALLOWED_OUTCOMES = {
     "REVIEW_1": {"PASS", "NEEDS_FIX", "FAIL"},
     "REVIEW_2": {"PASS", "NEEDS_FIX", "FAIL"},
-    "DEFENSE_1_1": {"LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"},
-    "DEFENSE_1_2": {"COMPLETED"},
+    "REVIEW_3": {"LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"},
+    "DEFENSE_1": {"COMPLETED"},
     "DEFENSE_2": {"PASS", "FAIL"},
 }
 

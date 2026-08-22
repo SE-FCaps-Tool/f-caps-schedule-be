@@ -107,7 +107,7 @@ def _can_write(db: Session, user: CurrentUser, context: dict[str, Any]) -> bool:
     lecturer_id = lecturer_id_for_account(db, user.account_id)
     if user.role != "LECTURER" or lecturer_id not in context["reviewer_ids"]:
         return False
-    if context["result_owner_mode"] and context["type"] in {"DEFENSE_1_1", "DEFENSE_2"}:
+    if context["result_owner_mode"] and context["type"] in {"REVIEW_3", "DEFENSE_2"}:
         return lecturer_id in context["owner_ids"]
     return True
 
@@ -200,7 +200,7 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
         )
     if (
         context["result_owner_mode"]
-        and context["type"] in {"DEFENSE_1_1", "DEFENSE_2"}
+        and context["type"] in {"REVIEW_3", "DEFENSE_2"}
         and len(context["owner_ids"]) != 1
     ):
         raise HTTPException(
@@ -212,18 +212,18 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
         )
     try:
         validate_result_outcome(str(context["type"]), payload.outcome)
-        if context["type"] == "DEFENSE_1_1" and payload.outcome == "LEVEL_2":
+        if context["type"] == "REVIEW_3" and payload.outcome == "LEVEL_2":
             if payload.remediation_due_at is None or payload.verifier_lecturer_id is None:
                 raise DomainError(
                     "REMEDIATION_FIELDS_REQUIRED",
                     "Level 2 requires a due date and Reviewer verifier.",
                 )
             validate_remediation_verifier(payload.verifier_lecturer_id, context["reviewer_ids"])
-        if context["type"] != "DEFENSE_1_1" and (
+        if context["type"] != "REVIEW_3" and (
             payload.remediation_due_at or payload.verifier_lecturer_id
         ):
             raise DomainError(
-                "REMEDIATION_NOT_ALLOWED", "Only Defense 1.1 Level 2 creates remediation."
+                "REMEDIATION_NOT_ALLOWED", "Only Review 3 Level 2 creates remediation."
             )
         if context["result"] is not None:
             if user.role != "MANAGER":
@@ -231,7 +231,7 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
                     "RESULT_CORRECTION_FORBIDDEN", "Only Manager may correct an existing result."
                 )
             require_change_reason(payload.correction_reason or "")
-        if context["type"] == "DEFENSE_1_1" and context["result"] is not None:
+        if context["type"] == "REVIEW_3" and context["result"] is not None:
             remediation = db.execute(
                 text("SELECT status FROM remediation_cases WHERE session_result_id = :result_id"),
                 {"result_id": context["result"]["id"]},
@@ -284,7 +284,7 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
                 },
             ).scalar_one()
             after_status = None
-            if context["type"] in {"DEFENSE_1_1", "DEFENSE_1_2", "DEFENSE_2"}:
+            if context["type"] in {"REVIEW_3", "DEFENSE_1", "DEFENSE_2"}:
                 outcome = (
                     ResultOutcome.COMPLETED
                     if payload.outcome == "COMPLETED"
@@ -299,7 +299,7 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
                     ),
                     {"status": after_status, "group_id": context["group_id"]},
                 )
-            if context["type"] == "DEFENSE_1_2" and payload.outcome == "COMPLETED":
+            if context["type"] == "DEFENSE_1" and payload.outcome == "COMPLETED":
                 db.execute(
                     text("UPDATE sessions SET status = 'COMPLETED' WHERE id = :session_id"),
                     {"session_id": session_id},
@@ -308,7 +308,7 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
                 text("UPDATE session_results SET after_group_status = CAST(:status AS group_status) WHERE id = :result_id"),
                 {"status": after_status or base_group_status, "result_id": result_id},
             )
-            if context["type"] == "DEFENSE_1_1" and payload.outcome == "LEVEL_2":
+            if context["type"] == "REVIEW_3" and payload.outcome == "LEVEL_2":
                 db.execute(
                     text(
                         "INSERT INTO remediation_cases (session_result_id, group_id, due_at, verifier_lecturer_id) VALUES (:result_id, :group_id, :due_at, :verifier_id) ON CONFLICT (session_result_id) DO UPDATE SET due_at = EXCLUDED.due_at, verifier_lecturer_id = EXCLUDED.verifier_lecturer_id, status = 'OPEN'"
@@ -320,7 +320,7 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
                         "verifier_id": payload.verifier_lecturer_id,
                     },
                 )
-            elif context["type"] == "DEFENSE_1_1" and before is not None:
+            elif context["type"] == "REVIEW_3" and before is not None:
                 db.execute(
                     text("DELETE FROM remediation_cases WHERE session_result_id = :result_id AND status = 'OPEN'"),
                     {"result_id": result_id},
@@ -352,7 +352,7 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
                 },
                 recipient_ids=recipient_ids,
             )
-            if context["type"] == "DEFENSE_1_1" and payload.outcome == "LEVEL_2":
+            if context["type"] == "REVIEW_3" and payload.outcome == "LEVEL_2":
                 verifier_account = db.execute(
                     text("SELECT account_id FROM lecturers WHERE id = :lecturer_id"),
                     {"lecturer_id": payload.verifier_lecturer_id},

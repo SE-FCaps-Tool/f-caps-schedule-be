@@ -237,7 +237,7 @@ def _candidate_soft_scores(candidate: object, context: RoundInput) -> dict[str, 
     prior = context.prior_reviewer_ids.get(candidate.group_id, set())
     if context.round_type == "REVIEW_2" and prior and set(candidate.reviewer_ids) == prior:
         scores["S2"] = 1
-    if context.round_type == "DEFENSE_1_2":
+    if context.round_type == "DEFENSE_1":
         scores["S3"] = len(set(candidate.reviewer_ids).intersection(prior))
     # S4-S7 are deliberately additive soft bonuses.  They never participate
     # in feasibility decisions, so H1-H13 semantics remain unchanged while

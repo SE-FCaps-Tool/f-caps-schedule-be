@@ -22,7 +22,7 @@ EnvelopeDataT = TypeVar("EnvelopeDataT")
 # place so every target route accepts both migration-era integers and the
 # documented ``prefix_number`` form.
 TARGET_ID_PREFIXES: tuple[str, ...] = (
-    "grp_", "prj_", "rnd_", "lec_", "stu_", "sv_", "ses_", "room_", "ts_", "inv_", "rem_"
+    "grp_", "prj_", "rnd_", "lec_", "stu_", "sv_", "ses_", "room_", "ts_", "inv_", "rem_", "cmt_"
 )
 
 
@@ -186,6 +186,12 @@ CHECKLIST_OPERATIONS: tuple[ApiOperation, ...] = (
     _op("PATCH", "/api/v1/timeframes/{timeframeId}"),
     _op("PATCH", "/api/v1/timeframes/{timeframeId}/manual"),
     _op("DELETE", "/api/v1/timeframes/{timeframeId}"),
+    _op("POST", "/api/v1/committees/preview"),
+    _op("POST", "/api/v1/committees", success_status=201),
+    _op("GET", "/api/v1/committees", schema="array"),
+    _op("GET", "/api/v1/committees/{committeeId}"),
+    _op("DELETE", "/api/v1/committees/{committeeId}"),
+    _op("POST", "/api/v1/committees/bulk-delete"),
 )
 
 

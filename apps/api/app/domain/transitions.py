@@ -55,7 +55,7 @@ def transition_group(
             return GroupStatus.ELIGIBLE_D12
         if current is GroupStatus.D12_CONDITIONAL and outcome is ResultOutcome.FAIL:
             return GroupStatus.FAILED
-    elif defense is DefenseType.DEFENSE_1_1:
+    elif defense is DefenseType.REVIEW_3:
         if current is GroupStatus.PENDING_D11:
             next_status = {
                 ResultOutcome.LEVEL_1: GroupStatus.ELIGIBLE_D12,
@@ -65,7 +65,7 @@ def transition_group(
             }.get(outcome)
             if next_status is not None:
                 return next_status
-    elif defense is DefenseType.DEFENSE_1_2:
+    elif defense is DefenseType.DEFENSE_1:
         if current is GroupStatus.ELIGIBLE_D12 and outcome is ResultOutcome.COMPLETED:
             return GroupStatus.COMPLETED
     elif defense is DefenseType.DEFENSE_2:

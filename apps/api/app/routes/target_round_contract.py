@@ -142,16 +142,16 @@ class TargetRoundCreate(BaseModel):
         expected_reviewers = {
             "REVIEW_1": 2,
             "REVIEW_2": 2,
-            "DEFENSE_1_1": 3,
-            "DEFENSE_1_2": 5,
+            "REVIEW_3": 3,
+            "DEFENSE_1": 5,
             "DEFENSE_2": 5,
         }.get(self.type)
         if expected_reviewers is None:
             raise ValueError("type is not a supported round type")
         if self.reviewer_count != expected_reviewers:
             raise ValueError(f"{self.type} requires {expected_reviewers} reviewers")
-        if self.result_owner_mode and self.type not in {"DEFENSE_1_1", "DEFENSE_2"}:
-            raise ValueError("resultOwnerMode is only available for DEFENSE_1_1 and DEFENSE_2")
+        if self.result_owner_mode and self.type not in {"REVIEW_3", "DEFENSE_2"}:
+            raise ValueError("resultOwnerMode is only available for REVIEW_3 and DEFENSE_2")
         if self.registration_deadline.tzinfo is None:
             raise ValueError("registrationDeadline must include a timezone offset")
         if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:

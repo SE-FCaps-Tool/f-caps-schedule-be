@@ -36,7 +36,7 @@ def session(
 
 def base_input(**overrides: object) -> RoundInput:
     values: dict[str, object] = {
-        "round_type": "DEFENSE_1_1",
+        "round_type": "REVIEW_3",
         "expected_reviewer_count": 3,
         "group_status": {1: "PENDING_D11"},
         "group_project": {1: 10},
@@ -68,9 +68,9 @@ def base_input(**overrides: object) -> RoundInput:
         ("H6", [session(1, reviewer_ids=(2, 2, 3))], base_input()),
         ("H7", [session(1, reviewer_ids=(2, 3, 4), slot_id=2)], base_input()),
         ("H8", [session(1, reviewer_ids=(2, 3, 4))], base_input(conflicts={(2, 10)})),
-        ("H9", [session(1)], base_input(round_type="DEFENSE_1_2", group_status={1: "PENDING_D11"})),
+        ("H9", [session(1)], base_input(round_type="DEFENSE_1", group_status={1: "PENDING_D11"})),
         ("H10", [session(1, slot_id=1)], base_input(group_selection_mode=True, group_selected_slots={1: {2}})),
-        ("H11", [session(1)], base_input(round_type="DEFENSE_1_2", prior_reviewer_ids={1: {55}}, group_status={1: "ELIGIBLE_D12"})),
+        ("H11", [session(1)], base_input(round_type="DEFENSE_1", prior_reviewer_ids={1: {55}}, group_status={1: "ELIGIBLE_D12"})),
         ("H12", [session(1), session(2, group_id=2, project_id=11, slot_id=2, start_hour=10)], base_input(group_status={1: "PENDING_D11", 2: "PENDING_D11"}, group_project={1: 10, 2: 11}, project_supervisors={10: {99}, 11: {98}}, lecturer_availability={(2, 1), (3, 1), (4, 1), (2, 2), (3, 2), (4, 2)}, h12_sessions_per_part=1)),
     ],
 )
@@ -81,7 +81,7 @@ def test_each_hard_constraint_returns_its_stable_rule_code(rule, schedule, conte
 
 def test_h11_waiver_allows_missing_continuity_but_is_not_a_general_waiver():
     context = base_input(
-        round_type="DEFENSE_1_2",
+        round_type="DEFENSE_1",
         group_status={1: "ELIGIBLE_D12"},
         prior_reviewer_ids={1: {55}},
         h11_waiver_groups={1},
@@ -128,7 +128,7 @@ def test_overlapping_sessions_with_same_concrete_room_still_trigger_h3():
 @pytest.mark.parametrize("actor", ["ADMIN", "LECTURER", ""])
 def test_h11_waiver_requires_manager_actor_and_reason(actor):
     context = base_input(
-        round_type="DEFENSE_1_2",
+        round_type="DEFENSE_1",
         group_status={1: "ELIGIBLE_D12"},
         prior_reviewer_ids={1: {55}},
         h11_waiver_groups={1},

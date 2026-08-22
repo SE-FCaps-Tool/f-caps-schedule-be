@@ -8,7 +8,7 @@ from app.scheduler.validator import validate_schedule
 
 def test_solver_returns_validator_safe_partial_schedule_with_reason_codes():
     context = RoundInput(
-        round_type="DEFENSE_1_1",
+        round_type="REVIEW_3",
         expected_reviewer_count=3,
         group_status={1: "PENDING_D11", 2: "PENDING_D11"},
         group_project={1: 10, 2: 11},
@@ -66,7 +66,7 @@ def test_solver_balances_reviewer_load_when_quota_and_s1_are_configured():
                 )
             )
     context = RoundInput(
-        round_type="DEFENSE_1_1",
+        round_type="REVIEW_3",
         expected_reviewer_count=3,
         group_status={group_id: "PENDING_D11" for group_id in groups},
         group_project={group_id: 1000 + group_id for group_id in groups},

@@ -47,8 +47,7 @@ class DefenseType(DomainEnum):
     REVIEW_2 = "REVIEW_2"
     REVIEW_3 = "REVIEW_3"
     REVIEW = "REVIEW"
-    DEFENSE_1_1 = "DEFENSE_1_1"
-    DEFENSE_1_2 = "DEFENSE_1_2"
+    DEFENSE_1 = "DEFENSE_1"
     DEFENSE_2 = "DEFENSE_2"
     REMEDIATION = "REMEDIATION"
 

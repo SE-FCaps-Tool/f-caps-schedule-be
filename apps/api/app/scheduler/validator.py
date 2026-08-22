@@ -21,8 +21,8 @@ def _eligible(round_type: str, status: str) -> bool:
     if status in {"FAILED", "DROPPED"}:
         return False
     expected = {
-        "DEFENSE_1_1": {"PENDING_D11"},
-        "DEFENSE_1_2": {"ELIGIBLE_D12"},
+        "REVIEW_3": {"PENDING_D11"},
+        "DEFENSE_1": {"ELIGIBLE_D12"},
         "DEFENSE_2": {"PENDING_D2"},
         "REVIEW_1": {"PENDING_D11", "ELIGIBLE_D12", "D12_CONDITIONAL", "PENDING_D2"},
         "REVIEW_2": {"PENDING_D11", "ELIGIBLE_D12", "D12_CONDITIONAL", "PENDING_D2"},
@@ -132,14 +132,14 @@ def validate_schedule(
                     current.group_id,
                 )
             )
-        if context.round_type == "DEFENSE_1_2" and not valid_h11_waiver(context, current.group_id):
+        if context.round_type == "DEFENSE_1" and not valid_h11_waiver(context, current.group_id):
             continuity = set(context.prior_reviewer_ids.get(current.group_id, set()))
             continuity.update(context.remediation_verifier_ids.get(current.group_id, set()))
             if not continuity.intersection(current.reviewer_ids):
                 violations.append(
                     _violation(
                         "H11",
-                        "Defense 1.2 has no Reviewer with continuity from Defense 1.1.",
+                        "Defense 1 has no Reviewer with continuity from Review 3.",
                         "Assign a prior Reviewer, choose the Remediation Verifier, or obtain an audited H11 waiver.",
                         current.group_id,
                     )

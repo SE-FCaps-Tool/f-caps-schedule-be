@@ -5,7 +5,7 @@ from app.scheduler.snapshot import build_input_snapshot
 
 def candidate_input() -> RoundInput:
     return RoundInput(
-        round_type="DEFENSE_1_1",
+        round_type="REVIEW_3",
         expected_reviewer_count=3,
         group_status={1: "PENDING_D11"},
         group_project={1: 10},

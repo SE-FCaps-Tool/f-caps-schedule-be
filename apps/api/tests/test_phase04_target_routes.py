@@ -27,8 +27,8 @@ def test_phase04_target_round_registration_routes_are_in_openapi():
 
 def _spec_round_payload() -> dict:
     return {
-        "name": "Defense 1.1",
-        "type": "DEFENSE_1_1",
+        "name": "Review 3",
+        "type": "REVIEW_3",
         "description": "demo",
         "durationMinutes": 60,
         "reviewerCount": 3,
