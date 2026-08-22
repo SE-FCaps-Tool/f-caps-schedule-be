@@ -40,6 +40,21 @@ def assign_roles(member_ids: list[int]) -> list[tuple[int, str, int]]:
     return assignments
 
 
+def validate_round_committee_sizes(round_reviewer_count: int, committees: list[dict[str, object]]) -> None:
+    """A Committee may only serve a Round whose reviewer count it can staff exactly."""
+
+    mismatched = [
+        str(committee["code"])
+        for committee in committees
+        if int(committee["member_count"]) != round_reviewer_count
+    ]
+    if mismatched:
+        raise DomainError(
+            "ROUND_COMMITTEE_SIZE_MISMATCH",
+            f"Committee(s) {', '.join(mismatched)} do not have {round_reviewer_count} members.",
+        )
+
+
 def validate_group(code: str, member_ids: list[int]) -> str:
     """Validate a batch input group and return its normalized code."""
 

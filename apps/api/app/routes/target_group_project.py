@@ -126,7 +126,8 @@ def list_semester_groups(
     rows = db.execute(
         text(
             "SELECT g.id, g.code, g.status::text AS status, g.project_id, "
-            "p.code AS project_code, p.title AS project_title, p.status::text AS project_status, "
+            "p.code AS project_code, COALESCE(p.title_en, p.title_vi, p.title) AS project_title, "
+            "p.title_vi AS project_title_vi, p.title_en AS project_title_en, p.status::text AS project_status, "
             "(SELECT COUNT(*) FROM group_memberships gm WHERE gm.group_id = g.id AND gm.status = 'ACTIVE') AS member_count, "
             "ldr.id AS leader_id, ldr.student_code AS leader_code, la.display_name AS leader_name, "
             "COUNT(*) OVER() AS total_count "
@@ -173,6 +174,8 @@ def list_semester_groups(
                 "id": external_id(row["project_id"], "prj"),
                 "code": row["project_code"],
                 "name": row["project_title"],
+                "nameVi": row["project_title_vi"] or row["project_title"],
+                "nameEn": row["project_title_en"],
                 "status": project_from_legacy(row["project_status"], has_group=True).value,
             } if project_assigned else None,
             "warnings": warnings,
@@ -395,8 +398,15 @@ def create_semester_project(semester_id: int, payload: TargetProjectCreate, db: 
         if major_id is None:
             raise HTTPException(status_code=422, detail={"code": "MAJOR_NOT_FOUND", "message": "No major is configured."})
         project_id = db.execute(
-            text("INSERT INTO projects (semester_id, major_id, code, title) VALUES (:semester_id, :major_id, :code, :title) RETURNING id"),
-            {"semester_id": semester_id, "major_id": major_id, "code": code, "title": payload.name_vi.strip()},
+            text("INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en) RETURNING id"),
+            {
+                "semester_id": semester_id,
+                "major_id": major_id,
+                "code": code,
+                "title": (payload.name_en or payload.name_vi).strip(),
+                "title_vi": payload.name_vi.strip(),
+                "title_en": payload.name_en.strip() if payload.name_en else None,
+            },
         ).scalar_one()
         for index, lecturer_id in enumerate(supervisor_ids):
             db.execute(
@@ -413,7 +423,8 @@ def project_progression(project_id: int, db: Db, user: User) -> dict[str, Any]:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Project access is not available."})
     row = db.execute(
         text(
-            "SELECT p.id AS project_id, p.code, p.title, p.status::text AS project_status, "
+            "SELECT p.id AS project_id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, "
+            "p.title_vi, p.title_en, p.status::text AS project_status, "
             "g.id AS group_id, g.status::text AS group_status "
             "FROM projects p LEFT JOIN groups g ON g.project_id = p.id WHERE p.id = :id"
         ),

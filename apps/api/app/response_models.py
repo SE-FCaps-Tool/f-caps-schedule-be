@@ -101,6 +101,8 @@ class ProjectResponse(ResponseModel):
     id: int
     code: str
     title: str
+    title_vi: str | None = None
+    title_en: str | None = None
     status: str | None = None
     semester_id: int | None = None
     semester_code: str | None = None
@@ -114,6 +116,8 @@ class ProjectMutationResponse(ResponseModel):
     id: int
     code: str
     title: str
+    title_vi: str | None = None
+    title_en: str | None = None
     status: str | None = None
     semester_id: int | None = None
 
@@ -139,6 +143,8 @@ class GroupResponse(ResponseModel):
     project_id: int | None = None
     project_code: str | None = None
     title: str | None = None
+    title_vi: str | None = None
+    title_en: str | None = None
     active_member_count: int | None = None
     leader_count: int | None = None
     leader_name: str | None = None
@@ -360,6 +366,7 @@ class RoundDetailContractResponse(ResponseModel):
     room_types: list[str] = Field(default_factory=list, alias="roomTypes")
     timeframe_id: str | None = Field(default=None, alias="timeframeId")
     timeframe_version_id: str | None = Field(default=None, alias="timeframeVersionId")
+    committee_count: int = Field(default=0, alias="committeeCount")
     days: list[RoundDetailDayContractResponse] = Field(default_factory=list)
 
 
@@ -1014,6 +1021,7 @@ class CommitteeBulkCreateEnvelopeResponse(ResponseModel):
 class CommitteeBulkDeleteResponse(ResponseModel):
     deleted: int
     deleted_ids: list[int] = Field(alias="deletedIds")
+    in_use_ids: list[int] = Field(default_factory=list, alias="inUseIds")
 
 
 class CommitteeBulkDeleteEnvelopeResponse(ResponseModel):

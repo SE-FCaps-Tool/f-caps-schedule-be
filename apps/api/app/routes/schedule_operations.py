@@ -375,14 +375,14 @@ def _round_input(
         .all()
     )
     prior_rows: list[Any] = []
-    if round_row["type"] == "DEFENSE_1":
+    if round_row["type"] in {"DEFENSE_1", "DEFENSE_1_2"}:
         prior_rows = db.execute(
             text(
                 "SELECT s.group_id, cm.lecturer_id FROM sessions s "
                 "JOIN council_members cm ON cm.council_id = s.council_id "
                 "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
                 "JOIN rounds previous_round ON previous_round.id = sv.round_id "
-                "WHERE s.group_id = ANY(:group_ids) AND previous_round.type = 'REVIEW_3' "
+                "WHERE s.group_id = ANY(:group_ids) AND previous_round.type IN ('DEFENSE_1_1', 'REVIEW_3') "
                 "AND sv.status IN ('ACTIVE', 'PUBLISHED')"
             ),
             {"group_ids": [row["id"] for row in group_rows] or [0]},
@@ -400,9 +400,28 @@ def _round_input(
     ).all():
         if verifier_id is not None:
             remediation_verifiers.setdefault(group_id, set()).add(verifier_id)
+    committee_member_lists = [
+        tuple(sorted(row[1]))
+        for row in db.execute(
+            text(
+                "SELECT c.id, array_agg(cm.lecturer_id ORDER BY cm.sequence_number) AS member_ids "
+                "FROM round_committees rc "
+                "JOIN committees c ON c.id = rc.committee_id "
+                "JOIN committee_members cm ON cm.committee_id = c.id "
+                "WHERE rc.round_id = :round_id GROUP BY c.id ORDER BY c.id"
+            ),
+            {"round_id": round_id},
+        ).all()
+    ]
+    eligible_pool = set(reviewer_ids)
+    committee_reviewer_sets = tuple(
+        member_ids for member_ids in committee_member_lists if eligible_pool.issuperset(member_ids)
+    )
     input_data = RoundInput(
         round_type=str(round_row["type"]),
         expected_reviewer_count=round_row["reviewer_count"],
+        committee_reviewer_sets=committee_reviewer_sets,
+        has_assigned_committees=bool(committee_member_lists),
         result_owner_mode=round_row["result_owner_mode"],
         group_status={row["id"]: str(row["status"]) for row in group_rows},
         group_leader_valid={row["id"]: int(row["leader_count"]) == 1 for row in group_rows},
@@ -554,7 +573,7 @@ def _owner_for_edit(
         text("SELECT type, result_owner_mode FROM rounds WHERE id = :round_id"),
         {"round_id": round_id},
     ).mappings().one()
-    if not round_row["result_owner_mode"] or round_row["type"] not in {"REVIEW_3", "DEFENSE_2"}:
+    if not round_row["result_owner_mode"] or round_row["type"] not in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"}:
         return None
     current_owner = db.execute(
         text("SELECT cm.lecturer_id FROM council_members cm JOIN sessions s ON s.council_id = cm.council_id "
@@ -776,7 +795,7 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
                         {
                             "assignment_id": assignment_id,
                             "lecturer_id": lecturer_id,
-                            "is_owner": context.result_owner_mode and context.round_type in {"REVIEW_3", "DEFENSE_2"} and reviewer_index == 0,
+                            "is_owner": context.result_owner_mode and context.round_type in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"} and reviewer_index == 0,
                             "snapshot_name": name_map.get(lecturer_id, str(lecturer_id)),
                         },
                     )
@@ -817,8 +836,7 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
         if isinstance(exc, DomainError):
             message = str(exc)
             prefix = f"{exc.code}: "
-            if message.startswith(prefix):
-                message = message[len(prefix) :]
+            message = message.removeprefix(prefix)
             raise HTTPException(
                 status_code=422, detail={"code": exc.code, "message": message}
             ) from exc
@@ -1014,7 +1032,7 @@ def assign_result_owner(version_id: int, session_id: int, payload: ResultOwnerPa
             if session["status"] in {"COMPLETED", "GROUP_ABSENT", "POSTPONED", "CANCELLED"}:
                 raise HTTPException(status_code=422, detail={"code": "SESSION_IMMUTABLE", "message": "This session's Council ownership is immutable."})
             before_recipients = affected_schedule_recipients(db, version_id)
-            if not session["result_owner_mode"] or session["type"] not in {"REVIEW_3", "DEFENSE_2"}:
+            if not session["result_owner_mode"] or session["type"] not in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"}:
                 raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_NOT_ALLOWED", "message": "Result Owner mode is disabled for this session."})
             members = load_council_members(db, int(session["council_id"]))
             if lecturer_id not in {int(member["lecturer_id"]) for member in members}:

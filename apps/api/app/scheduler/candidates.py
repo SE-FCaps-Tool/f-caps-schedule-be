@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from itertools import combinations
 
+from app.domain.round_types import DEFENSE_1_2_TYPES
 from app.scheduler.models import Candidate, RoundInput, UnscheduledReason
 from app.scheduler.validator import _eligible, valid_h11_waiver
 
@@ -36,11 +37,11 @@ def generate_candidates(
                 for reviewer_id in allowed_reviewers
                 if (reviewer_id, timeslot_id) in context.lecturer_availability
             ]
-            if context.round_type == "DEFENSE_1" and not valid_h11_waiver(context, group_id):
+            if context.round_type in DEFENSE_1_2_TYPES and not valid_h11_waiver(context, group_id):
                 continuity = set(context.prior_reviewer_ids.get(group_id, set()))
                 continuity.update(context.remediation_verifier_ids.get(group_id, set()))
                 available = [reviewer_id for reviewer_id in available if reviewer_id in continuity]
-            for reviewer_ids in combinations(available, context.expected_reviewer_count):
+            for reviewer_ids in _reviewer_tuples(context, available):
                 candidates.append(
                     Candidate(
                         group_id=group_id,
@@ -53,6 +54,24 @@ def generate_candidates(
                     )
                 )
     return candidates
+
+
+def _reviewer_tuples(context: RoundInput, available: list[int]) -> list[tuple[int, ...]]:
+    """Reviewer sets allowed for one (group, timeslot) after the hard filters.
+
+    A Round bound to Committees may only be staffed by a whole Committee, so a
+    Committee losing any member here drops out entirely rather than being
+    topped up from the free pool.
+    """
+
+    if not context.has_assigned_committees:
+        return list(combinations(available, context.expected_reviewer_count))
+    eligible = set(available)
+    return [
+        tuple(member_ids)
+        for member_ids in context.committee_reviewer_sets
+        if len(member_ids) == context.expected_reviewer_count and eligible.issuperset(member_ids)
+    ]
 
 
 def _normalize_timeslot(raw_timeslot: tuple[object, ...]):
@@ -118,19 +137,19 @@ def reason_for_unscheduled(
             "No eligible Reviewer has availability in the usable group slots.",
             "Invite more Reviewers or collect availability for the round slots.",
         )
-    if context.round_type == "DEFENSE_1" and not valid_h11_waiver(context, group_id):
+    if context.round_type in DEFENSE_1_2_TYPES and not valid_h11_waiver(context, group_id):
         continuity = set(context.prior_reviewer_ids.get(group_id, set()))
         continuity.update(context.remediation_verifier_ids.get(group_id, set()))
         if not continuity.intersection(reviewers):
             return UnscheduledReason(
                 "H11_CONTINUITY",
-                "No available Reviewer satisfies Defense 1 continuity.",
+                "No available Reviewer satisfies Defense 1.2 continuity.",
                 "Assign a prior Reviewer, the Verifier, or record an approved H11 waiver.",
             )
         if not continuity.intersection(available_reviewers):
             return UnscheduledReason(
                 "H11_CONTINUITY",
-                "No available Reviewer satisfies Defense 1 continuity.",
+                "No available Reviewer satisfies Defense 1.2 continuity.",
                 "Assign a prior Reviewer, the Verifier, or record an approved H11 waiver.",
             )
     return UnscheduledReason(

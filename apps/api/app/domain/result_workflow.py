@@ -1,10 +1,15 @@
 from app.domain.errors import DomainError
+from app.domain.round_types import (
+    DEFENSE_1_1_TYPES,
+    DEFENSE_1_2_TYPES,
+    REVIEW_1_1_TYPES,
+    REVIEW_2_1_TYPES,
+)
 
 _ALLOWED_OUTCOMES = {
-    "REVIEW_1": {"PASS", "NEEDS_FIX", "FAIL"},
-    "REVIEW_2": {"PASS", "NEEDS_FIX", "FAIL"},
-    "REVIEW_3": {"LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"},
-    "DEFENSE_1": {"COMPLETED"},
+    **{round_type: {"PASS", "NEEDS_FIX", "FAIL"} for round_type in REVIEW_1_1_TYPES | REVIEW_2_1_TYPES},
+    **{round_type: {"LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"} for round_type in DEFENSE_1_1_TYPES},
+    **{round_type: {"COMPLETED"} for round_type in DEFENSE_1_2_TYPES},
     "DEFENSE_2": {"PASS", "FAIL"},
 }
 

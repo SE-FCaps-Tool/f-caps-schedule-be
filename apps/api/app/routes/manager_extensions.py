@@ -248,7 +248,8 @@ def _load_round_detail(round_id: int, db: Session) -> dict[str, Any]:
                     WHERE rrt.round_id = r.id AND rm.active = TRUE) AS room_count,
                    COALESCE((SELECT array_agg(rrt.room_type::text ORDER BY rrt.room_type::text)
                              FROM round_room_types rrt WHERE rrt.round_id = r.id), ARRAY[]::text[]) AS room_types,
-                   (SELECT COUNT(*) FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id WHERE rd.round_id = r.id AND ts.active) AS active_timeslot_count
+                   (SELECT COUNT(*) FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id WHERE rd.round_id = r.id AND ts.active) AS active_timeslot_count,
+                   (SELECT COUNT(*) FROM round_committees WHERE round_id = r.id) AS committee_count
             FROM rounds r JOIN semesters s ON s.id = r.semester_id WHERE r.id = :id
             """
         ),
@@ -318,6 +319,7 @@ def _round_detail_payload(raw: dict[str, Any]) -> dict[str, Any]:
             "room_types": raw["room_types"],
             "timeframe_id": str(raw["timeframe_id"]) if raw.get("timeframe_id") is not None else None,
             "timeframe_version_id": str(raw["timeframe_version_id"]) if raw.get("timeframe_version_id") is not None else None,
+            "committee_count": raw["committee_count"],
             "days": list(days_by_date.values()),
         }
     )
@@ -333,7 +335,11 @@ def get_round_detail(round_id: int, db: Db, user: User) -> dict[str, Any]:
     return _round_detail_payload(_load_round_detail(round_id, db))
 
 
-@router.patch("/rounds/{round_id}", response_model=RoundDetailEnvelopeResponse)
+@router.patch(
+    "/rounds/{round_id}",
+    response_model=RoundDetailEnvelopeResponse,
+    response_model_exclude_none=True,
+)
 def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     values = payload.model_dump(exclude_unset=True)
@@ -464,15 +470,19 @@ def update_project(project_id: str, payload: ProjectUpdate, db: Db, user: User) 
         if co_db_id is not None:
             target_supervisors.append((co_db_id, "CO"))
     if "name_vi" in values:
-        values["title"] = values.pop("name_vi")
-    values.pop("name_en", None)
+        values["title_vi"] = values.pop("name_vi")
+        values["title"] = values["title_vi"]
+    elif "title" in values:
+        values["title_vi"] = values["title"]
+    if "name_en" in values:
+        values["title_en"] = values.pop("name_en")
     try:
         with db.begin():
-            row = db.execute(text("SELECT id, code, title, semester_id FROM projects WHERE id = :id FOR UPDATE"), {"id": project_id}).mappings().one_or_none()
+            row = db.execute(text("SELECT id, code, title, title_vi, title_en, semester_id FROM projects WHERE id = :id FOR UPDATE"), {"id": project_id}).mappings().one_or_none()
             if row is None:
                 raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "message": "Project does not exist."})
             ensure_semester_writable(db, int(row["semester_id"]))
-            scalar = {key: values[key] for key in ("code", "title") if key in values}
+            scalar = {key: values[key] for key in ("code", "title", "title_vi", "title_en") if key in values}
             if scalar:
                 assignments = ", ".join(f"{key} = :{key}" for key in scalar)
                 scalar["id"] = project_id
@@ -500,7 +510,7 @@ def update_project(project_id: str, payload: ProjectUpdate, db: Db, user: User) 
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail={"code": "PROJECT_DUPLICATE", "message": "Project code or supervisor assignment already exists."}) from exc
-    return dict(db.execute(text("SELECT id, code, title, status, semester_id FROM projects WHERE id = :id"), {"id": project_id}).mappings().one())
+    return dict(db.execute(text("SELECT id, code, title, title_vi, title_en, status, semester_id FROM projects WHERE id = :id"), {"id": project_id}).mappings().one())
 
 
 @router.get("/projects/{project_id}", response_model=ProjectDetailResponse)
@@ -508,7 +518,8 @@ def get_project_detail(project_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     row = db.execute(
         text(
-            "SELECT p.id, p.code, p.title, p.status, p.semester_id, s.code AS semester_code, m.code AS major_code "
+            "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en, "
+            "p.status, p.semester_id, s.code AS semester_code, m.code AS major_code "
             "FROM projects p JOIN semesters s ON s.id = p.semester_id JOIN majors m ON m.id = p.major_id WHERE p.id = :id"
         ),
         {"id": project_id},
@@ -587,7 +598,8 @@ def get_group_detail(group_id: int, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     row = db.execute(
         text(
-            "SELECT g.id, g.code, g.status, g.project_id, p.code AS project_code, p.title "
+            "SELECT g.id, g.code, g.status, g.project_id, p.code AS project_code, "
+            "COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en "
             "FROM groups g LEFT JOIN projects p ON p.id = g.project_id WHERE g.id = :id"
         ),
         {"id": group_id},
@@ -637,14 +649,15 @@ def list_round_groups(round_id: int, db: Db, user: User) -> list[dict[str, Any]]
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
-            "SELECT g.id AS group_id, g.code AS group_code, g.status, p.code AS project_code, p.title, "
+            "SELECT g.id AS group_id, g.code AS group_code, g.status, p.code AS project_code, "
+            "COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en, "
             "COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_member_count, "
             "MAX(a.display_name) FILTER (WHERE gm.membership_role = 'LEADER' AND gm.status = 'ACTIVE') AS leader_name, "
             "COUNT(DISTINCT gsp.timeslot_id) FILTER (WHERE gsp.selected) AS selected_slot_count "
             "FROM round_groups rg JOIN groups g ON g.id = rg.group_id JOIN projects p ON p.id = g.project_id "
             "LEFT JOIN group_memberships gm ON gm.group_id = g.id LEFT JOIN students st ON st.id = gm.student_id "
             "LEFT JOIN accounts a ON a.id = st.account_id LEFT JOIN group_slot_preferences gsp ON gsp.round_id = rg.round_id AND gsp.group_id = g.id "
-            "WHERE rg.round_id = :round_id GROUP BY g.id, g.code, g.status, p.code, p.title ORDER BY g.code"
+            "WHERE rg.round_id = :round_id GROUP BY g.id, g.code, g.status, p.code, p.title, p.title_vi, p.title_en ORDER BY g.code"
         ),
         {"round_id": round_id},
     ).mappings().all()
@@ -785,7 +798,7 @@ def group_progress_report(
     rows = db.execute(
         text(
             "WITH latest_results AS ("
-            " SELECT s.group_id, a.project_id, pr.title AS project_name, r.type, sr.outcome::text AS outcome, sr.entered_at, sr.verifier_lecturer_id, "
+            " SELECT s.group_id, a.project_id, COALESCE(pr.title_en, pr.title_vi, pr.title) AS project_name, r.type, sr.outcome::text AS outcome, sr.entered_at, sr.verifier_lecturer_id, "
             " ROW_NUMBER() OVER (PARTITION BY s.group_id, r.type ORDER BY sr.entered_at DESC, sr.id DESC) AS rn "
             " FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id JOIN projects pr ON pr.id=a.project_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
             " JOIN rounds r ON r.id = sv.round_id WHERE r.semester_id = :semester_id AND sv.status IN ('ACTIVE', 'PUBLISHED')"
@@ -797,18 +810,22 @@ def group_progress_report(
             " JOIN schedule_assignments ra ON ra.schedule_version_id = rss.schedule_version_id AND ra.group_id = rss.group_id "
             " JOIN projects rp ON rp.id = ra.project_id WHERE rp.semester_id = :semester_id"
             "), historical_groups AS ("
-            " SELECT DISTINCT ON (a.group_id) a.group_id, a.project_id, p.title AS project_name"
+            " SELECT DISTINCT ON (a.group_id) a.group_id, a.project_id, COALESCE(p.title_en, p.title_vi, p.title) AS project_name"
             " FROM schedule_assignments a JOIN projects p ON p.id = a.project_id"
             " JOIN schedule_versions hv ON hv.id = a.schedule_version_id"
             " WHERE p.semester_id = :semester_id AND hv.status IN ('ACTIVE', 'PUBLISHED')"
             " ORDER BY a.group_id, hv.activated_at DESC NULLS LAST, a.id DESC"
             ") SELECT hg.group_id AS group_id, g.code AS group_code, COALESCE(MAX(lr.project_name), hg.project_name) AS project_name, g.status AS group_status, "
-            "MAX(lr.outcome) FILTER (WHERE lr.type = 'REVIEW_1' AND lr.rn = 1) AS review_1, "
-            "MAX(lr.outcome) FILTER (WHERE lr.type = 'REVIEW_2' AND lr.rn = 1) AS review_2, "
-            "MAX(lr.outcome) FILTER (WHERE lr.type = 'REVIEW_3' AND lr.rn = 1) AS review_3, "
-            "MAX(lr.outcome) FILTER (WHERE lr.type = 'DEFENSE_1' AND lr.rn = 1) AS defense_1, "
+            "MAX(lr.outcome) FILTER (WHERE lr.type IN ('REVIEW_1_1', 'REVIEW_1') AND lr.rn = 1) AS review_1_1, "
+            "MAX(lr.outcome) FILTER (WHERE lr.type IN ('REVIEW_1_1', 'REVIEW_1') AND lr.rn = 1) AS review_1, "
+            "MAX(lr.outcome) FILTER (WHERE lr.type IN ('REVIEW_2_1', 'REVIEW_2') AND lr.rn = 1) AS review_2_1, "
+            "MAX(lr.outcome) FILTER (WHERE lr.type IN ('REVIEW_2_1', 'REVIEW_2') AND lr.rn = 1) AS review_2, "
+            "MAX(lr.outcome) FILTER (WHERE lr.type IN ('DEFENSE_1_1', 'REVIEW_3') AND lr.rn = 1) AS defense_1_1, "
+            "MAX(lr.outcome) FILTER (WHERE lr.type IN ('DEFENSE_1_1', 'REVIEW_3') AND lr.rn = 1) AS review_3, "
+            "MAX(lr.outcome) FILTER (WHERE lr.type IN ('DEFENSE_1_2', 'DEFENSE_1') AND lr.rn = 1) AS defense_1_2, "
+            "MAX(lr.outcome) FILTER (WHERE lr.type IN ('DEFENSE_1_2', 'DEFENSE_1') AND lr.rn = 1) AS defense_1, "
             "MAX(lr.outcome) FILTER (WHERE lr.type = 'DEFENSE_2' AND lr.rn = 1) AS defense_2, "
-            "MAX(lr.verifier_lecturer_id) FILTER (WHERE lr.type = 'REVIEW_3' AND lr.rn = 1) AS result_verifier_lecturer_id, "
+            "MAX(lr.verifier_lecturer_id) FILTER (WHERE lr.type IN ('DEFENSE_1_1', 'REVIEW_3') AND lr.rn = 1) AS result_verifier_lecturer_id, "
             "MAX(lm.remediation_status) FILTER (WHERE lm.rn = 1) AS remediation_status, "
             "MAX(lm.due_at) FILTER (WHERE lm.rn = 1) AS remediation_due_at, "
             "MAX(lm.verifier_lecturer_id) FILTER (WHERE lm.rn = 1) AS remediation_verifier_lecturer_id, "
@@ -954,7 +971,22 @@ async def import_projects(
     with db.begin():
         for index, row in enumerate(rows, start=2):
             code = str(row.get("code") or row.get("projectcode") or "").strip()
-            title = str(row.get("title") or row.get("project") or row.get("name") or code).strip()
+            title_vi = str(
+                row.get("titlevi")
+                or row.get("namevi")
+                or row.get("tendetaitiengviet")
+                or row.get("title")
+                or row.get("project")
+                or row.get("name")
+                or code
+            ).strip()
+            title_en = str(
+                row.get("titleen")
+                or row.get("nameen")
+                or row.get("tendetaitienganhtiengnhat")
+                or ""
+            ).strip() or None
+            title = title_en or title_vi
             semester_code = str(row.get("semestercode") or row.get("semester") or "").strip()
             major_code = str(row.get("majorcode") or row.get("major") or "").strip()
             if not code or not semester_code or not major_code:
@@ -968,7 +1000,7 @@ async def import_projects(
             ensure_semester_writable(db, int(semester_id))
             try:
                 with db.begin_nested():
-                    db.execute(text("INSERT INTO projects (semester_id, major_id, code, title) VALUES (:semester_id, :major_id, :code, :title)"), {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title})
+                    db.execute(text("INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en)"), {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title, "title_vi": title_vi, "title_en": title_en})
                 created += 1
             except Exception:
                 errors.append({"row": index, "code": "PROJECT_DUPLICATE_OR_INVALID"})

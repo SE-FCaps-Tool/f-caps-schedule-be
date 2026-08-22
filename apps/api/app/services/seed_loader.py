@@ -163,11 +163,12 @@ def load_seed_fixture(
                 project_id = _id(
                     session,
                     """
-                    INSERT INTO projects (semester_id, major_id, code, title)
-                    VALUES (:semester_id, :major_id, :code, :title)
+                    INSERT INTO projects (semester_id, major_id, code, title, title_vi)
+                    VALUES (:semester_id, :major_id, :code, :title, :title)
                     ON CONFLICT (semester_id, code) DO UPDATE SET
                         major_id = EXCLUDED.major_id,
                         title = EXCLUDED.title,
+                        title_vi = EXCLUDED.title_vi,
                         status = 'ACTIVE'
                     RETURNING id
                     """,

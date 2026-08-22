@@ -8,12 +8,11 @@ the bootstrap safe when both processes start at the same time.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
 import time
+from pathlib import Path
 
 import psycopg
-
 
 LOCK_KEY = 617283945
 ROOT = Path("/app")
@@ -34,6 +33,11 @@ def _connect(database_url: str) -> psycopg.Connection:
             time.sleep(1)
 
 
+def _seed_fixture_enabled() -> bool:
+    value = os.getenv("SEED_FIXTURE", "true").strip().lower()
+    return value not in {"0", "false", "no", "off"}
+
+
 def main() -> None:
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
@@ -41,10 +45,9 @@ def main() -> None:
 
     connection = _connect(database_url)
     try:
-        commands = [
-            ["alembic", "upgrade", "head"],
-            ["python", "/app/tools/seed_versioned_fixture.py"],
-        ]
+        commands = [["alembic", "upgrade", "head"]]
+        if _seed_fixture_enabled():
+            commands.append(["python", "/app/tools/seed_versioned_fixture.py"])
         for command in commands:
             subprocess.run(command, cwd=API_ROOT, check=True)
     finally:

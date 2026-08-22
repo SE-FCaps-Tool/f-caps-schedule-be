@@ -30,3 +30,26 @@ def test_round_cannot_enter_scheduling_without_all_required_inputs():
             reviewer_count=3,
         )
 
+
+@pytest.mark.parametrize(
+    ("round_type", "reviewer_count"),
+    [
+        ("REVIEW_1_1", 2),
+        ("REVIEW_2_1", 2),
+        ("DEFENSE_1_1", 3),
+        ("DEFENSE_1_2", 5),
+        ("DEFENSE_2", 5),
+    ],
+)
+def test_canonical_round_types_are_supported(round_type, reviewer_count):
+    assert validate_round_configuration(
+        {
+            "type": round_type,
+            "reviewer_count": reviewer_count,
+            "result_owner_mode": round_type in {"DEFENSE_1_1", "DEFENSE_2"},
+            "groups": [1],
+            "timeslots": [1],
+            "rooms": [1],
+        }
+    ) is True
+

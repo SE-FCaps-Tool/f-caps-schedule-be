@@ -107,8 +107,10 @@ def test_round_detail_matches_frontend_contract_and_groups_active_slots(client):
                 "registrationDeadline": "2030-01-20T16:59:00Z",
                 "groupSelectionMode": True,
                 "groupPreferenceDeadline": "2030-01-21T16:59:00Z",
+                "registrationPhase": "INACTIVE",
                 "resultOwnerMode": False,
                 "roomTypes": ["NORMAL"],
+                "committeeCount": 0,
                 "days": [
                     {
                         "date": "2030-02-01",

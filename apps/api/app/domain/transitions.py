@@ -1,5 +1,11 @@
 from app.domain.enums import DefenseType, GroupStatus, ResultOutcome, RoundStatus
 from app.domain.errors import DomainError
+from app.domain.round_types import (
+    DEFENSE_1_1_TYPES,
+    DEFENSE_1_2_TYPES,
+    REVIEW_1_1_TYPES,
+    REVIEW_2_1_TYPES,
+)
 
 _ROUND_TRANSITIONS: dict[RoundStatus, frozenset[RoundStatus]] = {
     RoundStatus.DRAFT: frozenset({RoundStatus.OPEN_REGISTRATION, RoundStatus.CANCELLED}),
@@ -48,14 +54,14 @@ def transition_group(
 
     if current is GroupStatus.DROPPED:
         raise DomainError("GROUP_TERMINAL", "A dropped group cannot receive a result.")
-    if defense in {DefenseType.REVIEW, DefenseType.REVIEW_1, DefenseType.REVIEW_2}:
+    if defense.value in REVIEW_1_1_TYPES | REVIEW_2_1_TYPES | {"REVIEW"}:
         return current
     if defense is DefenseType.REMEDIATION:
         if current is GroupStatus.D12_CONDITIONAL and outcome is ResultOutcome.PASS:
             return GroupStatus.ELIGIBLE_D12
         if current is GroupStatus.D12_CONDITIONAL and outcome is ResultOutcome.FAIL:
             return GroupStatus.FAILED
-    elif defense is DefenseType.REVIEW_3:
+    elif defense.value in DEFENSE_1_1_TYPES:
         if current is GroupStatus.PENDING_D11:
             next_status = {
                 ResultOutcome.LEVEL_1: GroupStatus.ELIGIBLE_D12,
@@ -65,7 +71,7 @@ def transition_group(
             }.get(outcome)
             if next_status is not None:
                 return next_status
-    elif defense is DefenseType.DEFENSE_1:
+    elif defense.value in DEFENSE_1_2_TYPES:
         if current is GroupStatus.ELIGIBLE_D12 and outcome is ResultOutcome.COMPLETED:
             return GroupStatus.COMPLETED
     elif defense is DefenseType.DEFENSE_2:

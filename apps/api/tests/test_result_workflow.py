@@ -23,6 +23,12 @@ def test_defense_1_is_completion_only_and_defense_2_is_binary():
         validate_result_outcome("DEFENSE_2", "NEEDS_FIX")
 
 
+def test_canonical_defense_rounds_use_the_same_outcomes():
+    for outcome in ("LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"):
+        assert validate_result_outcome("DEFENSE_1_1", outcome) is True
+    assert validate_result_outcome("DEFENSE_1_2", "COMPLETED") is True
+
+
 def test_remediation_verifier_must_be_a_session_reviewer():
     assert validate_remediation_verifier(7, {7, 8}) is True
     with pytest.raises(DomainError, match="VERIFIER_NOT_REVIEWER"):

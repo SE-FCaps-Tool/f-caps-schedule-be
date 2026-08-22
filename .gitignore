@@ -22,3 +22,8 @@ test-results/
 AGENTS.md
 CLAUDE.md
 docs/api/round-create-resultownermode-fix.md
+defenserflowdb/
+.playwright-mcp/
+plans/
+openapi.tmp.json
+feature_list.json

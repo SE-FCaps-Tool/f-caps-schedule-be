@@ -64,6 +64,8 @@ def build_input_snapshot(
             str(group_id): sorted(reviewers)
             for group_id, reviewers in sorted(context.prior_reviewer_ids.items())
         },
+        "committee_constraints": [list(member_ids) for member_ids in context.committee_reviewer_sets],
+        "committee_constraints_active": context.has_assigned_committees,
         "soft_weights": {key: soft_weights[key] for key in sorted(soft_weights)},
         "lecturer_load_preferences": {
             str(lecturer_id): context.lecturer_load_preferences[lecturer_id]

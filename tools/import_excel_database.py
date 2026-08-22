@@ -330,10 +330,10 @@ def main() -> None:
         )
 
     round_specs = {
-        "Review1": ("REVIEW_1", 2),
-        "Review2": ("REVIEW_2", 2),
-        "Review3": ("REVIEW_3", 2),
-        "Defense1": ("DEFENSE_1", 5),
+        "Review1": ("REVIEW_1_1", 2),
+        "Review2": ("REVIEW_2_1", 2),
+        "Review3": ("DEFENSE_1_1", 3),
+        "Defense1": ("DEFENSE_1_2", 5),
         "Defense2": ("DEFENSE_2", 5),
     }
     admin_id = "(SELECT id FROM accounts WHERE email = 'admin1@gmail.com')"
@@ -372,12 +372,13 @@ def main() -> None:
         group_code = clean_code(values[3])
         if not project_code or not group_code:
             continue
-        title_en = str(values[4] or values[5] or project_code)[:255]
-        title_vi = values[5]
+        title_en = str(values[4] or "").strip()[:255] or None
+        title_vi = str(values[5] or title_en or project_code).strip()[:255]
         add_sql(
             lines,
-            "INSERT INTO projects (semester_id, major_id, code, title) VALUES "
-            f"({semester_lookup}, {major_lookup}, {sql(project_code)}, {sql(title_en)})",
+            "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) VALUES "
+            f"({semester_lookup}, {major_lookup}, {sql(project_code)}, {sql(title_en or title_vi)}, "
+            f"{sql(title_vi)}, {sql(title_en)})",
         )
         add_sql(
             lines,

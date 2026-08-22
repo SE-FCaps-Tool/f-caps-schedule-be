@@ -110,7 +110,8 @@ def lecturer_supervised_projects(db: Db, user: User) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
         text(
-            "SELECT p.id, p.code, p.title, p.status::text AS status, p.semester_id, "
+            "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, "
+            "p.title_vi, p.title_en, p.status::text AS status, p.semester_id, "
             "s.code AS semester_code, ps.supervisor_type, "
             "grp.id AS group_id, grp.code AS group_code, grp.member_count, "
             "grp.leader, grp.members "
@@ -211,14 +212,15 @@ def leader_dashboard(db: Db, user: User) -> dict[str, Any]:
         text(
             "SELECT g.id, g.code, g.status::text AS group_status, g.project_id, "
             "COUNT(active_members.id) AS member_count, "
-            "p.code AS project_code, p.title AS project_title, p.status::text AS project_status "
+            "p.code AS project_code, COALESCE(p.title_en, p.title_vi, p.title) AS project_title, "
+            "p.title_vi AS project_title_vi, p.title_en AS project_title_en, p.status::text AS project_status "
             "FROM group_memberships leader "
             "JOIN groups g ON g.id = leader.group_id "
             "LEFT JOIN group_memberships active_members ON active_members.group_id = g.id AND active_members.status = 'ACTIVE' "
             "LEFT JOIN projects p ON p.id = g.project_id "
             "LEFT JOIN semesters sem ON sem.id = p.semester_id "
             "WHERE leader.student_id = :student_id AND leader.membership_role = 'LEADER' AND leader.status = 'ACTIVE' "
-            "GROUP BY g.id, g.code, g.status, g.project_id, p.code, p.title, p.status, sem.status "
+            "GROUP BY g.id, g.code, g.status, g.project_id, p.code, p.title, p.title_vi, p.title_en, p.status, sem.status "
             "ORDER BY (sem.status::text = 'ACTIVE') DESC NULLS LAST, g.code, g.id LIMIT 1"
         ),
         {"student_id": student_id},
@@ -316,8 +318,8 @@ def leader_dashboard(db: Db, user: User) -> dict[str, Any]:
         project = {
             "id": str(group["project_id"]),
             "code": group["project_code"],
-            "titleVi": group["project_title"],
-            "titleEn": None,
+            "titleVi": group["project_title_vi"] or group["project_title"],
+            "titleEn": group["project_title_en"],
             "status": project_status,
         }
     round_payload = None

@@ -1,5 +1,11 @@
 from collections import defaultdict
 
+from app.domain.round_types import (
+    DEFENSE_1_1_TYPES,
+    DEFENSE_1_2_TYPES,
+    REVIEW_1_1_TYPES,
+    REVIEW_2_1_TYPES,
+)
 from app.scheduler.models import RoundInput, ScheduledSession, ValidationResult, Violation
 
 
@@ -21,12 +27,11 @@ def _eligible(round_type: str, status: str) -> bool:
     if status in {"FAILED", "DROPPED"}:
         return False
     expected = {
-        "REVIEW_3": {"PENDING_D11"},
-        "DEFENSE_1": {"ELIGIBLE_D12"},
         "DEFENSE_2": {"PENDING_D2"},
-        "REVIEW_1": {"PENDING_D11", "ELIGIBLE_D12", "D12_CONDITIONAL", "PENDING_D2"},
-        "REVIEW_2": {"PENDING_D11", "ELIGIBLE_D12", "D12_CONDITIONAL", "PENDING_D2"},
     }
+    expected.update({round_type: {"PENDING_D11", "ELIGIBLE_D12", "D12_CONDITIONAL", "PENDING_D2"} for round_type in REVIEW_1_1_TYPES | REVIEW_2_1_TYPES})
+    expected.update({round_type: {"PENDING_D11"} for round_type in DEFENSE_1_1_TYPES})
+    expected.update({round_type: {"ELIGIBLE_D12"} for round_type in DEFENSE_1_2_TYPES})
     return status in expected.get(round_type, set())
 
 
@@ -132,14 +137,14 @@ def validate_schedule(
                     current.group_id,
                 )
             )
-        if context.round_type == "DEFENSE_1" and not valid_h11_waiver(context, current.group_id):
+        if context.round_type in DEFENSE_1_2_TYPES and not valid_h11_waiver(context, current.group_id):
             continuity = set(context.prior_reviewer_ids.get(current.group_id, set()))
             continuity.update(context.remediation_verifier_ids.get(current.group_id, set()))
             if not continuity.intersection(current.reviewer_ids):
                 violations.append(
                     _violation(
                         "H11",
-                        "Defense 1 has no Reviewer with continuity from Review 3.",
+                        "Defense 1.2 has no Reviewer with continuity from Defense 1.1.",
                         "Assign a prior Reviewer, choose the Remediation Verifier, or obtain an audited H11 waiver.",
                         current.group_id,
                     )

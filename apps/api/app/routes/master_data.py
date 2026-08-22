@@ -348,11 +348,20 @@ class RoomCreate(BaseModel):
 
 
 class ProjectCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     semester_id: int = Field(gt=0)
     major_id: int = Field(gt=0)
     code: str = Field(min_length=1, max_length=64)
-    title: str = Field(min_length=1, max_length=255)
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    title_vi: str | None = Field(default=None, alias="titleVi", min_length=1, max_length=255)
+    title_en: str | None = Field(default=None, alias="titleEn", max_length=255)
     supervisors: list[str] = Field(min_length=1, max_length=2)
+
+    @model_validator(mode="after")
+    def require_title(self) -> Self:
+        if not self.title and not self.title_vi:
+            raise ValueError("title or titleVi is required")
+        return self
 
 
 class MemberPayload(BaseModel):
@@ -578,7 +587,8 @@ def list_projects(db: Db, user: User, semester_id: int | None = None) -> list[di
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
-            "SELECT p.id, p.code, p.title, p.status, p.semester_id, sem.code AS semester_code, "
+            "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, "
+             "p.title_vi, p.title_en, p.status, p.semester_id, sem.code AS semester_code, "
              "m.code AS major_code, COUNT(ps.lecturer_id) AS supervisor_count, "
              "COALESCE(jsonb_agg(jsonb_build_object('lecturer_code', sl.lecturer_code, 'display_name', sa.display_name, 'type', ps.supervisor_type)) FILTER (WHERE sl.id IS NOT NULL), '[]'::jsonb) AS supervisors "
              "FROM projects p JOIN semesters sem ON sem.id = p.semester_id "
@@ -609,7 +619,8 @@ def list_semester_projects(
     offset = (page - 1) * page_size
     rows = db.execute(
         text(
-            "SELECT p.id, p.code, p.title, p.status::text AS status, g.id AS group_id, g.code AS group_code, "
+            "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, "
+            "p.title_vi, p.title_en, p.status::text AS status, g.id AS group_id, g.code AS group_code, "
             "(SELECT jsonb_build_object('id', l.id, 'code', l.lecturer_code, 'fullName', a.display_name) "
             " FROM project_supervisors ps JOIN lecturers l ON l.id = ps.lecturer_id "
             " JOIN accounts a ON a.id = l.account_id "
@@ -621,7 +632,9 @@ def list_semester_projects(
             "COUNT(*) OVER() AS total_count "
             "FROM projects p LEFT JOIN groups g ON g.project_id = p.id "
             "WHERE p.semester_id = :semester_id "
-            "AND (CAST(:search AS text) IS NULL OR p.code ILIKE '%' || CAST(:search AS text) || '%' OR p.title ILIKE '%' || CAST(:search AS text) || '%') "
+            "AND (CAST(:search AS text) IS NULL OR p.code ILIKE '%' || CAST(:search AS text) || '%' "
+            "OR COALESCE(p.title_en, p.title_vi, p.title) ILIKE '%' || CAST(:search AS text) || '%' "
+            "OR COALESCE(p.title_vi, p.title) ILIKE '%' || CAST(:search AS text) || '%') "
             "AND (CAST(:status AS text) IS NULL OR p.status::text = CAST(:status AS text)) "
             "AND (CAST(:has_group AS boolean) IS NULL OR (g.id IS NOT NULL) = CAST(:has_group AS boolean)) "
             "AND (CAST(:supervisor_id AS BIGINT) IS NULL OR EXISTS (SELECT 1 FROM project_supervisors ps WHERE ps.project_id = p.id AND ps.lecturer_id = CAST(:supervisor_id AS BIGINT))) "
@@ -639,7 +652,8 @@ def list_semester_projects(
             "id": external_id(row["id"], "prj"),
             "code": row["code"],
             "name": row["title"],
-            "nameVi": row["title"],
+            "nameVi": row["title_vi"] or row["title"],
+            "nameEn": row["title_en"],
             "status": project_from_legacy(row["status"], has_group=row["group_id"] is not None).value,
             "mainSupervisor": (
                 {**dict(row["main_supervisor"]), "id": external_id(row["main_supervisor"]["id"], "lec")}
@@ -800,7 +814,9 @@ def list_groups(db: Db, user: User, semester_id: int | None = None) -> list[dict
     rows = db.execute(
         text(
             """
-            SELECT g.id, g.code, g.status, g.project_id, p.code AS project_code, p.title
+            SELECT g.id, g.code, g.status, g.project_id, p.code AS project_code,
+                   COALESCE(p.title_en, p.title_vi, p.title) AS title,
+                   p.title_vi, p.title_en
                    , COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_member_count
                    , COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_count
                    , MAX(a.display_name) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_name
@@ -808,7 +824,7 @@ def list_groups(db: Db, user: User, semester_id: int | None = None) -> list[dict
              LEFT JOIN group_memberships gm ON gm.group_id = g.id
              LEFT JOIN students st ON st.id = gm.student_id LEFT JOIN accounts a ON a.id = st.account_id
              WHERE (CAST(:semester_id AS BIGINT) IS NULL OR p.semester_id = CAST(:semester_id AS BIGINT))
-             GROUP BY g.id, g.code, g.status, g.project_id, p.code, p.title
+             GROUP BY g.id, g.code, g.status, g.project_id, p.code, p.title, p.title_vi, p.title_en
             ORDER BY g.code
             """
         )
@@ -836,14 +852,16 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
                 lecturer_ids[lecturer_code] = lecturer_id
             project_id = db.execute(
                 text(
-                    "INSERT INTO projects (semester_id, major_id, code, title) "
-                    "VALUES (:semester_id, :major_id, :code, :title) RETURNING id"
+                    "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) "
+                    "VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en) RETURNING id"
                 ),
                 {
                     "semester_id": payload.semester_id,
                     "major_id": payload.major_id,
                     "code": normalize_code(payload.code),
-                    "title": payload.title.strip(),
+                    "title": (payload.title_en or payload.title_vi or payload.title).strip(),
+                    "title_vi": (payload.title_vi or payload.title).strip(),
+                    "title_en": payload.title_en.strip() if payload.title_en else None,
                 },
             ).scalar_one()
             for assignment in payload.supervisors:
@@ -875,7 +893,15 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
             status_code=409,
             detail={"code": "DATA_DUPLICATE", "message": "Project code already exists in this semester."},
         ) from exc
-    return {"id": project_id, "code": normalize_code(payload.code), "title": payload.title.strip()}
+    title_vi = (payload.title_vi or payload.title or "").strip()
+    title_en = payload.title_en.strip() if payload.title_en else None
+    return {
+        "id": project_id,
+        "code": normalize_code(payload.code),
+        "title": title_en or title_vi,
+        "title_vi": title_vi,
+        "title_en": title_en,
+    }
 
 
 @router.post("/groups", status_code=status.HTTP_201_CREATED, response_model=GroupMutationResponse, response_model_exclude_none=True)
@@ -1472,7 +1498,7 @@ def attach_round_resources(
             if round_type is None:
                 raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
             for group_id in set(payload.group_ids):
-                if round_type == "REVIEW_1":
+                if round_type in {"REVIEW_1_1", "REVIEW_1"}:
                     already_reviewed = db.execute(
                         text(
                             "SELECT EXISTS ("
@@ -1480,7 +1506,7 @@ def attach_round_resources(
                             "JOIN rounds previous_round ON previous_round.id = previous_rg.round_id "
                             "WHERE previous_rg.group_id = :group_id "
                             "AND previous_rg.round_id <> :round_id "
-                            "AND previous_round.type = 'REVIEW_1' "
+                            "AND previous_round.type IN ('REVIEW_1_1', 'REVIEW_1') "
                             "AND previous_round.status <> 'CANCELLED'"
                             ")"
                         ),
@@ -1489,7 +1515,7 @@ def attach_round_resources(
                     if already_reviewed:
                         raise DomainError(
                             "GROUP_ALREADY_REVIEWED",
-                            "This group already has a non-cancelled REVIEW_1 round.",
+                            "This group already has a non-cancelled REVIEW_1_1 round.",
                         )
                 db.execute(
                     text(

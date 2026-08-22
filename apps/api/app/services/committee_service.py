@@ -6,17 +6,38 @@ import json
 from typing import Any
 
 from fastapi import HTTPException
+from psycopg.errors import ForeignKeyViolation
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser
-from app.domain.committees import assign_roles, label_role, validate_group
+from app.domain.committees import (
+    assign_roles,
+    label_role,
+    validate_group,
+    validate_round_committee_sizes,
+)
 from app.domain.errors import DomainError
+
+ROUND_COMMITTEE_FK = "fk_round_committees_committee_id"
 
 
 def _error(status_code: int, code: str, message: str) -> HTTPException:
     return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+
+
+def _committee_in_use_error() -> HTTPException:
+    return _error(409, "COMMITTEE_IN_USE", "Committee is assigned to a Round and cannot be deleted.")
+
+
+def _is_round_committee_fk_violation(exc: IntegrityError) -> bool:
+    """Only a Round assignment may be reported as in-use; other failures must surface."""
+    cause = getattr(exc, "orig", None)
+    if not isinstance(cause, ForeignKeyViolation):
+        return False
+    diag = getattr(cause, "diag", None)
+    return (getattr(diag, "constraint_name", None) or "") == ROUND_COMMITTEE_FK
 
 
 def _actor_id(db: Session, user: CurrentUser) -> int | None:
@@ -172,6 +193,131 @@ def list_committees(db: Session, *, lecturer_id: int | None = None) -> list[dict
     return [_load_committee_detail(db, int(row["id"]), row) for row in rows]
 
 
+def list_round_committees(db: Session, round_id: int) -> list[dict[str, Any]]:
+    rows = db.execute(
+        text(
+            "SELECT c.id, c.code, c.member_count, c.created_by, c.created_at "
+            "FROM round_committees rc JOIN committees c ON c.id = rc.committee_id "
+            "WHERE rc.round_id = :round_id "
+            "ORDER BY c.code, c.id"
+        ),
+        {"round_id": round_id},
+    ).mappings().all()
+    return [_load_committee_detail(db, int(row["id"]), row) for row in rows]
+
+
+def unusable_round_committees(db: Session, round_id: int) -> list[dict[str, Any]]:
+    """Assigned Committees the scheduler would silently drop, and who is missing.
+
+    Mirrors ``_round_input``'s ``accepted_reviewer_ids or available_reviewer_ids``
+    pool exactly: a Committee is only usable when every member is in that pool,
+    so a manager needs to see the gap before running the solver rather than
+    reading it out of an all-UNSCHEDULED result.
+    """
+
+    rows = db.execute(
+        text(
+            "WITH accepted AS ("
+            " SELECT lecturer_id FROM round_invitations "
+            " WHERE round_id = :round_id AND status = 'ACCEPTED'"
+            "), pool AS ("
+            " SELECT lecturer_id FROM accepted"
+            " UNION"
+            " SELECT lecturer_id FROM lecturer_availabilities"
+            " WHERE round_id = :round_id AND state = 'AVAILABLE'"
+            "   AND NOT EXISTS (SELECT 1 FROM accepted)"
+            ") "
+            "SELECT c.id, c.code, "
+            " array_agg(cm.lecturer_id ORDER BY cm.lecturer_id) "
+            "  FILTER (WHERE cm.lecturer_id NOT IN (SELECT lecturer_id FROM pool)) AS missing "
+            "FROM round_committees rc "
+            "JOIN committees c ON c.id = rc.committee_id "
+            "JOIN committee_members cm ON cm.committee_id = c.id "
+            "WHERE rc.round_id = :round_id "
+            "GROUP BY c.id, c.code "
+            "HAVING COUNT(*) FILTER (WHERE cm.lecturer_id NOT IN (SELECT lecturer_id FROM pool)) > 0 "
+            "ORDER BY c.code, c.id"
+        ),
+        {"round_id": round_id},
+    ).mappings().all()
+    return [
+        {
+            "committee_id": int(row["id"]),
+            "code": row["code"],
+            "missing_lecturer_ids": [int(value) for value in (row["missing"] or [])],
+        }
+        for row in rows
+    ]
+
+
+def replace_round_committees(
+    db: Session,
+    round_id: int,
+    user: CurrentUser,
+    committee_ids: list[int],
+) -> list[dict[str, Any]]:
+    """Replace the whole Committee set bound to a Round; an empty list clears it."""
+
+    if len(set(committee_ids)) != len(committee_ids):
+        raise _error(
+            422,
+            "ROUND_COMMITTEE_DUPLICATE_ID",
+            "The same committee cannot be assigned twice to one round.",
+        )
+    db.rollback()
+    with db.begin():
+        actor_id = _actor_id(db, user)
+        current_round = db.execute(
+            text("SELECT status, reviewer_count FROM rounds WHERE id = :id FOR UPDATE"),
+            {"id": round_id},
+        ).mappings().one_or_none()
+        if current_round is None:
+            raise _error(404, "ROUND_NOT_FOUND", "Round does not exist.")
+        if str(current_round["status"]) not in {"DRAFT", "OPEN_REGISTRATION"}:
+            raise _error(
+                409,
+                "ROUND_CONFIG_LOCKED",
+                "Round configuration can only be edited before scheduling.",
+            )
+        if committee_ids:
+            found = db.execute(
+                text("SELECT id, code, member_count FROM committees WHERE id = ANY(:ids)"),
+                {"ids": sorted(committee_ids)},
+            ).mappings().all()
+            missing = sorted(set(committee_ids) - {int(row["id"]) for row in found})
+            if missing:
+                raise _error(
+                    404,
+                    "COMMITTEE_NOT_FOUND",
+                    f"Unknown committee id(s): {', '.join(str(value) for value in missing)}.",
+                )
+            try:
+                validate_round_committee_sizes(int(current_round["reviewer_count"]), [dict(row) for row in found])
+            except DomainError as exc:
+                raise _error(422, exc.code, str(exc).partition(": ")[2]) from exc
+        db.execute(text("DELETE FROM round_committees WHERE round_id = :round_id"), {"round_id": round_id})
+        for committee_id in committee_ids:
+            db.execute(
+                text(
+                    "INSERT INTO round_committees (round_id, committee_id, created_by) "
+                    "VALUES (:round_id, :committee_id, :created_by)"
+                ),
+                {"round_id": round_id, "committee_id": committee_id, "created_by": actor_id},
+            )
+        db.execute(
+            text(
+                "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
+                "VALUES (:actor_id, 'ROUND_COMMITTEES_REPLACED', 'round', :entity_id, CAST(:after_json AS JSONB))"
+            ),
+            {
+                "actor_id": actor_id,
+                "entity_id": str(round_id),
+                "after_json": json.dumps({"committee_ids": committee_ids}),
+            },
+        )
+    return list_round_committees(db, round_id)
+
+
 def _load_committee_detail(db: Session, committee_id: int, row: Any) -> dict[str, Any]:
     members = db.execute(
         text(
@@ -214,20 +360,55 @@ def get_committee(db: Session, committee_id: int) -> dict[str, Any]:
     return _load_committee_detail(db, committee_id, row)
 
 
+def _assigned_committee_ids(db: Session, committee_ids: list[int]) -> set[int]:
+    if not committee_ids:
+        return set()
+    rows = db.execute(
+        text("SELECT DISTINCT committee_id FROM round_committees WHERE committee_id = ANY(:ids)"),
+        {"ids": sorted(committee_ids)},
+    ).scalars().all()
+    return {int(value) for value in rows}
+
+
 def delete_committee(db: Session, committee_id: int) -> None:
     with db.begin():
-        deleted = db.execute(
-            text("DELETE FROM committees WHERE id = :id RETURNING id"),
-            {"id": committee_id},
-        ).scalar_one_or_none()
+        if _assigned_committee_ids(db, [committee_id]):
+            raise _committee_in_use_error()
+        try:
+            deleted = db.execute(
+                text("DELETE FROM committees WHERE id = :id RETURNING id"),
+                {"id": committee_id},
+            ).scalar_one_or_none()
+        except IntegrityError as exc:
+            if not _is_round_committee_fk_violation(exc):
+                raise
+            raise _committee_in_use_error() from exc
         if deleted is None:
             raise _error(404, "COMMITTEE_NOT_FOUND", "Committee not found.")
 
 
 def bulk_delete_committees(db: Session, committee_ids: list[int]) -> dict[str, Any]:
     with db.begin():
-        deleted_ids = db.execute(
-            text("DELETE FROM committees WHERE id = ANY(:ids) RETURNING id"),
-            {"ids": committee_ids},
-        ).scalars().all()
-    return {"deleted": len(deleted_ids), "deleted_ids": [int(value) for value in deleted_ids]}
+        in_use_ids = _assigned_committee_ids(db, committee_ids)
+        deleted_ids: list[int] = []
+        for committee_id in committee_ids:
+            if committee_id in in_use_ids:
+                continue
+            try:
+                with db.begin_nested():
+                    deleted = db.execute(
+                        text("DELETE FROM committees WHERE id = :id RETURNING id"),
+                        {"id": committee_id},
+                    ).scalar_one_or_none()
+            except IntegrityError as exc:
+                if not _is_round_committee_fk_violation(exc):
+                    raise
+                in_use_ids.add(committee_id)
+                continue
+            if deleted is not None:
+                deleted_ids.append(int(deleted))
+    return {
+        "deleted": len(deleted_ids),
+        "deleted_ids": deleted_ids,
+        "in_use_ids": sorted(in_use_ids),
+    }

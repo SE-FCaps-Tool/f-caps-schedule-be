@@ -1,28 +1,26 @@
 from collections.abc import Sequence
 
 from app.domain.errors import DomainError
+from app.domain.round_types import (
+    DEFENSE_1_1_TYPES,
+    RESULT_OWNER_TYPES,
+    REVIEW_1_1_TYPES,
+    REVIEW_2_1_TYPES,
+    ROUND_REVIEWER_COUNTS,
+)
 
-_REVIEW_TYPES = {"REVIEW_1", "REVIEW_2", "REVIEW_3"}
-_DEFENSE_TYPES = {"DEFENSE_1", "DEFENSE_2"}
+_SUPPORTED_TYPES = frozenset(ROUND_REVIEWER_COUNTS)
 
 
 def validate_round_configuration(config: dict[str, object]) -> bool:
     round_type = str(config.get("type", ""))
-    # The Manager UI mock models the later defense panels with five reviewers,
-    # while Review 1/2/3 remain on the existing panel sizes.
-    expected_reviewers = {
-        "REVIEW_1": 2,
-        "REVIEW_2": 2,
-        "REVIEW_3": 3,
-        "DEFENSE_1": 5,
-        "DEFENSE_2": 5,
-    }.get(round_type)
-    if round_type not in _REVIEW_TYPES | _DEFENSE_TYPES:
+    expected_reviewers = ROUND_REVIEWER_COUNTS.get(round_type)
+    if round_type not in _SUPPORTED_TYPES:
         raise DomainError("ROUND_TYPE_INVALID", "Round type is not supported in Scheduler-only V1.")
-    if round_type in _REVIEW_TYPES and config.get("reviewer_count") != expected_reviewers:
+    if round_type in DEFENSE_1_1_TYPES | REVIEW_1_1_TYPES | REVIEW_2_1_TYPES and config.get("reviewer_count") != expected_reviewers:
         raise DomainError("REVIEWER_COUNT_INVALID", f"{round_type} requires {expected_reviewers} Reviewers.")
-    if config.get("result_owner_mode") and round_type not in {"REVIEW_3", "DEFENSE_2"}:
-        raise DomainError("RESULT_OWNER_NOT_ALLOWED", "Result Owner mode is only available for Review 3 and Defense 2.")
+    if config.get("result_owner_mode") and round_type not in RESULT_OWNER_TYPES:
+        raise DomainError("RESULT_OWNER_NOT_ALLOWED", "Result Owner mode is only available for Defense 1.1 and Defense 2.")
     if config.get("reviewer_count") != expected_reviewers:
         raise DomainError("REVIEWER_COUNT_INVALID", f"{round_type} requires {expected_reviewers} Reviewers.")
     for key in ("groups", "timeslots", "rooms"):

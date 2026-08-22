@@ -33,6 +33,7 @@ from app.routes.master_data import (
 )
 from app.scheduler.validator import _eligible
 from app.services.access import is_active_group_leader, lecturer_id_for_account
+from app.services.committee_service import unusable_round_committees
 
 router = APIRouter(prefix="/api/v1", tags=["target-rounds"])
 Db = Annotated[Session, Depends(get_db)]
@@ -140,9 +141,13 @@ class TargetRoundCreate(BaseModel):
                         f"{deadline_name} must fall within startDate and endDate"
                     )
         expected_reviewers = {
+            "REVIEW_1_1": 2,
             "REVIEW_1": 2,
+            "REVIEW_2_1": 2,
             "REVIEW_2": 2,
+            "DEFENSE_1_1": 3,
             "REVIEW_3": 3,
+            "DEFENSE_1_2": 5,
             "DEFENSE_1": 5,
             "DEFENSE_2": 5,
         }.get(self.type)
@@ -150,8 +155,8 @@ class TargetRoundCreate(BaseModel):
             raise ValueError("type is not a supported round type")
         if self.reviewer_count != expected_reviewers:
             raise ValueError(f"{self.type} requires {expected_reviewers} reviewers")
-        if self.result_owner_mode and self.type not in {"REVIEW_3", "DEFENSE_2"}:
-            raise ValueError("resultOwnerMode is only available for REVIEW_3 and DEFENSE_2")
+        if self.result_owner_mode and self.type not in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"}:
+            raise ValueError("resultOwnerMode is only available for DEFENSE_1_1 and DEFENSE_2")
         if self.registration_deadline.tzinfo is None:
             raise ValueError("registrationDeadline must include a timezone offset")
         if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:
@@ -253,7 +258,7 @@ def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
             "(SELECT COUNT(*) FROM group_memberships gm WHERE gm.group_id = g.id AND gm.status = 'ACTIVE') AS active_member_count, "
             "EXISTS (SELECT 1 FROM round_groups previous_rg JOIN rounds previous_round ON previous_round.id = previous_rg.round_id "
             "WHERE previous_rg.group_id = g.id AND previous_rg.round_id <> :round_id "
-            "AND previous_round.type = 'REVIEW_1' AND previous_round.status <> 'CANCELLED') AS has_prior_review_1 "
+            "AND previous_round.type IN ('REVIEW_1_1', 'REVIEW_1') AND previous_round.status <> 'CANCELLED') AS has_prior_review_1 "
             "FROM projects p JOIN rounds r ON r.semester_id = p.semester_id "
             "LEFT JOIN groups g ON g.project_id = p.id "
             "WHERE r.id = :round_id AND p.status::text <> 'ARCHIVED' "
@@ -272,7 +277,8 @@ def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
         progression_allowed = (
             has_group
             and _eligible(round_type, row["group_status"] or "")
-            and not (round_type == "REVIEW_1" and has_prior_review_1)
+            and round_type in {"REVIEW_1_1", "REVIEW_1"}
+            and has_prior_review_1
         )
         eligible = has_group and has_active_leader and has_main_supervisor and progression_allowed
         blocking_reasons = []
@@ -284,8 +290,8 @@ def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
             blocking_reasons.append("No Main Supervisor")
         if has_group and not progression_allowed:
             blocking_reasons.append(
-                "Group already has a non-cancelled REVIEW_1 round."
-                if round_type == "REVIEW_1" and has_prior_review_1
+                "Group already has a non-cancelled REVIEW_1_1 round."
+                if round_type in {"REVIEW_1_1", "REVIEW_1"} and has_prior_review_1
                 else "Progression incompatible"
             )
         warnings = []
@@ -333,7 +339,20 @@ def scheduling_readiness(round_id: int, db: Db, user: User) -> dict[str, Any]:
         blockers.append("NO_GROUPS")
     if not row["timeslots"]:
         blockers.append("NO_TIMESLOTS")
-    return success_payload({"ready": not blockers, "blockers": blockers, **dict(row)})
+    # An assigned Committee whose members are not all in the reviewer pool is
+    # dropped silently by the scheduler, so name it here rather than letting the
+    # manager infer it from an all-UNSCHEDULED run.
+    unusable = unusable_round_committees(db, round_id)
+    if unusable:
+        blockers.append("COMMITTEE_MEMBERS_NOT_ELIGIBLE")
+    return success_payload(
+        {
+            "ready": not blockers,
+            "blockers": blockers,
+            "unusable_committees": unusable,
+            **dict(row),
+        }
+    )
 
 
 def _transition(

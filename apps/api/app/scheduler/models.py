@@ -44,6 +44,10 @@ class RoundInput:
     max_groups_per_timeslot: int | None = None
     max_minutes_per_part: int | None = None
     max_minutes_per_day: int | None = None
+    committee_reviewer_sets: tuple[tuple[int, ...], ...] = ()
+    # Distinguishes "no Committee assigned" from "assigned but none eligible";
+    # the latter must not fall back to free-pool reviewer combinations.
+    has_assigned_committees: bool = False
 
 
 @dataclass(frozen=True)

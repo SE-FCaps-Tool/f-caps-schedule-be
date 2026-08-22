@@ -43,8 +43,13 @@ class RoundStatus(DomainEnum):
 
 
 class DefenseType(DomainEnum):
+    REVIEW_1_1 = "REVIEW_1_1"
+    REVIEW_2_1 = "REVIEW_2_1"
     REVIEW_1 = "REVIEW_1"
     REVIEW_2 = "REVIEW_2"
+    DEFENSE_1_1 = "DEFENSE_1_1"
+    DEFENSE_1_2 = "DEFENSE_1_2"
+    # Legacy names kept so historical rows and clients remain readable.
     REVIEW_3 = "REVIEW_3"
     REVIEW = "REVIEW"
     DEFENSE_1 = "DEFENSE_1"
