@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -44,9 +44,9 @@ class PublishTargetPayload(BaseModel):
     version_id: int = Field(alias="versionId", gt=0)
 
 
-@router.get("/rounds/{round_id}/rooms/available")
+@router.get("/rounds/{roundId}/rooms/available")
 def target_available_rooms(
-    round_id: int,
+    round_id: Annotated[int, Path(alias="roundId")],
     db: Db,
     user: User,
     timeslot_id: int | None = Query(default=None, alias="timeslotId", gt=0),
@@ -56,18 +56,18 @@ def target_available_rooms(
     return success_payload(rows, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
 
-@router.put("/sessions/{session_id}/room")
-def target_assign_room(session_id: int, payload: RoomAssignmentPayload, db: Db, user: User) -> dict[str, Any]:
+@router.put("/sessions/{sessionId}/room")
+def target_assign_room(session_id: Annotated[int, Path(alias="sessionId")], payload: RoomAssignmentPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(assign_session_room(session_id, payload, db, user))
 
 
-@router.post("/rounds/{round_id}/rooms/suggest")
-def target_suggest_rooms(round_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.post("/rounds/{roundId}/rooms/suggest")
+def target_suggest_rooms(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     return success_payload(suggest_rooms(round_id, db, user))
 
 
-@router.post("/rounds/{round_id}/rooms/apply-suggestions")
-def target_apply_room_suggestions(round_id: int, payload: RoomSuggestionPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/rounds/{roundId}/rooms/apply-suggestions")
+def target_apply_room_suggestions(round_id: Annotated[int, Path(alias="roundId")], payload: RoomSuggestionPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(apply_room_suggestions(round_id, payload, db, user))
 
 
@@ -76,8 +76,8 @@ def _manager(user: CurrentUser) -> None:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Manager permission required."})
 
 
-@router.patch("/rooms/{room_id}")
-def update_room(room_id: int, payload: RoomUpdateTarget, db: Db, user: User) -> dict[str, Any]:
+@router.patch("/rooms/{roomId}")
+def update_room(room_id: Annotated[int, Path(alias="roomId")], payload: RoomUpdateTarget, db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     current = db.execute(text("SELECT id, code, name, capacity, active, room_type::text AS room_type FROM rooms WHERE id = :id"), {"id": room_id}).mappings().one_or_none()
     db.rollback()
@@ -104,8 +104,8 @@ def update_room(room_id: int, payload: RoomUpdateTarget, db: Db, user: User) -> 
     return success_payload(dict(row))
 
 
-@router.get("/rounds/{round_id}/publish-readiness")
-def publish_readiness(round_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/rounds/{roundId}/publish-readiness")
+def publish_readiness(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     version = db.execute(text("SELECT id, status::text AS status FROM schedule_versions WHERE round_id = :round_id AND status = 'ACTIVE' ORDER BY id DESC LIMIT 1"), {"round_id": round_id}).mappings().one_or_none()
     db.rollback()
@@ -121,6 +121,6 @@ def publish_readiness(round_id: int, db: Db, user: User) -> dict[str, Any]:
     return success_payload({"ready": not blockers, "versionId": int(version["id"]), "blockers": blockers})
 
 
-@router.post("/rounds/{round_id}/actions/publish")
-def publish_target_schedule(round_id: int, payload: PublishTargetPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/rounds/{roundId}/actions/publish")
+def publish_target_schedule(round_id: Annotated[int, Path(alias="roundId")], payload: PublishTargetPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(publish_schedule(round_id, payload.version_id, db, user))

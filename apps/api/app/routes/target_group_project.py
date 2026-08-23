@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -107,9 +107,9 @@ def _parse_group_id(value: str | int) -> int:
         ) from exc
 
 
-@router.get("/semesters/{semester_id}/groups")
+@router.get("/semesters/{semesterId}/groups")
 def list_semester_groups(
-    semester_id: int,
+    semester_id: Annotated[int, Path(alias="semesterId")],
     db: Db,
     user: User,
     search: str | None = None,
@@ -183,8 +183,8 @@ def list_semester_groups(
     return success_payload(items, meta={"page": page, "pageSize": page_size, "total": total})
 
 
-@router.post("/semesters/{semester_id}/groups", status_code=status.HTTP_201_CREATED)
-def create_semester_group(semester_id: int, payload: TargetGroupCreate, db: Db, user: User) -> dict[str, Any]:
+@router.post("/semesters/{semesterId}/groups", status_code=status.HTTP_201_CREATED)
+def create_semester_group(semester_id: Annotated[int, Path(alias="semesterId")], payload: TargetGroupCreate, db: Db, user: User) -> dict[str, Any]:
     _require_manager(user)
     semester_or_404(db, semester_id)
     student_ids = [parse_external_id(value, prefix="stu") for value in payload.student_ids]
@@ -228,8 +228,8 @@ def create_semester_group(semester_id: int, payload: TargetGroupCreate, db: Db, 
     return success_payload({"id": external_id(group_id, "grp"), "code": code, "status": status_value})
 
 
-@router.get("/groups/{group_id}/members")
-def list_group_members(group_id: str, db: Db, user: User) -> dict[str, Any]:
+@router.get("/groups/{groupId}/members")
+def list_group_members(group_id: Annotated[str, Path(alias="groupId")], db: Db, user: User) -> dict[str, Any]:
     group_id = _parse_group_id(group_id)
     if user.role not in {"ADMIN", "MANAGER", "LECTURER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Group access is not available."})
@@ -255,8 +255,8 @@ def list_group_members(group_id: str, db: Db, user: User) -> dict[str, Any]:
     return success_payload(members, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
 
-@router.post("/groups/{group_id}/actions/change-leader")
-def target_change_group_leader(group_id: str, payload: TargetChangeLeaderPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/groups/{groupId}/actions/change-leader")
+def target_change_group_leader(group_id: Annotated[str, Path(alias="groupId")], payload: TargetChangeLeaderPayload, db: Db, user: User) -> dict[str, Any]:
     group_id = _parse_group_id(group_id)
     student_id = parse_external_id(payload.leader_id, prefix="stu")
     try:
@@ -273,8 +273,8 @@ def target_change_group_leader(group_id: str, payload: TargetChangeLeaderPayload
     return success_payload(result)
 
 
-@router.post("/groups/{group_id}/members/{membership_id}/actions/leave")
-def target_leave_group(group_id: str, membership_id: str | int, payload: TargetLeaveGroupPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/groups/{groupId}/members/{membershipId}/actions/leave")
+def target_leave_group(group_id: Annotated[str, Path(alias="groupId")], membership_id: Annotated[str | int, Path(alias="membershipId")], payload: TargetLeaveGroupPayload, db: Db, user: User) -> dict[str, Any]:
     _require_manager(user)
     group_id = _parse_group_id(group_id)
     membership_id = parse_external_id(membership_id, prefix="mem")
@@ -323,8 +323,8 @@ def target_leave_group(group_id: str, membership_id: str | int, payload: TargetL
     })
 
 
-@router.put("/groups/{group_id}/project")
-def assign_group_project(group_id: str, payload: ProjectAssignment, db: Db, user: User) -> dict[str, Any]:
+@router.put("/groups/{groupId}/project")
+def assign_group_project(group_id: Annotated[str, Path(alias="groupId")], payload: ProjectAssignment, db: Db, user: User) -> dict[str, Any]:
     _require_manager(user)
     group_id = _parse_group_id(group_id)
     if payload.project_id is None:
@@ -372,8 +372,8 @@ def assign_group_project(group_id: str, payload: ProjectAssignment, db: Db, user
     })
 
 
-@router.post("/semesters/{semester_id}/projects", status_code=status.HTTP_201_CREATED)
-def create_semester_project(semester_id: int, payload: TargetProjectCreate, db: Db, user: User) -> dict[str, Any]:
+@router.post("/semesters/{semesterId}/projects", status_code=status.HTTP_201_CREATED)
+def create_semester_project(semester_id: Annotated[int, Path(alias="semesterId")], payload: TargetProjectCreate, db: Db, user: User) -> dict[str, Any]:
     _require_manager(user)
     semester_or_404(db, semester_id)
     supervisor_ids = [parse_external_id(payload.main_supervisor_id, prefix="lec")]
@@ -417,8 +417,8 @@ def create_semester_project(semester_id: int, payload: TargetProjectCreate, db: 
     return success_payload({"id": external_id(project_id, "prj"), "code": code, "nameVi": payload.name_vi.strip(), "nameEn": payload.name_en, "status": status_value})
 
 
-@router.get("/projects/{project_id}/progression")
-def project_progression(project_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/projects/{projectId}/progression")
+def project_progression(project_id: Annotated[int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
     if user.role not in {"ADMIN", "MANAGER", "LECTURER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Project access is not available."})
     row = db.execute(
@@ -440,8 +440,8 @@ def project_progression(project_id: int, db: Db, user: User) -> dict[str, Any]:
     return success_payload(result)
 
 
-@router.get("/projects/{project_id}/results")
-def project_results(project_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/projects/{projectId}/results")
+def project_results(project_id: Annotated[int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
     if user.role not in {"ADMIN", "MANAGER", "LECTURER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Project access is not available."})
     rows = db.execute(

@@ -8,12 +8,15 @@ making the registry the source of runtime authorization decisions.
 
 from __future__ import annotations
 
+import inspect
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
+from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 EnvelopeDataT = TypeVar("EnvelopeDataT")
 
@@ -243,6 +246,81 @@ class PaginationMeta(BaseModel):
 class ApiDataEnvelope(BaseModel, Generic[EnvelopeDataT]):
     data: EnvelopeDataT
     meta: PaginationMeta | None = None
+
+
+class RequestModel(BaseModel):
+    """Accepts a field under either its camelCase or its declared name.
+
+    Subclasses keep their own ``extra`` setting; only aliasing is shared.
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+def dual_name_query(
+    camel_name: str,
+    legacy_name: str,
+    annotation: Any,
+    *,
+    default: Any = None,
+    required: bool = False,
+    **constraints: Any,
+) -> Any:
+    """Accept one query parameter under its camelCase or its legacy snake_case name.
+
+    Only ``camel_name`` reaches the OpenAPI document, so generated clients learn
+    a single spelling; ``legacy_name`` keeps working until the frontend has
+    finished migrating.  Sending both with different values is rejected rather
+    than silently resolved, so a half-migrated caller fails loudly.
+
+    ``required`` reproduces the 422 a plain mandatory query parameter would give:
+    FastAPI can no longer enforce it, because either spelling satisfies it.
+    """
+
+    optional = annotation | None
+
+    def resolve(modern: Any = None, legacy: Any = None) -> Any:
+        if modern is not None and legacy is not None and modern != legacy:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "AMBIGUOUS_PARAM",
+                    "message": f"Send either {camel_name} or {legacy_name}, not both with different values.",
+                    "details": {"param": camel_name, "legacyParam": legacy_name},
+                },
+            )
+        value = modern if modern is not None else legacy
+        if value is None:
+            if required:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "VALIDATION_ERROR",
+                        "message": f"Query parameter {camel_name} is required.",
+                        "details": {"param": camel_name},
+                    },
+                )
+            return default
+        return value
+
+    resolve.__signature__ = inspect.Signature(
+        [
+            inspect.Parameter(
+                "modern",
+                inspect.Parameter.KEYWORD_ONLY,
+                annotation=optional,
+                default=Query(default=None, alias=camel_name, **constraints),
+            ),
+            inspect.Parameter(
+                "legacy",
+                inspect.Parameter.KEYWORD_ONLY,
+                annotation=optional,
+                default=Query(default=None, alias=legacy_name, include_in_schema=False, **constraints),
+            ),
+        ]
+    )
+    resolve.__annotations__ = {"modern": optional, "legacy": optional}
+    return Depends(resolve)
 
 
 class ApiErrorBody(BaseModel):

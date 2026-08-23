@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -135,8 +135,8 @@ def _queue_event(
         )
 
 
-@router.get("/sessions/{session_id}/result", response_model=ResultDetailResponse)
-def get_result(session_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/sessions/{sessionId}/result", response_model=ResultDetailResponse)
+def get_result(session_id: Annotated[int, Path(alias="sessionId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     if not can_read_session(db, user, session_id):
         raise HTTPException(status_code=403, detail="Result is outside the actor's scope.")
@@ -183,8 +183,8 @@ def list_remediation_cases(
     return success_payload(rows, meta={"page": page, "pageSize": page_size, "total": total})
 
 
-@router.post("/sessions/{session_id}/result", status_code=status.HTTP_201_CREATED, response_model=ResultWriteResponse)
-def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/sessions/{sessionId}/result", status_code=status.HTTP_201_CREATED, response_model=ResultWriteResponse)
+def record_result(session_id: Annotated[int, Path(alias="sessionId")], payload: ResultPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "MANAGER", "LECTURER")
     context = _session_context(db, session_id)
     if context["session_status"] in {"GROUP_ABSENT", "POSTPONED", "CANCELLED"}:
@@ -391,9 +391,9 @@ def record_result(session_id: int, payload: ResultPayload, db: Db, user: User) -
         ) from exc
 
 
-@router.post("/remediation/{case_id}/decision", response_model=ActionResponse, response_model_exclude_none=True)
+@router.post("/remediation/{caseId}/decision", response_model=ActionResponse, response_model_exclude_none=True)
 def decide_remediation(
-    case_id: int, payload: RemediationDecisionPayload, db: Db, user: User
+    case_id: Annotated[int, Path(alias="caseId")], payload: RemediationDecisionPayload, db: Db, user: User
 ) -> dict[str, Any]:
     _require(user, "LECTURER")
     with db.begin():
@@ -455,9 +455,9 @@ def decide_remediation(
     return {"id": case_id, "status": status_value}
 
 
-@router.post("/remediation/{case_id}/overdue-fail", response_model=ActionResponse, response_model_exclude_none=True)
+@router.post("/remediation/{caseId}/overdue-fail", response_model=ActionResponse, response_model_exclude_none=True)
 def fail_overdue_remediation(
-    case_id: int, payload: OverdueFailPayload, db: Db, user: User
+    case_id: Annotated[int, Path(alias="caseId")], payload: OverdueFailPayload, db: Db, user: User
 ) -> dict[str, Any]:
     _require(user, "MANAGER")
     require_change_reason(payload.reason)

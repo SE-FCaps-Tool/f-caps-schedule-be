@@ -133,10 +133,10 @@ def test_room_assignment_service_exposes_shared_eligibility_conflict_and_batch_h
 def test_room_assignment_routes_expose_all_four_manager_endpoints():
     source = _module_source("app.routes.room_assignment")
     for path in (
-        "/rounds/{round_id}/rooms/available",
-        "/sessions/{session_id}/room",
-        "/rounds/{round_id}/rooms/suggest",
-        "/rounds/{round_id}/rooms/apply-suggestions",
+        "/rounds/{roundId}/rooms/available",
+        "/sessions/{sessionId}/room",
+        "/rounds/{roundId}/rooms/suggest",
+        "/rounds/{roundId}/rooms/apply-suggestions",
     ):
         assert path in source, path
     assert "ADMIN" in source and "MANAGER" in source

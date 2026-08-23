@@ -1,12 +1,13 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api_contract import RequestModel
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.domain.enums import RoundStatus
@@ -57,7 +58,7 @@ from app.services.room_assignment import (
 from app.services.semester_queries import ensure_round_semester_writable
 
 router = APIRouter(prefix="/api/v1", tags=["schedule-operations"])
-CONTROLLED_CHANGE_PATH = "/schedule/versions/{version_id}/sessions/{session_id}/controlled-change"
+CONTROLLED_CHANGE_PATH = "/schedule/versions/{versionId}/sessions/{sessionId}/controlled-change"
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
 
@@ -73,7 +74,7 @@ class ScheduleRunPayload(BaseModel):
     time_limit_seconds: float = Field(default=10, alias="timeLimitSeconds", gt=0, le=300)
 
 
-class SessionEditPayload(BaseModel):
+class SessionEditPayload(RequestModel):
     timeslot_id: int | None = Field(default=None, gt=0)
     reviewer_ids: list[int] | None = None
     result_owner_id: int | None = Field(default=None, gt=0)
@@ -93,7 +94,7 @@ class RescheduleDecisionPayload(BaseModel):
     note: str = Field(min_length=1, max_length=1000)
 
 
-class MakeupSessionPayload(BaseModel):
+class MakeupSessionPayload(RequestModel):
     timeslot_id: int = Field(gt=0)
     room_id: int | None = Field(default=None, gt=0)
     reviewer_ids: list[int] | None = None
@@ -109,7 +110,7 @@ class H11WaiverPayload(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
-class ResultOwnerPayload(BaseModel):
+class ResultOwnerPayload(RequestModel):
     lecturer_id: int = Field(gt=0)
 
 
@@ -590,8 +591,8 @@ def _owner_for_edit(
     return owner_id
 
 
-@router.get("/rounds/{round_id}/schedule/versions", response_model=list[VersionSummaryResponse])
-def list_schedule_versions(round_id: int, db: Db, user: User) -> list[dict[str, Any]]:
+@router.get("/rounds/{roundId}/schedule/versions", response_model=list[VersionSummaryResponse])
+def list_schedule_versions(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     rows = (
         db.execute(
@@ -617,8 +618,8 @@ def list_schedule_versions(round_id: int, db: Db, user: User) -> list[dict[str, 
     return [_version_ui(row) for row in rows if row["id"] in visible_versions]
 
 
-@router.get("/schedule/versions/{version_id}", response_model=VersionDetailResponse)
-def schedule_version_detail(version_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/schedule/versions/{versionId}", response_model=VersionDetailResponse)
+def schedule_version_detail(version_id: Annotated[int, Path(alias="versionId")], db: Db, user: User) -> dict[str, Any]:
     # Drafts are sourced from schedule_assignments; Sessions are materialized later.
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     version = (
@@ -648,8 +649,8 @@ def _version_ui(row: Any) -> dict[str, Any]:
     return payload
 
 
-@router.get("/schedule/versions/compare/{version_a}/{version_b}", response_model=CompareResponse)
-def compare_schedule_versions(version_a: int, version_b: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/schedule/versions/compare/{versionA}/{versionB}", response_model=CompareResponse)
+def compare_schedule_versions(version_a: Annotated[int, Path(alias="versionA")], version_b: Annotated[int, Path(alias="versionB")], db: Db, user: User) -> dict[str, Any]:
     """Return a stable, FE-friendly diff between two versions in one round."""
     _require(user, "ADMIN", "MANAGER")
     versions = db.execute(
@@ -678,8 +679,8 @@ def compare_schedule_versions(version_a: int, version_b: int, db: Db, user: User
     return {"version_a": dict(next(item for item in versions if item["id"] == version_a)), "version_b": dict(next(item for item in versions if item["id"] == version_b)), "changed_sessions": changes}
 
 
-@router.delete("/schedule/versions/{version_id}", response_model=ActionResponse, response_model_exclude_none=True)
-def delete_draft_version(version_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.delete("/schedule/versions/{versionId}", response_model=ActionResponse, response_model_exclude_none=True)
+def delete_draft_version(version_id: Annotated[int, Path(alias="versionId")], db: Db, user: User) -> dict[str, Any]:
     # schedule_assignments and scheduler_jobs are owned by the version cascade.
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
@@ -699,8 +700,8 @@ def delete_draft_version(version_id: int, db: Db, user: User) -> dict[str, Any]:
     return {"id": version_id, "deleted": True}
 
 
-@router.post("/rounds/{round_id}/schedule/run", status_code=status.HTTP_201_CREATED, response_model=ScheduleRunResponse)
-def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/rounds/{roundId}/schedule/run", status_code=status.HTTP_201_CREATED, response_model=ScheduleRunResponse)
+def run_scheduler(round_id: Annotated[int, Path(alias="roundId")], payload: ScheduleRunPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     try:
         with db.begin():
@@ -849,8 +850,8 @@ def run_scheduler(round_id: int, payload: ScheduleRunPayload, db: Db, user: User
         ) from exc
 
 
-@router.post("/rounds/{round_id}/groups/{group_id}/h11-waiver", response_model=ActionResponse, response_model_exclude_none=True)
-def grant_h11_waiver(round_id: int, group_id: int, payload: H11WaiverPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/rounds/{roundId}/groups/{groupId}/h11-waiver", response_model=ActionResponse, response_model_exclude_none=True)
+def grant_h11_waiver(round_id: Annotated[int, Path(alias="roundId")], group_id: Annotated[int, Path(alias="groupId")], payload: H11WaiverPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "MANAGER")
     require_change_reason(payload.reason)
     with db.begin():
@@ -864,8 +865,8 @@ def grant_h11_waiver(round_id: int, group_id: int, payload: H11WaiverPayload, db
     return {"id": row["id"], "round_id": round_id, "group_id": group_id, "active": row["active"]}
 
 
-@router.delete("/rounds/{round_id}/groups/{group_id}/h11-waiver", response_model=ActionResponse, response_model_exclude_none=True)
-def revoke_h11_waiver(round_id: int, group_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.delete("/rounds/{roundId}/groups/{groupId}/h11-waiver", response_model=ActionResponse, response_model_exclude_none=True)
+def revoke_h11_waiver(round_id: Annotated[int, Path(alias="roundId")], group_id: Annotated[int, Path(alias="groupId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "MANAGER")
     with db.begin():
         ensure_round_semester_writable(db, round_id)
@@ -876,8 +877,8 @@ def revoke_h11_waiver(round_id: int, group_id: int, db: Db, user: User) -> dict[
     return {"id": updated["id"], "round_id": round_id, "group_id": group_id, "active": False}
 
 
-@router.post("/schedule/versions/{version_id}/activate", response_model=ActionResponse, response_model_exclude_none=True)
-def activate_schedule_version(version_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.post("/schedule/versions/{versionId}/activate", response_model=ActionResponse, response_model_exclude_none=True)
+def activate_schedule_version(version_id: Annotated[int, Path(alias="versionId")], db: Db, user: User) -> dict[str, Any]:
     # acquire_resource_locks issues pg_advisory_xact_lock for every Reviewer.
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
@@ -1008,8 +1009,8 @@ def activate_schedule_version(version_id: int, db: Db, user: User) -> dict[str, 
     return {"version_id": version_id, "status": "ACTIVE"}
 
 
-@router.post("/schedule/versions/{version_id}/sessions/{session_id}/result-owner", response_model=ResultOwnerResponse)
-def assign_result_owner(version_id: int, session_id: int, payload: ResultOwnerPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/schedule/versions/{versionId}/sessions/{sessionId}/result-owner", response_model=ResultOwnerResponse)
+def assign_result_owner(version_id: Annotated[int, Path(alias="versionId")], session_id: Annotated[int, Path(alias="sessionId")], payload: ResultOwnerPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "MANAGER")
     lecturer_id = payload.lecturer_id
     try:
@@ -1058,8 +1059,8 @@ def assign_result_owner(version_id: int, session_id: int, payload: ResultOwnerPa
         raise HTTPException(status_code=exc.status_code, detail={"code": exc.code, "message": str(exc), **(exc.details or {})}) from exc
 
 
-@router.post("/schedule/versions/{version_id}/sessions/{session_id}/edit", response_model=SessionEditResponse)
-def edit_draft_session(version_id: int, session_id: int, payload: SessionEditPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/schedule/versions/{versionId}/sessions/{sessionId}/edit", response_model=SessionEditResponse)
+def edit_draft_session(version_id: Annotated[int, Path(alias="versionId")], session_id: Annotated[int, Path(alias="sessionId")], payload: SessionEditPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     require_change_reason(payload.reason)
     version = db.execute(text("SELECT round_id, status FROM schedule_versions WHERE id = :id"), {"id": version_id}).mappings().one_or_none()
@@ -1127,8 +1128,8 @@ def edit_draft_session(version_id: int, session_id: int, payload: SessionEditPay
 def controlled_change(
     round_scope: int | None = Query(default=None, include_in_schema=False),
     *,
-    version_id: int,
-    session_id: int,
+    version_id: Annotated[int, Path(alias="versionId")],
+    session_id: Annotated[int, Path(alias="sessionId")],
     payload: ControlledChangePayload,
     db: Db,
     user: User,
@@ -1301,8 +1302,8 @@ def controlled_change(
         raise HTTPException(status_code=getattr(exc, "status_code", 422), detail={"code": exc.code, "message": str(exc), **(getattr(exc, "details", None) or {})}) from exc
 
 
-@router.get("/sessions/{session_id}/replacement-suggestions", response_model=list[ReplacementSuggestionResponse])
-def replacement_suggestions(session_id: int, db: Db, user: User) -> list[dict[str, Any]]:
+@router.get("/sessions/{sessionId}/replacement-suggestions", response_model=list[ReplacementSuggestionResponse])
+def replacement_suggestions(session_id: Annotated[int, Path(alias="sessionId")], db: Db, user: User) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER")
     row = db.execute(text("SELECT s.*, sv.round_id, a.project_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN groups g ON g.id = s.group_id JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id WHERE s.id = :id"), {"id": session_id}).mappings().one_or_none()
     if row is None:
@@ -1336,8 +1337,8 @@ def replacement_suggestions(session_id: int, db: Db, user: User) -> list[dict[st
     return suggestions
 
 
-@router.post("/sessions/{session_id}/postpone", response_model=ActionResponse, response_model_exclude_none=True)
-def postpone_session(session_id: int, payload: RescheduleRequestPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/sessions/{sessionId}/postpone", response_model=ActionResponse, response_model_exclude_none=True)
+def postpone_session(session_id: Annotated[int, Path(alias="sessionId")], payload: RescheduleRequestPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     require_change_reason(payload.reason)
     with db.begin():
@@ -1361,8 +1362,8 @@ def postpone_session(session_id: int, payload: RescheduleRequestPayload, db: Db,
     return dict(updated)
 
 
-@router.post("/sessions/{session_id}/makeup", response_model=ActionResponse, response_model_exclude_none=True)
-def create_makeup_session(session_id: int, payload: MakeupSessionPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/sessions/{sessionId}/makeup", response_model=ActionResponse, response_model_exclude_none=True)
+def create_makeup_session(session_id: Annotated[int, Path(alias="sessionId")], payload: MakeupSessionPayload, db: Db, user: User) -> dict[str, Any]:
     """Create a new operational Session for a postponed Session (spec §73)."""
     _require(user, "ADMIN", "MANAGER")
     try:
@@ -1528,8 +1529,8 @@ def create_makeup_session(session_id: int, payload: MakeupSessionPayload, db: Db
     return {"id": new_session_id, "session_id": new_session_id, "status": "SCHEDULED", "makeup_of_session_id": session_id}
 
 
-@router.post("/sessions/{session_id}/group-absent", response_model=ActionResponse, response_model_exclude_none=True)
-def mark_group_absent(session_id: int, payload: RescheduleRequestPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/sessions/{sessionId}/group-absent", response_model=ActionResponse, response_model_exclude_none=True)
+def mark_group_absent(session_id: Annotated[int, Path(alias="sessionId")], payload: RescheduleRequestPayload, db: Db, user: User) -> dict[str, Any]:
     """Mark a published operational session absent when its group does not attend."""
     _require(user, "ADMIN", "MANAGER")
     try:
@@ -1576,8 +1577,8 @@ def mark_group_absent(session_id: int, payload: RescheduleRequestPayload, db: Db
     return {"id": session_id, "status": "GROUP_ABSENT"}
 
 
-@router.post("/rounds/{round_id}/schedule/publish/{version_id}", response_model=PublishResponse)
-def publish_schedule(round_id: int, version_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.post("/rounds/{roundId}/schedule/publish/{versionId}", response_model=PublishResponse)
+def publish_schedule(round_id: Annotated[int, Path(alias="roundId")], version_id: Annotated[int, Path(alias="versionId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
         # Publish lifecycle lock order is Round -> ScheduleVersion -> Sessions -> Rooms.
@@ -1698,9 +1699,9 @@ def publish_schedule(round_id: int, version_id: int, db: Db, user: User) -> dict
     }
 
 
-@router.post("/sessions/{session_id}/reschedule-requests", status_code=status.HTTP_201_CREATED, response_model=ActionResponse, response_model_exclude_none=True)
+@router.post("/sessions/{sessionId}/reschedule-requests", status_code=status.HTTP_201_CREATED, response_model=ActionResponse, response_model_exclude_none=True)
 def request_reschedule(
-    session_id: int, payload: RescheduleRequestPayload, db: Db, user: User
+    session_id: Annotated[int, Path(alias="sessionId")], payload: RescheduleRequestPayload, db: Db, user: User
 ) -> dict[str, Any]:
     require_change_reason(payload.reason)
     _require(user, "MANAGER", "LECTURER", "STUDENT")
@@ -1732,9 +1733,9 @@ def request_reschedule(
     return {"id": request_id, "status": "REQUESTED"}
 
 
-@router.post("/reschedule-requests/{request_id}/decision", response_model=ActionResponse, response_model_exclude_none=True)
+@router.post("/reschedule-requests/{requestId}/decision", response_model=ActionResponse, response_model_exclude_none=True)
 def decide_reschedule(
-    request_id: int, payload: RescheduleDecisionPayload, db: Db, user: User
+    request_id: Annotated[int, Path(alias="requestId")], payload: RescheduleDecisionPayload, db: Db, user: User
 ) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
@@ -1773,9 +1774,9 @@ def decide_reschedule(
     return dict(updated)
 
 
-@router.post("/rounds/{round_id}/operation", response_model=ActionResponse, response_model_exclude_none=True)
+@router.post("/rounds/{roundId}/operation", response_model=ActionResponse, response_model_exclude_none=True)
 def operate_round(
-    round_id: int, payload: RoundOperationPayload, db: Db, user: User
+    round_id: Annotated[int, Path(alias="roundId")], payload: RoundOperationPayload, db: Db, user: User
 ) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     require_change_reason(payload.reason)

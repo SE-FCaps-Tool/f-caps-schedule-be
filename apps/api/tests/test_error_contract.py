@@ -58,14 +58,23 @@ def test_legacy_and_target_routes_share_one_error_shape(client):
 
 
 def test_validation_locator_keeps_the_name_the_caller_sent(client):
-    legacy = client.post("/api/v1/rounds", json={}, headers=MANAGER).json()
-    target = client.post("/api/v1/semesters/1/rounds", json={}, headers=MANAGER).json()
+    """`loc` holds submitted names, so it is data and must not be camelized.
 
-    legacy_fields = {error["loc"][-1] for error in legacy["error"]["details"]["errors"]}
-    target_fields = {error["loc"][-1] for error in target["error"]["details"]["errors"]}
+    Since Phase 3 both spellings reach the same field, and each caller is told
+    off in the spelling it used.  A field the caller omitted has no submitted
+    name, so Pydantic falls back to the alias — the camelCase one.
+    """
 
-    assert "reviewer_count" in legacy_fields
-    assert "reviewerCount" in target_fields
+    snake = client.post("/api/v1/rounds", json={"reviewer_count": "x"}, headers=MANAGER).json()
+    camel = client.post("/api/v1/rounds", json={"reviewerCount": "x"}, headers=MANAGER).json()
+    omitted = client.post("/api/v1/rounds", json={}, headers=MANAGER).json()
+
+    def fields(body: dict) -> set[str]:
+        return {error["loc"][-1] for error in body["error"]["details"]["errors"]}
+
+    assert "reviewer_count" in fields(snake)
+    assert "reviewerCount" in fields(camel)
+    assert "reviewerCount" in fields(omitted)
 
 
 def test_validation_errors_never_echo_the_submitted_body(client):

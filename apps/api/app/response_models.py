@@ -171,7 +171,7 @@ class LecturerResponse(ResponseModel):
     email: str | None = None
     display_name: str | None = None
     account_status: str | None = None
-    conflicts: list["ConflictItem"] = Field(default_factory=list)
+    conflicts: list[ConflictItem] = Field(default_factory=list)
 
 
 class ConflictItem(ResponseModel):
@@ -438,7 +438,7 @@ class SessionResponse(ResponseModel):
     status: str | None = None
     council_id: int | None = None
     council_members: list[dict[str, Any]] = Field(default_factory=list)
-    reviewers: list["ReviewerSummary"] | None = None
+    reviewers: list[ReviewerSummary] | None = None
 
 
 class ReviewerSummary(ResponseModel):
@@ -529,8 +529,8 @@ class DashboardResponse(ResponseModel):
     pending_reschedule_requests: int = 0
     changes: int = 0
     version: VersionSummaryResponse | None = None
-    lecturer_load: list["DashboardLecturerLoadResponse"] = Field(default_factory=list)
-    attention_groups: list["AttentionGroupResponse"] = Field(default_factory=list)
+    lecturer_load: list[DashboardLecturerLoadResponse] = Field(default_factory=list)
+    attention_groups: list[AttentionGroupResponse] = Field(default_factory=list)
     attention: dict[str, int] = Field(default_factory=dict)
 
 

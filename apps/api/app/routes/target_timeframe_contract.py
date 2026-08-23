@@ -3,7 +3,7 @@
 from datetime import time
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -166,14 +166,14 @@ def list_all(
     return success_payload(rows, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
 
-@router.get("/timeframes/{timeframe_id}", response_model=TimeframeEnvelopeResponse)
-def get_one(timeframe_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/timeframes/{timeframeId}", response_model=TimeframeEnvelopeResponse)
+def get_one(timeframe_id: Annotated[int, Path(alias="timeframeId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     return success_payload(get_timeframe(db, timeframe_id))
 
 
-@router.patch("/timeframes/{timeframe_id}", response_model=TimeframeEnvelopeResponse)
-def update(timeframe_id: int, payload: TimeframeMutationPayload, db: Db, user: User) -> dict[str, Any]:
+@router.patch("/timeframes/{timeframeId}", response_model=TimeframeEnvelopeResponse)
+def update(timeframe_id: Annotated[int, Path(alias="timeframeId")], payload: TimeframeMutationPayload, db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     values = payload.model_dump()
     kind = values.pop("type")
@@ -185,11 +185,11 @@ def update(timeframe_id: int, payload: TimeframeMutationPayload, db: Db, user: U
 
 
 @router.patch(
-    "/timeframes/{timeframe_id}/manual",
+    "/timeframes/{timeframeId}/manual",
     response_model=TimeframeEnvelopeResponse,
 )
 def update_manual(
-    timeframe_id: int,
+    timeframe_id: Annotated[int, Path(alias="timeframeId")],
     payload: ManualTimeframeMutationPayload,
     db: Db,
     user: User,
@@ -210,9 +210,9 @@ def update_manual(
     return success_payload(result)
 
 
-@router.delete("/timeframes/{timeframe_id}", response_model=TimeframeEnvelopeResponse)
+@router.delete("/timeframes/{timeframeId}", response_model=TimeframeEnvelopeResponse)
 def archive(
-    timeframe_id: int,
+    timeframe_id: Annotated[int, Path(alias="timeframeId")],
     db: Db,
     user: User,
     payload: TimeframeArchivePayload | None = None,

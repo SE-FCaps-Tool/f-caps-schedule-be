@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -40,13 +40,13 @@ class TargetResultPayload(BaseModel):
     remediation: TargetRemediation | None = None
 
 
-@router.post("/remediations/{remediation_id}/verify")
-def verify_remediation(remediation_id: int, payload: RemediationDecisionPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/remediations/{remediationId}/verify")
+def verify_remediation(remediation_id: Annotated[int, Path(alias="remediationId")], payload: RemediationDecisionPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(decide_remediation(remediation_id, payload, db, user))
 
 
-@router.post("/sessions/{session_id}/result", status_code=201)
-def create_target_result(session_id: int, payload: TargetResultPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/sessions/{sessionId}/result", status_code=201)
+def create_target_result(session_id: Annotated[int, Path(alias="sessionId")], payload: TargetResultPayload, db: Db, user: User) -> dict[str, Any]:
     verifier_id = None
     remediation_due_at = None
     if payload.remediation is not None:
@@ -63,13 +63,13 @@ def create_target_result(session_id: int, payload: TargetResultPayload, db: Db, 
     return success_payload(record_result(session_id, legacy, db, user))
 
 
-@router.post("/remediations/{remediation_id}/actions/overdue-fail")
-def overdue_fail_remediation(remediation_id: int, payload: OverdueFailPayload, db: Db, user: User) -> dict[str, Any]:
+@router.post("/remediations/{remediationId}/actions/overdue-fail")
+def overdue_fail_remediation(remediation_id: Annotated[int, Path(alias="remediationId")], payload: OverdueFailPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(fail_overdue_remediation(remediation_id, payload, db, user))
 
 
-@router.get("/semesters/{semester_id}/remediations")
-def list_semester_remediations(semester_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/semesters/{semesterId}/remediations")
+def list_semester_remediations(semester_id: Annotated[int, Path(alias="semesterId")], db: Db, user: User) -> dict[str, Any]:
     if user.role not in {"ADMIN", "MANAGER", "LECTURER"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Remediation access is not available."})
     rows = db.execute(

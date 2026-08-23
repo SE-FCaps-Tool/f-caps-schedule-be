@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -89,15 +89,15 @@ def list_all(
     return success_payload(rows, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
 
-@router.get("/committees/{committee_id}", response_model=CommitteeEnvelopeResponse)
-def get_one(committee_id: str, db: Db, user: User) -> dict[str, Any]:
+@router.get("/committees/{committeeId}", response_model=CommitteeEnvelopeResponse)
+def get_one(committee_id: Annotated[str, Path(alias="committeeId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     resolved = parse_external_id(committee_id, prefix="cmt")
     return success_payload(get_committee(db, resolved))
 
 
-@router.delete("/committees/{committee_id}")
-def remove(committee_id: str, db: Db, user: User) -> dict[str, Any]:
+@router.delete("/committees/{committeeId}")
+def remove(committee_id: Annotated[str, Path(alias="committeeId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     resolved = parse_external_id(committee_id, prefix="cmt")
     delete_committee(db, resolved)

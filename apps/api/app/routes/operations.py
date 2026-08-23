@@ -1,14 +1,13 @@
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.api_contract import dual_name_query
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
-from app.services.access import is_management_user, visible_session_ids
-from app.services.ical import build_ical
 from app.response_models import (
     DashboardResponse,
     LecturerLoadReportResponse,
@@ -21,6 +20,8 @@ from app.response_models import (
     UnscheduledReportResponse,
     VersionSummaryResponse,
 )
+from app.services.access import is_management_user, visible_session_ids
+from app.services.ical import build_ical
 
 _PHASE3_PROVENANCE_TABLE = "schedule_assignments"
 router = APIRouter(prefix="/api/v1", tags=["operations"])
@@ -51,7 +52,12 @@ def _version_scope(db: Session, round_id: int | None = None, semester_id: int | 
 
 
 @router.get("/dashboard", response_model=DashboardResponse)
-def manager_dashboard(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
+def manager_dashboard(
+    db: Db,
+    user: User,
+    round_id: int | None = dual_name_query("roundId", "round_id", int),
+    semester_id: int | None = dual_name_query("semesterId", "semester_id", int),
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     params = {"round_id": round_id, "semester_id": semester_id}
     availability = db.execute(
@@ -134,7 +140,12 @@ def manager_dashboard(db: Db, user: User, round_id: int | None = None, semester_
 
 
 @router.get("/reports/lecturer-load", response_model=LecturerLoadReportResponse)
-def lecturer_load_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
+def lecturer_load_report(
+    db: Db,
+    user: User,
+    round_id: int | None = dual_name_query("roundId", "round_id", int),
+    semester_id: int | None = dual_name_query("semesterId", "semester_id", int),
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     selected = _version_scope(db, round_id, semester_id)
     rows = db.execute(
@@ -154,15 +165,19 @@ def lecturer_load_report(db: Db, user: User, round_id: int | None = None, semest
 
 
 @router.get("/reports/unscheduled", response_model=UnscheduledReportResponse)
-def unscheduled_report(db: Db, user: User, round_id: int) -> dict[str, Any]:
+def unscheduled_report(
+    db: Db,
+    user: User,
+    round_id: int = dual_name_query("roundId", "round_id", int, required=True),
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     generated_at = datetime.now(UTC)
     rows = db.execute(text("SELECT sv.id, sv.version_no, sv.status, sv.input_snapshot, sv.created_at, r.type, s.code AS semester_code FROM schedule_versions sv JOIN rounds r ON r.id = sv.round_id JOIN semesters s ON s.id = r.semester_id WHERE sv.round_id = :round_id ORDER BY sv.version_no DESC"), {"round_id": round_id}).mappings().all()
     return {"round_id": round_id, "generated_at": generated_at, "versions": [{"version_id": row["id"], "version_no": row["version_no"], "status": row["status"], "created_at": row["created_at"], "unscheduled": (row["input_snapshot"] or {}).get("unscheduled", []), "provenance": {"semester_code": row["semester_code"], "round_type": row["type"], "version_id": row["id"], "generated_at": generated_at}} for row in rows]}
 
 
-@router.get("/reports/provenance/{version_id}", response_model=VersionSummaryResponse)
-def report_provenance(version_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/reports/provenance/{versionId}", response_model=VersionSummaryResponse)
+def report_provenance(version_id: Annotated[int, Path(alias="versionId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     if user.role not in {"ADMIN", "MANAGER"} and not visible_session_ids(db, user, version_id=version_id):
         raise HTTPException(status_code=403, detail="Report is outside the actor's scope.")
@@ -173,14 +188,23 @@ def report_provenance(version_id: int, db: Db, user: User) -> dict[str, Any]:
 
 
 @router.get("/reports/quality", response_model=QualityReportResponse)
-def group_quality_report(db: Db, user: User, semester_id: int | None = None) -> dict[str, Any]:
+def group_quality_report(
+    db: Db,
+    user: User,
+    semester_id: int | None = dual_name_query("semesterId", "semester_id", int),
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(text("SELECT g.id, g.code, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_members, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leaders FROM groups g JOIN projects p ON p.id = g.project_id LEFT JOIN group_memberships gm ON gm.group_id = g.id WHERE (CAST(:semester_id AS INTEGER) IS NULL OR p.semester_id = CAST(:semester_id AS INTEGER)) GROUP BY g.id, g.code HAVING COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') < 4 OR COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') <> 1 ORDER BY g.code"), {"semester_id": semester_id}).mappings().all()
     return {"version": _version_scope(db, None, semester_id), "rows": [dict(row) for row in rows]}
 
 
 @router.get("/reports/remediation", response_model=RemediationReportResponse)
-def remediation_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
+def remediation_report(
+    db: Db,
+    user: User,
+    round_id: int | None = dual_name_query("roundId", "round_id", int),
+    semester_id: int | None = dual_name_query("semesterId", "semester_id", int),
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     selected = _version_scope(db, round_id, semester_id)
     rows = db.execute(text("SELECT rc.id, rc.group_id, g.code AS group_code, rc.due_at, rc.status, rc.verifier_lecturer_id FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id LEFT JOIN session_results sr ON sr.id = rc.session_result_id LEFT JOIN sessions s ON s.id = sr.session_id LEFT JOIN schedule_assignments sa ON sa.schedule_version_id=s.schedule_version_id AND sa.group_id=s.group_id LEFT JOIN projects p ON p.id = sa.project_id LEFT JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR sv.round_id = CAST(:round_id AS INTEGER)) AND (CAST(:semester_id AS INTEGER) IS NULL OR p.semester_id = CAST(:semester_id AS INTEGER)) ORDER BY rc.due_at"), {"round_id": round_id, "semester_id": semester_id}).mappings().all()
@@ -188,7 +212,12 @@ def remediation_report(db: Db, user: User, round_id: int | None = None, semester
 
 
 @router.get("/reports/outcomes", response_model=OutcomesReportResponse)
-def outcomes_report(db: Db, user: User, round_id: int | None = None, semester_id: int | None = None) -> dict[str, Any]:
+def outcomes_report(
+    db: Db,
+    user: User,
+    round_id: int | None = dual_name_query("roundId", "round_id", int),
+    semester_id: int | None = dual_name_query("semesterId", "semester_id", int),
+) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     selected = _version_scope(db, round_id, semester_id)
     rows = db.execute(text("SELECT r.type, sr.outcome, COUNT(*) AS count FROM session_results sr JOIN sessions s ON s.id = sr.session_id JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id WHERE (CAST(:round_id AS INTEGER) IS NULL OR r.id = CAST(:round_id AS INTEGER)) AND (CAST(:semester_id AS INTEGER) IS NULL OR r.semester_id = CAST(:semester_id AS INTEGER)) GROUP BY r.type, sr.outcome ORDER BY r.type, sr.outcome"), {"round_id": round_id, "semester_id": semester_id}).mappings().all()
@@ -203,8 +232,8 @@ def list_notifications(db: Db, user: User, limit: int = 50) -> list[dict[str, An
     return [dict(row) for row in rows]
 
 
-@router.post("/notifications/{notification_id}/retry", response_model=NotificationRetryResponse)
-def retry_notification(notification_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.post("/notifications/{notificationId}/retry", response_model=NotificationRetryResponse)
+def retry_notification(notification_id: Annotated[int, Path(alias="notificationId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
         row = db.execute(text("UPDATE notifications SET status = 'PENDING', sent_at = NULL WHERE id = :id AND status = 'FAILED' RETURNING id, status, dedupe_key"), {"id": notification_id}).mappings().one_or_none()
@@ -214,8 +243,8 @@ def retry_notification(notification_id: int, db: Db, user: User) -> dict[str, An
     return dict(row)
 
 
-@router.get("/schedule/versions/{version_id}/calendar.ics")
-def calendar_export(version_id: int, db: Db, user: User) -> Response:
+@router.get("/schedule/versions/{versionId}/calendar.ics")
+def calendar_export(version_id: Annotated[int, Path(alias="versionId")], db: Db, user: User) -> Response:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     if user.role not in {"ADMIN", "MANAGER"} and not visible_session_ids(db, user, version_id=version_id):
         raise HTTPException(status_code=403, detail="Calendar is outside the actor's scope.")
@@ -234,9 +263,9 @@ def calendar_export(version_id: int, db: Db, user: User) -> Response:
 def personal_schedule(
     db: Db,
     user: User,
-    version_id: int | None = None,
-    from_at: datetime | None = None,
-    to_at: datetime | None = None,
+    version_id: int | None = dual_name_query("versionId", "version_id", int),
+    from_at: datetime | None = dual_name_query("fromAt", "from_at", datetime),
+    to_at: datetime | None = dual_name_query("toAt", "to_at", datetime),
 ) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER", "LECTURER", "STUDENT")
     selected = _version_scope(db) if version_id is None else db.execute(

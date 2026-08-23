@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -27,16 +27,16 @@ def _manager(user: CurrentUser) -> None:
         raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "Manager access is required."})
 
 
-@router.put("/rounds/{round_id}/committees", response_model=CommitteeListEnvelopeResponse)
-def replace(round_id: int, payload: RoundCommitteeReplacePayload, db: Db, user: User) -> dict[str, Any]:
+@router.put("/rounds/{roundId}/committees", response_model=CommitteeListEnvelopeResponse)
+def replace(round_id: Annotated[int, Path(alias="roundId")], payload: RoundCommitteeReplacePayload, db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     ids = [parse_external_id(value, prefix="cmt") for value in payload.committee_ids]
     rows = replace_round_committees(db, round_id, user, ids)
     return success_payload(rows, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
 
-@router.get("/rounds/{round_id}/committees", response_model=CommitteeListEnvelopeResponse)
-def list_for_round(round_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/rounds/{roundId}/committees", response_model=CommitteeListEnvelopeResponse)
+def list_for_round(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     rows = list_round_committees(db, round_id)
     return success_payload(rows, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
