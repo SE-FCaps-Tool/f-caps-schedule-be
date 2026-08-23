@@ -308,6 +308,8 @@ def _round_detail_payload(raw: dict[str, Any]) -> dict[str, Any]:
             "type": str(raw["type"]),
             "status": str(raw["status"]),
             "description": raw["description"],
+            "start_date": raw["start_date"],
+            "end_date": raw["end_date"],
             "duration_minutes": raw["session_duration_minutes"],
             "reviewer_count": raw["reviewer_count"],
             "max_groups_per_timeslot": raw["max_groups_per_timeslot"],
@@ -371,8 +373,14 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
             raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "group_preference_deadline must include a timezone offset."})
         if merged_start is not None and merged_end is not None:
             for field_name, deadline in (("registration_deadline", merged_registration_deadline), ("group_preference_deadline", merged_group_preference_deadline)):
-                if deadline is not None and not (merged_start <= deadline.date() <= merged_end):
-                    raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": f"{field_name} must fall within start_date and end_date."})
+                if deadline is not None and deadline.date() > merged_start:
+                    raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": f"{field_name} must be on or before start_date."})
+        if (
+            merged_registration_deadline is not None
+            and merged_group_preference_deadline is not None
+            and merged_group_preference_deadline <= merged_registration_deadline
+        ):
+            raise HTTPException(status_code=422, detail={"code": "ROUND_DEADLINE_INVALID", "message": "group_preference_deadline must be later than registration_deadline."})
         requested_timeframe = values.get("timeframe_id", current_round["timeframe_id"])
         timeframe_changed = "timeframe_id" in values and values["timeframe_id"] != current_round["timeframe_id"]
         if "timeframe_id" in values and values["timeframe_id"] is None and current_round["timeframe_id"] is not None:

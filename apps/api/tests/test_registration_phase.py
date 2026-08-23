@@ -118,11 +118,62 @@ def test_legacy_round_create_allows_missing_group_deadline():
             "session_duration_minutes": 60,
             "registration_deadline": "2030-01-10T23:59:00+07:00",
             "room_types": ["NORMAL"],
-            "start_date": "2030-01-01",
+            "start_date": "2030-01-20",
             "end_date": "2030-03-01",
         }
     )
     assert payload.group_preference_deadline is None
+
+
+def test_round_create_accepts_deadlines_before_grading_start():
+    payload = RoundCreate.model_validate(
+        {
+            "semester_id": 1,
+            "type": "REVIEW_1",
+            "reviewer_count": 2,
+            "group_selection_mode": True,
+            "session_duration_minutes": 60,
+            "registration_deadline": "2030-01-10T23:59:00+07:00",
+            "group_preference_deadline": "2030-01-12T23:59:00+07:00",
+            "room_types": ["NORMAL"],
+            "start_date": "2030-01-20",
+            "end_date": "2030-03-01",
+        }
+    )
+    assert payload.start_date.isoformat() == "2030-01-20"
+
+
+def test_round_create_rejects_deadline_after_grading_start():
+    with pytest.raises(ValueError, match="registration_deadline must be on or before start_date"):
+        RoundCreate.model_validate(
+            {
+                "semester_id": 1,
+                "type": "REVIEW_1",
+                "reviewer_count": 2,
+                "session_duration_minutes": 60,
+                "registration_deadline": "2030-01-21T23:59:00+07:00",
+                "room_types": ["NORMAL"],
+                "start_date": "2030-01-20",
+                "end_date": "2030-03-01",
+            }
+        )
+
+
+def test_round_create_rejects_group_deadline_before_registration_deadline():
+    with pytest.raises(ValueError, match="group_preference_deadline must be later than registration_deadline"):
+        RoundCreate.model_validate(
+            {
+                "semester_id": 1,
+                "type": "REVIEW_1",
+                "reviewer_count": 2,
+                "session_duration_minutes": 60,
+                "registration_deadline": "2030-01-12T23:59:00+07:00",
+                "group_preference_deadline": "2030-01-11T23:59:00+07:00",
+                "room_types": ["NORMAL"],
+                "start_date": "2030-01-20",
+                "end_date": "2030-03-01",
+            }
+        )
 
 
 @pytest.mark.integration

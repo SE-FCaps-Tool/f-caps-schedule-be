@@ -41,6 +41,18 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 
 # BR-STU-03: a group under this size only produces a warning, never a block.
 MIN_RECOMMENDED_MEMBERS = 4
+REVIEW_1_TYPES = {"REVIEW_1_1", "REVIEW_1"}
+
+
+def _progression_allowed(
+    round_type: str,
+    group_status: str,
+    *,
+    has_prior_review_1: bool,
+) -> bool:
+    if not _eligible(round_type, group_status):
+        return False
+    return not (round_type in REVIEW_1_TYPES and has_prior_review_1)
 
 
 class RegistrationAction(BaseModel):
@@ -125,21 +137,25 @@ class TargetRoundCreate(BaseModel):
             raise ValueError("Either timeframeId or days must be supplied")
         if self.timeframe_id is not None and self.days:
             raise ValueError("Provide either timeframeId or days, not both")
+        if self.registration_deadline.tzinfo is None:
+            raise ValueError("registrationDeadline must include a timezone offset")
+        if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:
+            raise ValueError("groupPreferenceDeadline must include a timezone offset")
+        grading_start_date = self.start_date or (min(day.day_date for day in self.days) if self.days else None)
+        if self.start_date is not None and self.end_date is not None and self.end_date < self.start_date:
+            raise ValueError("endDate must be on or after startDate")
+        if grading_start_date is not None and self.registration_deadline.date() > grading_start_date:
+            raise ValueError("registrationDeadline must be on or before startDate")
+        if self.group_preference_deadline is not None:
+            if grading_start_date is not None and self.group_preference_deadline.date() > grading_start_date:
+                raise ValueError("groupPreferenceDeadline must be on or before startDate")
+            if self.group_preference_deadline <= self.registration_deadline:
+                raise ValueError("groupPreferenceDeadline must be later than registrationDeadline")
         if self.timeframe_id is not None:
             if self.start_date is None or self.end_date is None:
                 raise ValueError("startDate and endDate are required with timeframeId")
             if self.end_date < self.start_date:
                 raise ValueError("endDate must be on or after startDate")
-            for deadline_name, deadline in (
-                ("registrationDeadline", self.registration_deadline),
-                ("groupPreferenceDeadline", self.group_preference_deadline),
-            ):
-                if deadline is not None and not (
-                    self.start_date <= deadline.date() <= self.end_date
-                ):
-                    raise ValueError(
-                        f"{deadline_name} must fall within startDate and endDate"
-                    )
         expected_reviewers = {
             "REVIEW_1_1": 2,
             "REVIEW_1": 2,
@@ -157,10 +173,6 @@ class TargetRoundCreate(BaseModel):
             raise ValueError(f"{self.type} requires {expected_reviewers} reviewers")
         if self.result_owner_mode and self.type not in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"}:
             raise ValueError("resultOwnerMode is only available for DEFENSE_1_1 and DEFENSE_2")
-        if self.registration_deadline.tzinfo is None:
-            raise ValueError("registrationDeadline must include a timezone offset")
-        if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:
-            raise ValueError("groupPreferenceDeadline must include a timezone offset")
         if any(room_type not in {"NORMAL", "SEMINAR", "LAB"} for room_type in self.room_types):
             raise ValueError("roomTypes must contain only NORMAL, SEMINAR, or LAB")
 
@@ -202,9 +214,6 @@ class TargetRoundCreate(BaseModel):
             boundary_dates.append(self.start_date)
         if self.end_date is not None:
             boundary_dates.append(self.end_date)
-        boundary_dates.append(self.registration_deadline.date())
-        if self.group_preference_deadline is not None:
-            boundary_dates.append(self.group_preference_deadline.date())
         legacy = RoundCreate(
             semester_id=semester_id,
             name=self.name,
@@ -274,11 +283,10 @@ def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
         has_active_leader = bool(row["has_active_leader"]) if has_group else False
         has_main_supervisor = bool(row["has_main_supervisor"])
         has_prior_review_1 = bool(row["has_prior_review_1"]) if has_group else False
-        progression_allowed = (
-            has_group
-            and _eligible(round_type, row["group_status"] or "")
-            and round_type in {"REVIEW_1_1", "REVIEW_1"}
-            and has_prior_review_1
+        progression_allowed = has_group and _progression_allowed(
+            round_type,
+            row["group_status"] or "",
+            has_prior_review_1=has_prior_review_1,
         )
         eligible = has_group and has_active_leader and has_main_supervisor and progression_allowed
         blocking_reasons = []
@@ -291,7 +299,7 @@ def eligible_projects(round_id: int, db: Db, user: User) -> dict[str, Any]:
         if has_group and not progression_allowed:
             blocking_reasons.append(
                 "Group already has a non-cancelled REVIEW_1_1 round."
-                if round_type in {"REVIEW_1_1", "REVIEW_1"} and has_prior_review_1
+                if round_type in REVIEW_1_TYPES and has_prior_review_1
                 else "Progression incompatible"
             )
         warnings = []

@@ -87,7 +87,7 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
             "registration_deadline": registration_deadline,
             "group_preference_deadline": group_preference_deadline,
             "session_duration_minutes": 30,
-            "start_date": "2030-01-01",
+            "start_date": "2030-01-25",
             "end_date": "2030-03-01",
             "registration_deadline": "2030-01-15T16:59:00Z",
             "group_preference_deadline": "2030-01-20T16:59:00Z",

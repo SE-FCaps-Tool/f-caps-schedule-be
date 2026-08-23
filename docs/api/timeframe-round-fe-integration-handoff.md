@@ -1,10 +1,27 @@
 # FE Handoff — Timeframe, Round và lịch chính thức
 
-Ngày cập nhật: 2026-08-21
+Ngày cập nhật: 2026-08-22
 
 Tài liệu này mô tả phần tích hợp mới giữa Timeframe global, Round và flow chạy
 scheduler. Tài liệu CRUD/preview chi tiết vẫn nằm ở
 docs/api/timeframe-fe-handoff.md.
+
+## Trạng thái triển khai FE
+
+Round create wizard hiện đã có picker Timeframe và giữ lại cả hai cách tạo
+timeline:
+
+- Chế độ Timeframe tải danh sách Timeframe active, cho chọn một cấu hình, nhập
+  `startDate`/`endDate` và tự khóa `durationMinutes` theo
+  `groupDurationMinutes`.
+- Chế độ Timeframe gửi `timeframeId`, `startDate`, `endDate` cùng các tham số
+  Round; không gửi `days`.
+- Chế độ thủ công tiếp tục gửi `days[].slots[]` và không gửi `timeframeId`.
+- Round list/detail đọc và hiển thị `timeframeId` cùng
+  `timeframeVersionId` khi Backend trả về.
+
+Các mục trong checklist QA bên dưới vẫn cần được kiểm tra bằng browser/API
+thực tế; phần trạng thái này chỉ ghi nhận wiring đã có trong FE.
 
 ## 1. Ý nghĩa thay đổi
 
@@ -549,7 +566,9 @@ Bắt buộc:
 - durationMinutes phải bằng groupDurationMinutes.
 - reviewerCount đúng loại Round: REVIEW_1/2 là 2, DEFENSE_1_1 là 3,
   DEFENSE_1_2/DEFENSE_2 là 5.
-- deadline có timezone offset hoặc Z và nằm trong khoảng ngày Round.
+- deadline có timezone offset hoặc Z và không được sau `startDate`; nếu có
+  `groupPreferenceDeadline` thì deadline này phải sau `registrationDeadline` và
+  cũng không được sau `startDate`.
 - không gửi days cùng timeframeId.
 - Semester phải ACTIVE.
 - roomTypes chỉ là NORMAL, SEMINAR hoặc LAB.
@@ -779,7 +798,7 @@ capacity và break do Backend trả về.
 ### 8.2 Tạo Round
 
 1. GET /timeframes.
-2. Dropdown chỉ cho chọn Timeframe chưa archive.
+2. Picker/card list chỉ cho chọn Timeframe chưa archive.
 3. Hiển thị preview read-only blocks/groupSlots/capacity.
 4. Nhập startDate/endDate.
 5. Tự điền durationMinutes bằng groupDurationMinutes, nên disable.

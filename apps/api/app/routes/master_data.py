@@ -28,6 +28,7 @@ from app.domain.registration_phase import (
     resolve_registration_phase,
 )
 from app.domain.round_setup import validate_round_configuration
+from app.domain.round_types import REVIEW_1_1_TYPES
 from app.domain.seed import seed_fixture_v1
 from app.domain.status_compat import project_from_legacy
 from app.domain.transitions import transition_round
@@ -58,8 +59,8 @@ from app.response_models import (
     RoundResponse,
     SeedFixtureResponse,
     SemesterResponse,
-    StudentResponse,
 )
+from app.scheduler.validator import _eligible
 from app.services.access import (
     is_active_group_leader,
     lecturer_id_for_account,
@@ -201,14 +202,13 @@ class RoundCreate(BaseModel):
             raise ValueError("registration_deadline must include a timezone offset")
         if self.group_preference_deadline is not None and self.group_preference_deadline.tzinfo is None:
             raise ValueError("group_preference_deadline must include a timezone offset")
-        if self.registration_deadline is not None and not (
-            self.start_date <= self.registration_deadline.date() <= self.end_date
-        ):
-            raise ValueError("registration_deadline must fall within start_date and end_date")
-        if self.group_preference_deadline is not None and not (
-            self.start_date <= self.group_preference_deadline.date() <= self.end_date
-        ):
-            raise ValueError("group_preference_deadline must fall within start_date and end_date")
+        if self.registration_deadline is not None and self.registration_deadline.date() > self.start_date:
+            raise ValueError("registration_deadline must be on or before start_date")
+        if self.group_preference_deadline is not None:
+            if self.group_preference_deadline.date() > self.start_date:
+                raise ValueError("group_preference_deadline must be on or before start_date")
+            if self.registration_deadline is not None and self.group_preference_deadline <= self.registration_deadline:
+                raise ValueError("group_preference_deadline must be later than registration_deadline")
         return self
 
 
@@ -220,14 +220,8 @@ class RoundTransitionPayload(BaseModel):
 class RoundResources(BaseModel):
     model_config = ConfigDict(extra="allow")
     group_ids: list[int] = Field(min_length=1)
-    timeslot_ids: list[int] = Field(min_length=1)
+    timeslot_ids: list[int] = Field(default_factory=list)
     room_types: list[Literal["NORMAL", "SEMINAR", "LAB"]] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def require_room_selection(self) -> "RoundResources":
-        if not self.room_types and not (self.model_extra or {}).get("room_ids"):
-            raise ValueError("room_types must contain at least one allowed type")
-        return self
 
 
 class SlotCreate(BaseModel):
@@ -569,17 +563,47 @@ def list_majors(db: Db, user: User) -> list[dict[str, object]]:
     return [dict(row) for row in rows]
 
 
-@router.get("/students", response_model=list[StudentResponse])
-def list_students(db: Db, user: User) -> list[dict[str, object]]:
+@router.get("/students")
+def list_students(
+    db: Db,
+    user: User,
+    search: str | None = None,
+    semester_id: int | None = Query(default=None, alias="semesterId", gt=0),
+    has_group: bool | None = Query(default=None, alias="hasGroup"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
+) -> dict[str, object]:
     _require(user, "ADMIN", "MANAGER")
+    offset = (page - 1) * page_size
     rows = db.execute(
         text(
-            "SELECT st.id, st.student_code, a.display_name, a.email "
+            "SELECT st.id, st.student_code, a.display_name AS full_name, a.email, "
+            "COUNT(*) OVER() AS total_count "
             "FROM students st LEFT JOIN accounts a ON a.id = st.account_id "
-            "ORDER BY st.student_code"
-        )
-    ).mappings()
-    return [dict(row) for row in rows]
+            "WHERE (CAST(:search AS text) IS NULL "
+            "OR st.student_code ILIKE '%' || CAST(:search AS text) || '%' "
+            "OR a.display_name ILIKE '%' || CAST(:search AS text) || '%') "
+            "AND (CAST(:has_group AS boolean) IS NULL OR EXISTS ("
+            "SELECT 1 FROM group_memberships gm "
+            "JOIN groups g ON g.id = gm.group_id "
+            "LEFT JOIN projects p ON p.id = g.project_id "
+            "WHERE gm.student_id = st.id AND gm.status = 'ACTIVE' "
+            "AND (CAST(:semester_id AS bigint) IS NULL "
+            "OR p.semester_id = CAST(:semester_id AS bigint) OR g.project_id IS NULL)"
+            ") = CAST(:has_group AS boolean)) "
+            "ORDER BY st.student_code LIMIT :limit OFFSET :offset"
+        ),
+        {
+            "search": search,
+            "semester_id": semester_id,
+            "has_group": has_group,
+            "limit": page_size,
+            "offset": offset,
+        },
+    ).mappings().all()
+    total = rows[0]["total_count"] if rows else 0
+    items = [{k: v for k, v in dict(row).items() if k != "total_count"} for row in rows]
+    return success_payload(items, meta={"page": page, "pageSize": page_size, "total": total})
 
 
 @router.get("/projects", response_model=list[ProjectResponse])
@@ -1491,32 +1515,54 @@ def attach_round_resources(
     try:
         with db.begin():
             ensure_round_semester_writable(db, round_id)
-            round_type = db.execute(
-                text("SELECT type::text FROM rounds WHERE id = :id"),
+            round_row = db.execute(
+                text("SELECT type::text AS type, semester_id FROM rounds WHERE id = :id FOR UPDATE"),
                 {"id": round_id},
-            ).scalar_one_or_none()
-            if round_type is None:
+            ).mappings().one_or_none()
+            if round_row is None:
                 raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
+            round_type = str(round_row["type"])
             for group_id in set(payload.group_ids):
-                if round_type in {"REVIEW_1_1", "REVIEW_1"}:
-                    already_reviewed = db.execute(
-                        text(
-                            "SELECT EXISTS ("
-                            "SELECT 1 FROM round_groups previous_rg "
-                            "JOIN rounds previous_round ON previous_round.id = previous_rg.round_id "
-                            "WHERE previous_rg.group_id = :group_id "
-                            "AND previous_rg.round_id <> :round_id "
-                            "AND previous_round.type IN ('REVIEW_1_1', 'REVIEW_1') "
-                            "AND previous_round.status <> 'CANCELLED'"
-                            ")"
-                        ),
-                        {"group_id": group_id, "round_id": round_id},
-                    ).scalar_one()
-                    if already_reviewed:
-                        raise DomainError(
-                            "GROUP_ALREADY_REVIEWED",
-                            "This group already has a non-cancelled REVIEW_1_1 round.",
-                        )
+                group = db.execute(
+                    text(
+                        "SELECT g.status::text AS status, p.semester_id, p.status::text AS project_status, "
+                        "EXISTS (SELECT 1 FROM group_memberships gm WHERE gm.group_id = g.id "
+                        "AND gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS has_active_leader, "
+                        "EXISTS (SELECT 1 FROM project_supervisors ps WHERE ps.project_id = p.id "
+                        "AND ps.supervisor_type = 'MAIN') AS has_main_supervisor, "
+                        "EXISTS (SELECT 1 FROM round_groups previous_rg "
+                        "JOIN rounds previous_round ON previous_round.id = previous_rg.round_id "
+                        "WHERE previous_rg.group_id = g.id AND previous_rg.round_id <> :round_id "
+                        "AND previous_round.type IN ('REVIEW_1_1', 'REVIEW_1') "
+                        "AND previous_round.status <> 'CANCELLED') AS has_prior_review_1 "
+                        "FROM groups g JOIN projects p ON p.id = g.project_id "
+                        "WHERE g.id = :group_id FOR UPDATE OF g"
+                    ),
+                    {"group_id": group_id, "round_id": round_id},
+                ).mappings().one_or_none()
+                if group is None:
+                    raise DomainError("GROUP_NOT_FOUND", "Group does not exist or has no project.")
+                if int(group["semester_id"]) != int(round_row["semester_id"]):
+                    raise DomainError(
+                        "GROUP_SEMESTER_MISMATCH",
+                        "Group and round must belong to the same semester.",
+                    )
+                if group["project_status"] == "ARCHIVED":
+                    raise DomainError("GROUP_NOT_ELIGIBLE", "The group's project is archived.")
+                if not group["has_active_leader"]:
+                    raise DomainError("GROUP_NOT_ELIGIBLE", "Group needs an active leader before it can be attached.")
+                if not group["has_main_supervisor"]:
+                    raise DomainError("GROUP_NOT_ELIGIBLE", "Group needs a main supervisor before it can be attached.")
+                if round_type in REVIEW_1_1_TYPES and group["has_prior_review_1"]:
+                    raise DomainError(
+                        "GROUP_ALREADY_REVIEWED",
+                        "This group already has a non-cancelled REVIEW_1_1 round.",
+                    )
+                if not _eligible(round_type, str(group["status"])):
+                    raise DomainError(
+                        "GROUP_NOT_ELIGIBLE",
+                        "Group progression is incompatible with this round type.",
+                    )
                 db.execute(
                     text(
                         "INSERT INTO round_groups (round_id, group_id) VALUES (:round_id, :group_id) "
@@ -1555,7 +1601,7 @@ def attach_round_resources(
                 "room_types": sorted(room_types),
             }
     except DomainError as exc:
-        status_code = 409 if exc.code == "GROUP_ALREADY_REVIEWED" else 404
+        status_code = 404 if exc.code in {"ROUND_NOT_FOUND", "GROUP_NOT_FOUND"} else 409
         raise HTTPException(status_code=status_code, detail={"code": exc.code, "message": str(exc)}) from exc
     except IntegrityError as exc:
         raise HTTPException(

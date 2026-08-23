@@ -1,10 +1,10 @@
 """Import Defense 1.2 eligibility from the SU26 one-sheet workbook.
 
 The workbook marks projects that passed Review 1.1 with ``Bảo vệ kỳ 2``.
-This importer creates (or reuses) a draft ``DEFENSE_1_2`` round and links only
-groups that already exist and satisfy the scheduler's group shape rules:
-four or five members and exactly one leader.  It never invents students or
-groups for projects that are incomplete in the database.
+By default this importer only updates eligible groups to ``ELIGIBLE_D12``.
+Pass ``--attach-round`` to also create (or reuse) a draft ``DEFENSE_1_2`` round
+and link those groups. It never invents students or groups for projects that
+are incomplete in the database.
 
 Default mode is validation-only.  Pass ``--apply`` to write to PostgreSQL.
 The operation is idempotent for the same semester and round type.
@@ -131,8 +131,8 @@ def load_reference(
     rows = session.execute(
         text(
             "SELECT p.code AS project_code, g.id AS group_id, g.code AS group_code, "
-            "COUNT(gm.student_id)::int AS member_count, "
-            "COUNT(*) FILTER (WHERE gm.membership_role = 'LEADER')::int AS leader_count "
+            "COUNT(gm.student_id) FILTER (WHERE gm.status = 'ACTIVE')::int AS member_count, "
+            "COUNT(*) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER')::int AS leader_count "
             "FROM projects p "
             "LEFT JOIN groups g ON g.project_id = p.id "
             "LEFT JOIN group_memberships gm ON gm.group_id = g.id "
@@ -155,7 +155,7 @@ def load_reference(
         if code in by_project
         and by_project[code]["group_id"] is not None
         and not (
-            4 <= int(by_project[code]["member_count"]) <= 5
+            int(by_project[code]["member_count"]) <= 5
             and int(by_project[code]["leader_count"]) == 1
         )
     ]
@@ -182,69 +182,74 @@ def apply_import(
     source_name: str,
     eligible_count: int,
     source_sheet: str,
+    *,
+    attach_round: bool = False,
 ) -> dict[str, Any]:
     semester = reference["semester"]
-    round_row = session.execute(
-        text(
-            "SELECT id, status FROM rounds "
-            "WHERE semester_id = :semester_id AND type = CAST(:type AS round_type) "
-            "ORDER BY id DESC LIMIT 1 FOR UPDATE"
-        ),
-        {"semester_id": semester["id"], "type": ROUND_TYPE},
-    ).mappings().one_or_none()
-
-    if round_row is not None and str(round_row["status"]) != "DRAFT":
-        raise ValueError(
-            f"Existing {ROUND_TYPE} round {round_row['id']} is "
-            f"{round_row['status']}; refusing to change a non-draft round."
-        )
-
-    if round_row is None:
-        creator_id = session.execute(
+    round_id: int | None = None
+    round_created = False
+    if attach_round:
+        round_row = session.execute(
             text(
-                "SELECT a.id FROM accounts a "
-                "JOIN account_roles ar ON ar.account_id = a.id "
-                "WHERE ar.role = 'ADMIN' ORDER BY a.id LIMIT 1"
-            )
-        ).scalar_one_or_none()
-        round_id = session.execute(
-            text(
-                "INSERT INTO rounds "
-                "(semester_id, name, description, type, reviewer_count, "
-                "result_owner_mode, group_selection_mode, session_duration_minutes, "
-                "start_date, end_date, created_by) "
-                "VALUES (:semester_id, :name, :description, CAST(:type AS round_type), 5, "
-                "FALSE, FALSE, 30, :start_date, :end_date, :created_by) RETURNING id"
+                "SELECT id, status FROM rounds "
+                "WHERE semester_id = :semester_id AND type = CAST(:type AS round_type) "
+                "ORDER BY id DESC LIMIT 1 FOR UPDATE"
             ),
-            {
-                "semester_id": semester["id"],
-                "name": ROUND_NAME,
-                "description": (
-                    f"Imported from {source_name}; sheet {source_sheet}; "
-                    f"Review 1.1 result = {ELIGIBLE_RESULT}."
+            {"semester_id": semester["id"], "type": ROUND_TYPE},
+        ).mappings().one_or_none()
+
+        if round_row is not None and str(round_row["status"]) != "DRAFT":
+            raise ValueError(
+                f"Existing {ROUND_TYPE} round {round_row['id']} is "
+                f"{round_row['status']}; refusing to change a non-draft round."
+            )
+
+        if round_row is None:
+            creator_id = session.execute(
+                text(
+                    "SELECT a.id FROM accounts a "
+                    "JOIN account_roles ar ON ar.account_id = a.id "
+                    "WHERE ar.role = 'ADMIN' ORDER BY a.id LIMIT 1"
+                )
+            ).scalar_one_or_none()
+            round_id = session.execute(
+                text(
+                    "INSERT INTO rounds "
+                    "(semester_id, name, description, type, reviewer_count, "
+                    "result_owner_mode, group_selection_mode, session_duration_minutes, "
+                    "start_date, end_date, created_by) "
+                    "VALUES (:semester_id, :name, :description, CAST(:type AS round_type), 5, "
+                    "FALSE, FALSE, 30, :start_date, :end_date, :created_by) RETURNING id"
                 ),
-                "type": ROUND_TYPE,
-                "start_date": semester["start_date"],
-                "end_date": semester["end_date"],
-                "created_by": creator_id,
-            },
-        ).scalar_one()
-        round_created = True
-    else:
-        round_id = int(round_row["id"])
-        round_created = False
+                {
+                    "semester_id": semester["id"],
+                    "name": ROUND_NAME,
+                    "description": (
+                        f"Imported from {source_name}; sheet {source_sheet}; "
+                        f"Review 1.1 result = {ELIGIBLE_RESULT}."
+                    ),
+                    "type": ROUND_TYPE,
+                    "start_date": semester["start_date"],
+                    "end_date": semester["end_date"],
+                    "created_by": creator_id,
+                },
+            ).scalar_one()
+            round_created = True
+        else:
+            round_id = int(round_row["id"])
 
     linked = 0
     status_updated = 0
     for group in reference["usable_groups"]:
-        inserted = session.execute(
-            text(
-                "INSERT INTO round_groups (round_id, group_id) VALUES (:round_id, :group_id) "
-                "ON CONFLICT DO NOTHING RETURNING group_id"
-            ),
-            {"round_id": round_id, "group_id": group["group_id"]},
-        ).scalar_one_or_none()
-        linked += int(inserted is not None)
+        if round_id is not None:
+            inserted = session.execute(
+                text(
+                    "INSERT INTO round_groups (round_id, group_id) VALUES (:round_id, :group_id) "
+                    "ON CONFLICT DO NOTHING RETURNING group_id"
+                ),
+                {"round_id": round_id, "group_id": group["group_id"]},
+            ).scalar_one_or_none()
+            linked += int(inserted is not None)
         updated = session.execute(
             text(
                 "UPDATE groups SET status = 'ELIGIBLE_D12' "
@@ -258,11 +263,12 @@ def apply_import(
         text(
             "INSERT INTO audit_events "
             "(actor_id, action, entity_type, entity_id, reason, after_json) "
-            "VALUES (NULL, 'EXCEL_DEFENSE_ELIGIBILITY_IMPORTED', 'round', :entity_id, "
+            "VALUES (NULL, 'EXCEL_DEFENSE_ELIGIBILITY_IMPORTED', :entity_type, :entity_id, "
             ":reason, CAST(:after_json AS JSONB))"
         ),
         {
-            "entity_id": str(round_id),
+            "entity_type": "round" if round_id is not None else "semester",
+            "entity_id": str(round_id if round_id is not None else semester["id"]),
             "reason": "Import Defense 1.2 eligible groups from SU26 workbook",
             "after_json": json.dumps(
                 {
@@ -271,7 +277,8 @@ def apply_import(
                     "sheet": source_sheet,
                     "eligible_projects": eligible_count,
                     "usable_groups": len(reference["usable_groups"]),
-                    "linked_groups": len(reference["usable_groups"]),
+                    "round_id": round_id,
+                    "linked_groups": linked,
                     "status_updated": status_updated,
                 }
             ),
@@ -280,7 +287,7 @@ def apply_import(
     return {
         "round_id": round_id,
         "round_created": round_created,
-        "groups_linked": len(reference["usable_groups"]),
+        "groups_linked": linked,
         "new_links": linked,
         "group_status_updated": status_updated,
     }
@@ -296,6 +303,11 @@ def main() -> None:
         default=os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL),
     )
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument(
+        "--attach-round",
+        action="store_true",
+        help="Also create/reuse the Defense 1.2 round and attach eligible groups.",
+    )
     args = parser.parse_args()
 
     workbook_path = args.workbook.resolve()
@@ -336,6 +348,7 @@ def main() -> None:
                             workbook_path.name,
                             len(projects),
                             sheet_name,
+                            attach_round=args.attach_round,
                         )
                     )
             print(json.dumps(result, ensure_ascii=False, indent=2, default=str))

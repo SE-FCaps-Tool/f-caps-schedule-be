@@ -33,6 +33,48 @@ def test_round_update_payload_accepts_frontend_contract_aliases():
 
 
 @pytest.mark.integration
+def test_round_update_accepts_pre_grading_deadline_and_rejects_after_start(client):
+    headers = {"X-Test-Session": "active-manager"}
+    engine = get_engine(get_settings().database_url)
+
+    with Session(engine) as db, db.begin():
+        semester_id = db.execute(text("SELECT MIN(id) FROM semesters")).scalar_one()
+        round_id = db.execute(
+            text(
+                "INSERT INTO rounds "
+                "(semester_id, name, type, status, reviewer_count, session_duration_minutes, "
+                "start_date, end_date, registration_deadline) "
+                "VALUES (:semester_id, 'Deadline Contract', CAST('REVIEW_1' AS round_type), "
+                "CAST('DRAFT' AS round_status), 2, 60, DATE '2030-02-01', DATE '2030-02-03', "
+                "CAST('2030-01-20T16:59:00Z' AS timestamptz)) RETURNING id"
+            ),
+            {"semester_id": semester_id},
+        ).scalar_one()
+
+    try:
+        early = client.patch(
+            f"/api/v1/rounds/{round_id}",
+            headers=headers,
+            json={"registrationDeadline": "2030-01-15T16:59:00Z"},
+        )
+        assert early.status_code == 200, early.text
+        assert early.json()["data"]["registrationDeadline"] == "2030-01-15T16:59:00Z"
+        assert early.json()["data"]["startDate"] == "2030-02-01"
+        assert early.json()["data"]["endDate"] == "2030-02-03"
+
+        late = client.patch(
+            f"/api/v1/rounds/{round_id}",
+            headers=headers,
+            json={"registrationDeadline": "2030-02-02T16:59:00Z"},
+        )
+        assert late.status_code == 422, late.text
+        assert late.json()["detail"]["code"] == "ROUND_DEADLINE_INVALID"
+    finally:
+        with Session(engine) as db, db.begin():
+            db.execute(text("DELETE FROM rounds WHERE id = :id"), {"id": round_id})
+
+
+@pytest.mark.integration
 def test_round_detail_matches_frontend_contract_and_groups_active_slots(client):
     headers = {"X-Test-Session": "active-manager"}
     engine = get_engine(get_settings().database_url)

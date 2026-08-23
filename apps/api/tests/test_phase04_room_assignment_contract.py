@@ -75,6 +75,16 @@ def test_round_resource_contract_persists_room_types_not_room_ids():
     assert "room_types" in RoundDetailResponse.model_fields
 
 
+def test_round_resource_contract_allows_attaching_groups_before_other_resources():
+    from app.routes.master_data import RoundResources
+
+    payload = RoundResources.model_validate({"group_ids": [42]})
+
+    assert payload.group_ids == [42]
+    assert payload.timeslot_ids == []
+    assert payload.room_types == []
+
+
 def test_response_models_expose_room_listing_assignment_suggestion_and_readiness_shapes():
     source = (API_ROOT / "app" / "response_models.py").read_text(encoding="utf-8")
     for model_name in (

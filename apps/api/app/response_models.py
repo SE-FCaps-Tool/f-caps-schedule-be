@@ -81,6 +81,7 @@ class MajorResponse(ResponseModel):
 class StudentResponse(ResponseModel):
     id: int
     student_code: str
+    full_name: str | None = None
     display_name: str | None = None
     email: str | None = None
 
@@ -356,6 +357,8 @@ class RoundDetailContractResponse(ResponseModel):
     type: str
     status: str
     description: str | None = None
+    start_date: date | None = Field(default=None, alias="startDate")
+    end_date: date | None = Field(default=None, alias="endDate")
     duration_minutes: int = Field(alias="durationMinutes")
     reviewer_count: int = Field(alias="reviewerCount")
     max_groups_per_timeslot: int | None = Field(default=None, alias="maxGroupsPerTimeslot")
