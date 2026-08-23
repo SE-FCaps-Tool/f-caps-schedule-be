@@ -11,9 +11,23 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api_contract import external_id, parse_external_id, success_payload
+from app.api_contract import ApiDataEnvelope, external_id, parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.response_models import (
+    TargetAvailabilityResponse,
+    TargetEligibleProjectResponse,
+    TargetGroupAvailabilityWriteResponse,
+    TargetGroupPreferencesResponse,
+    TargetInvitationCreateResponse,
+    TargetInvitationDecisionResponse,
+    TargetInvitationReminderResponse,
+    TargetLecturerAvailabilityWriteResponse,
+    TargetRegistrationSummaryResponse,
+    TargetRoundResponse,
+    TargetRoundTransitionResponse,
+    TargetSchedulingReadinessResponse,
+)
 from app.routes.manager_extensions import resend_invitation
 from app.routes.master_data import (
     AvailabilitySubmit,
@@ -239,21 +253,34 @@ def _manager(user: CurrentUser) -> None:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Manager permission required."})
 
 
-@router.get("/semesters/{semesterId}/rounds")
+@router.get(
+    "/semesters/{semesterId}/rounds",
+    response_model=ApiDataEnvelope[list[TargetRoundResponse]],
+    response_model_exclude_unset=True,
+)
 def list_semester_rounds(semester_id: Annotated[int, Path(alias="semesterId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     rows = list_rounds(db, user, semester_id=semester_id)
     return success_payload(rows, meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
 
-@router.post("/semesters/{semesterId}/rounds", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/semesters/{semesterId}/rounds",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiDataEnvelope[TargetRoundResponse],
+    response_model_exclude_unset=True,
+)
 def create_semester_round(semester_id: Annotated[int, Path(alias="semesterId")], payload: TargetRoundCreate, db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     legacy_payload, days = payload.to_legacy(semester_id)
     return success_payload(create_round_with_days(legacy_payload, db, user, days=days))
 
 
-@router.get("/rounds/{roundId}/eligible-projects")
+@router.get(
+    "/rounds/{roundId}/eligible-projects",
+    response_model=ApiDataEnvelope[list[TargetEligibleProjectResponse]],
+    response_model_exclude_unset=True,
+)
 def eligible_projects(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     round_row = db.execute(text("SELECT type::text AS type FROM rounds WHERE id = :id"), {"id": round_id}).mappings().one_or_none()
@@ -321,13 +348,21 @@ def eligible_projects(round_id: Annotated[int, Path(alias="roundId")], db: Db, u
     return success_payload(items, meta={"page": 1, "pageSize": len(items), "total": len(items)})
 
 
-@router.get("/rounds/{roundId}/registration-summary")
+@router.get(
+    "/rounds/{roundId}/registration-summary",
+    response_model=ApiDataEnvelope[TargetRegistrationSummaryResponse],
+    response_model_exclude_unset=True,
+)
 def registration_summary(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     return success_payload(registration_dashboard(round_id, db, user))
 
 
-@router.get("/rounds/{roundId}/scheduling-readiness")
+@router.get(
+    "/rounds/{roundId}/scheduling-readiness",
+    response_model=ApiDataEnvelope[TargetSchedulingReadinessResponse],
+    response_model_exclude_unset=True,
+)
 def scheduling_readiness(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     row = db.execute(
@@ -375,7 +410,11 @@ def _transition(
     return success_payload(transition_round_status(round_id, transition, db, user))
 
 
-@router.post("/rounds/{roundId}/actions/open-registration")
+@router.post(
+    "/rounds/{roundId}/actions/open-registration",
+    response_model=ApiDataEnvelope[TargetRoundTransitionResponse],
+    response_model_exclude_unset=True,
+)
 def open_registration(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User, payload: RegistrationAction | None = None) -> dict[str, Any]:
     return _transition(round_id, "OPEN_REGISTRATION", payload, db, user)
 
@@ -394,19 +433,31 @@ def open_group_registration(round_id: Annotated[int, Path(alias="roundId")], db:
     )
 
 
-@router.post("/rounds/{roundId}/actions/close-registration")
+@router.post(
+    "/rounds/{roundId}/actions/close-registration",
+    response_model=ApiDataEnvelope[TargetRoundTransitionResponse],
+    response_model_exclude_unset=True,
+)
 def close_registration(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User, payload: RegistrationAction | None = None) -> dict[str, Any]:
     return _transition(round_id, "REGISTRATION_CLOSED", payload, db, user)
 
 
-@router.get("/rounds/{roundId}/availability/me")
+@router.get(
+    "/rounds/{roundId}/availability/me",
+    response_model=ApiDataEnvelope[TargetAvailabilityResponse],
+    response_model_exclude_unset=True,
+)
 def get_my_availability(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     # Reading a submitted availability remains allowed after the registration
     # window closes; only the PUT endpoint enforces the active phase.
     return success_payload(_build_my_availability(round_id, db, user, enforce_registration_phase=False))
 
 
-@router.put("/rounds/{roundId}/availability/me")
+@router.put(
+    "/rounds/{roundId}/availability/me",
+    response_model=ApiDataEnvelope[TargetLecturerAvailabilityWriteResponse],
+    response_model_exclude_unset=True,
+)
 def put_my_availability(round_id: Annotated[int, Path(alias="roundId")], payload: TargetAvailabilitySubmit, db: Db, user: User) -> dict[str, Any]:
     if user.role != "LECTURER":
         raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "Only a Lecturer may edit personal availability."})
@@ -418,7 +469,11 @@ def put_my_availability(round_id: Annotated[int, Path(alias="roundId")], payload
     return success_payload(submit_lecturer_availability(round_id, lecturer_id, legacy, db, user))
 
 
-@router.post("/rounds/{roundId}/invitations/me/respond")
+@router.post(
+    "/rounds/{roundId}/invitations/me/respond",
+    response_model=ApiDataEnvelope[TargetInvitationDecisionResponse],
+    response_model_exclude_unset=True,
+)
 def respond_my_invitation(round_id: Annotated[int, Path(alias="roundId")], payload: TargetInvitationResponse, db: Db, user: User) -> dict[str, Any]:
     if user.role != "LECTURER":
         raise HTTPException(status_code=403, detail={"code": "AUTH_RESOURCE_SCOPE", "message": "Only a Lecturer may respond to an invitation."})
@@ -429,7 +484,12 @@ def respond_my_invitation(round_id: Annotated[int, Path(alias="roundId")], paylo
     return success_payload(respond_to_invitation(round_id, lecturer_id, legacy, db, user))
 
 
-@router.post("/rounds/{roundId}/invitations", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/rounds/{roundId}/invitations",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiDataEnvelope[TargetInvitationCreateResponse],
+    response_model_exclude_unset=True,
+)
 def create_target_invitations(round_id: Annotated[int, Path(alias="roundId")], payload: TargetInvitationCreate, db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     lecturer_ids = [parse_external_id(value, prefix="lec") for value in payload.lecturer_ids]
@@ -442,13 +502,21 @@ def create_target_invitations(round_id: Annotated[int, Path(alias="roundId")], p
     return success_payload({"roundId": external_id(round_id, "rnd"), "invitedCount": len(set(lecturer_ids))})
 
 
-@router.post("/rounds/{roundId}/invitations/{invitationId}/remind")
+@router.post(
+    "/rounds/{roundId}/invitations/{invitationId}/remind",
+    response_model=ApiDataEnvelope[TargetInvitationReminderResponse],
+    response_model_exclude_unset=True,
+)
 def remind_invitation(round_id: Annotated[int, Path(alias="roundId")], invitation_id: Annotated[int, Path(alias="invitationId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     return success_payload(resend_invitation(round_id, invitation_id, db, user))
 
 
-@router.get("/rounds/{roundId}/groups/{groupId}/preferences")
+@router.get(
+    "/rounds/{roundId}/groups/{groupId}/preferences",
+    response_model=ApiDataEnvelope[TargetGroupPreferencesResponse],
+    response_model_exclude_unset=True,
+)
 def get_group_preferences(round_id: Annotated[int, Path(alias="roundId")], group_id: Annotated[int, Path(alias="groupId")], db: Db, user: User) -> dict[str, Any]:
     if user.role not in {"ADMIN", "MANAGER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Group preference access is not available."})
@@ -485,7 +553,11 @@ def get_group_preferences(round_id: Annotated[int, Path(alias="roundId")], group
     return success_payload({"roundId": round_id, "groupId": group_id, "timeslots": [dict(row) for row in rows]})
 
 
-@router.put("/rounds/{roundId}/groups/{groupId}/preferences")
+@router.put(
+    "/rounds/{roundId}/groups/{groupId}/preferences",
+    response_model=ApiDataEnvelope[TargetGroupAvailabilityWriteResponse],
+    response_model_exclude_unset=True,
+)
 def put_group_preferences(round_id: Annotated[int, Path(alias="roundId")], group_id: Annotated[int, Path(alias="groupId")], payload: TargetGroupPreferences, db: Db, user: User) -> dict[str, Any]:
     selected = [parse_external_id(value, prefix="ts") for value in payload.timeslot_ids]
     legacy = AvailabilitySubmit(selected_timeslot_ids=selected, load_preference="MEDIUM")
