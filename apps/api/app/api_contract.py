@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 from fastapi import Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -322,6 +323,22 @@ def camelize(value: Any) -> Any:
     if isinstance(value, tuple):
         return tuple(camelize(item) for item in value)
     return value
+
+
+class CamelJSONResponse(JSONResponse):
+    """The app's ``default_response_class`` — camelizes every JSON body on the way out.
+
+    FastAPI hands ``render()`` the content *after* ``response_model`` serialization, so
+    this is the one place that catches legacy ``ResponseModel`` fields (declared snake_case,
+    no alias) and raw dict/SQL-row returns alike, without touching route handlers.
+    ``camelize()`` is idempotent on already-camelCase keys, so ``TargetResponseModel``
+    output (already aliased) passes through unchanged. ``StreamingResponse``/``Response``
+    (``.xlsx``/``.ics`` exports) never go through a response class's ``render()`` for JSON
+    content, so they are untouched by design.
+    """
+
+    def render(self, content: Any) -> bytes:
+        return super().render(camelize(content))
 
 
 def success_payload(data: Any, *, meta: Mapping[str, Any] | None = None) -> dict[str, Any]:

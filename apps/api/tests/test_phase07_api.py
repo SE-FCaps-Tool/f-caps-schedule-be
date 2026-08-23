@@ -18,8 +18,8 @@ def test_manager_operations_and_report_surfaces_have_provenance(client):
 
     dashboard = client.get("/api/v1/dashboard", headers=headers)
     assert dashboard.status_code == 200, dashboard.text
-    assert {"current_semester", "availability", "groups", "lecturer_load", "attention_groups"}.issubset(dashboard.json())
-    current_semester = dashboard.json()["current_semester"]
+    assert {"currentSemester", "availability", "groups", "lecturerLoad", "attentionGroups"}.issubset(dashboard.json())
+    current_semester = dashboard.json()["currentSemester"]
     assert current_semester is not None
     assert current_semester["status"] == "ACTIVE"
     assert {"id", "code", "name", "status"} <= current_semester.keys()

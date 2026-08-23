@@ -14,7 +14,13 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .api_contract import ApiErrorEnvelope, camelize, error_payload, legacy_contract_headers
+from .api_contract import (
+    ApiErrorEnvelope,
+    CamelJSONResponse,
+    camelize_openapi,
+    error_payload,
+    legacy_contract_headers,
+)
 from .auth import CurrentUser, get_current_user
 from .config import get_settings
 from .database import get_engine
@@ -42,9 +48,9 @@ VALIDATION_ERROR_FIELDS = ("type", "loc", "msg")
 
 
 def error_response(status_code: int, code: str, message: str, *, details: dict | None = None, headers: dict | None = None) -> JSONResponse:
-    return JSONResponse(
+    return CamelJSONResponse(
         status_code=status_code,
-        content=camelize(error_payload(code, message, details=details)),
+        content=error_payload(code, message, details=details),
         headers=headers,
     )
 
@@ -64,7 +70,7 @@ def _public_validation_errors(errors: list) -> list[dict]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None)
+    app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None, default_response_class=CamelJSONResponse)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -185,7 +191,6 @@ def create_app() -> FastAPI:
         if app.openapi_schema:
             return app.openapi_schema
         schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
-        schema.setdefault("info", {})["x-be-wire-case"] = "snake_case"
         schema.setdefault("components", {}).setdefault("schemas", {}).update(
             ApiErrorEnvelope.model_json_schema(ref_template="#/components/schemas/{model}")
             .pop("$defs", {})
@@ -210,8 +215,8 @@ def create_app() -> FastAPI:
         for orphan in ("HTTPValidationError", "ValidationError"):
             if orphan not in json.dumps(schema["paths"]):
                 schema["components"]["schemas"].pop(orphan, None)
-        app.openapi_schema = schema
-        return schema
+        app.openapi_schema = camelize_openapi(schema)
+        return app.openapi_schema
 
     app.openapi = custom_openapi
 

@@ -344,8 +344,8 @@ def test_round_creation_materializes_and_pins_quick_timeframe_revision(client):
         assert created_round.status_code == 201, created_round.text
         round_data = created_round.json()
         round_id = int(round_data["id"])
-        assert round_data["timeframe_id"] == timeframe_id
-        assert round_data["timeframe_version_id"] == active_version_id
+        assert round_data["timeframeId"] == timeframe_id
+        assert round_data["timeframeVersionId"] == active_version_id
 
         with Session(engine) as db:
             slots_before = db.execute(

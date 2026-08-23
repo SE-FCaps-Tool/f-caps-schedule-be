@@ -39,8 +39,8 @@ def test_manager_can_create_semester_and_duplicate_code_is_rejected(client):
         assert created.status_code == 201
         assert created.json()["code"] == code.upper()
         assert created.json()["status"] == "ACTIVE"
-        assert created.json()["start_date"] == "2030-01-01"
-        assert created.json()["end_date"] == "2030-04-15"
+        assert created.json()["startDate"] == "2030-01-01"
+        assert created.json()["endDate"] == "2030-04-15"
 
         duplicate = client.post("/api/v1/semesters", json=payload, headers=headers)
         assert duplicate.status_code == 409
