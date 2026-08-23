@@ -7,9 +7,10 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.orm import Session
 
-from app.api_contract import external_id, success_payload
+from app.api_contract import ApiDataEnvelope, external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.response_models import TargetScheduleDiscardResponse
 from app.routes.manager_extensions import list_sessions
 from app.routes.schedule_operations import (
     ScheduleRunPayload,
@@ -61,7 +62,11 @@ def set_target_schedule_active(round_id: Annotated[int, Path(alias="roundId")], 
     return success_payload(activate_schedule_version(schedule_id, db, user))
 
 
-@router.post("/rounds/{roundId}/schedules/{scheduleId}/actions/discard")
+@router.post(
+    "/rounds/{roundId}/schedules/{scheduleId}/actions/discard",
+    response_model=ApiDataEnvelope[TargetScheduleDiscardResponse],
+    response_model_exclude_unset=True,
+)
 def discard_target_schedule(round_id: Annotated[int, Path(alias="roundId")], schedule_id: Annotated[int, Path(alias="scheduleId")], db: Db, user: User) -> dict[str, Any]:
     return success_payload(delete_draft_version(schedule_id, db, user))
 
