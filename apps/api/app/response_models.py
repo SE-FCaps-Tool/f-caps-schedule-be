@@ -512,6 +512,10 @@ class VersionSummaryResponse(ResponseModel):
     random_seed: int | None = None
     created_at: datetime | None = None
     activated_at: datetime | None = None
+    type: str | None = None
+    semester_id: int | None = None
+    semester_code: str | None = None
+    generated_at: datetime | None = None
 
 
 class VersionDetailResponse(VersionSummaryResponse):
@@ -1404,6 +1408,7 @@ class RoundDayCreateResponse(ResponseModel):
 
 class TimeframeRevisionResponse(ResponseModel):
     id: int
+    timeframe_id: int | None = Field(default=None, alias="timeframeId")
     version_number: int = Field(alias="versionNumber")
     status: str
     start_time: time = Field(alias="startTime")
