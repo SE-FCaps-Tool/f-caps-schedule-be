@@ -13,10 +13,15 @@ from datetime import date, datetime, time
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic.alias_generators import to_camel
 
 
 class ResponseModel(BaseModel):
     model_config = ConfigDict(extra="allow")
+
+
+class TargetResponseModel(ResponseModel):
+    model_config = ConfigDict(extra="allow", alias_generator=to_camel, populate_by_name=True)
 
 
 class LoginResponse(ResponseModel):
@@ -693,6 +698,557 @@ class ActionResponse(ResponseModel):
     timeslots: int | None = None
     rooms: int | None = None
     makeup_of_session_id: int | None = None
+
+
+class TargetAuditActorResponse(TargetResponseModel):
+    id: int
+    email: str
+    display_name: str
+
+
+class TargetSemesterResponse(TargetResponseModel):
+    id: int
+    code: str
+    name: str
+    note: str | None
+    start_date: date | None
+    end_date: date | None
+    academic_year: str | None
+    status: Literal["PLANNING", "ACTIVE", "CLOSED", "ARCHIVED"]
+    project_count: int
+    group_count: int
+    round_count: int
+    created_at: datetime | None
+    created_by: TargetAuditActorResponse | None
+    updated_at: datetime | None
+    updated_by: TargetAuditActorResponse | None
+
+
+class TargetStudentResponse(TargetResponseModel):
+    id: int
+    student_code: str
+    full_name: str | None
+    email: str | None
+
+
+class TargetConflictItemResponse(TargetResponseModel):
+    project_id: int
+    reason: str | None
+
+
+class TargetLecturerResponse(TargetResponseModel):
+    id: int
+    lecturer_code: str
+    account_id: int
+    email: str
+    display_name: str
+    account_status: str
+    conflicts: list[TargetConflictItemResponse]
+
+
+class TargetRoomResponse(TargetResponseModel):
+    id: int
+    code: str
+    name: str
+    capacity: int
+    active: bool
+    room_type: str
+
+
+class TargetPersonSummaryResponse(TargetResponseModel):
+    id: str
+    code: str
+    full_name: str | None
+
+
+class TargetProjectGroupSummaryResponse(TargetResponseModel):
+    id: str
+    code: str
+
+
+class TargetProjectListItemResponse(TargetResponseModel):
+    id: str
+    code: str
+    name: str
+    name_vi: str
+    name_en: str | None
+    status: str
+    main_supervisor: TargetPersonSummaryResponse | None
+    co_supervisor: TargetPersonSummaryResponse | None
+    group: TargetProjectGroupSummaryResponse | None
+
+
+class TargetWarningResponse(TargetResponseModel):
+    code: str
+    message: str
+
+
+class TargetGroupProjectSummaryResponse(TargetResponseModel):
+    id: str
+    code: str
+    name: str
+    name_vi: str
+    name_en: str | None
+    status: str
+
+
+class TargetGroupListItemResponse(TargetResponseModel):
+    id: str
+    code: str
+    status: str
+    member_count: int
+    leader: TargetPersonSummaryResponse | None
+    project: TargetGroupProjectSummaryResponse | None
+    warnings: list[TargetWarningResponse]
+
+
+class TargetGroupCreateResponse(TargetResponseModel):
+    id: str
+    code: str
+    status: str
+
+
+class TargetGroupMemberResponse(TargetResponseModel):
+    membership_id: str
+    student_id: str
+    student_code: str
+    display_name: str | None
+    email: str | None
+    role: str
+    status: str
+
+
+class TargetLeaderChangeResponse(TargetResponseModel):
+    group_id: int
+    leader_student_id: int
+
+
+class TargetGroupLeaveResponse(TargetResponseModel):
+    group_id: str
+    membership_id: str
+    status: str
+    member_count: int
+    leader_id: str | None
+
+
+class TargetGroupProjectAssignmentResponse(TargetResponseModel):
+    id: str | int
+    code: str
+    status: str
+    project_id: str | int | None
+
+
+class TargetProjectCreateResponse(TargetResponseModel):
+    id: str
+    code: str
+    name_vi: str
+    name_en: str | None
+    status: str
+
+
+class TargetProjectProgressionResponse(TargetResponseModel):
+    project_id: int
+    code: str
+    title: str
+    title_vi: str | None
+    title_en: str | None
+    project_status: str
+    group_id: int | None
+    group_status: str | None
+
+
+class TargetProjectResultResponse(TargetResponseModel):
+    id: int
+    session_id: int
+    round_type: str
+    outcome: str | None
+    note: str | None
+    entered_at: datetime | None
+    verify_status: str | None
+    remediation_due_at: datetime | None
+
+
+class TargetRoundResponse(TargetResponseModel):
+    id: int
+    semester_id: int
+    name: str | None
+    description: str | None
+    type: str
+    status: str
+    reviewer_count: int
+    result_owner_mode: bool
+    group_selection_mode: bool
+    session_duration_minutes: int | None
+    start_date: date | None
+    end_date: date | None
+    registration_deadline: datetime | None
+    group_preference_deadline: datetime | None
+    h12_sessions_per_part: int | None
+    h12_sessions_per_day: int | None
+    h12_semester_quota: int | None
+    max_groups_per_timeslot: int | None
+    max_minutes_per_part: int | None
+    max_minutes_per_day: int | None
+    timeframe_id: int | None
+    timeframe_version_id: int | None
+    soft_weights: dict[str, int]
+    room_types: list[str]
+
+
+class TargetEligibilityChecksResponse(TargetResponseModel):
+    has_group: bool
+    has_active_leader: bool
+    has_main_supervisor: bool
+    progression_allowed: bool
+
+
+class TargetEligibleProjectResponse(TargetResponseModel):
+    project_id: str
+    group_id: str | None
+    eligible: bool
+    checks: TargetEligibilityChecksResponse
+    blocking_reasons: list[str]
+    warnings: list[TargetWarningResponse]
+
+
+class TargetRegistrationSummaryResponse(TargetResponseModel):
+    invited: int
+    responded: int
+    lecturer_availability: int
+    group_availability: int
+
+
+class TargetUnusableCommitteeResponse(TargetResponseModel):
+    committee_id: int
+    code: str
+    missing_lecturer_ids: list[int]
+
+
+class TargetSchedulingReadinessResponse(TargetResponseModel):
+    ready: bool
+    blockers: list[str]
+    unusable_committees: list[TargetUnusableCommitteeResponse]
+    id: int
+    status: str
+    groups: int
+    timeslots: int
+    accepted_invitations: int
+
+
+class TargetRoundTransitionResponse(TargetResponseModel):
+    round_id: int
+    status: str
+
+
+class TargetAvailabilityRoundResponse(TargetResponseModel):
+    id: int
+    type: str
+    status: str
+    group_selection_mode: bool
+    registration_deadline: datetime | None
+    group_preference_deadline: datetime | None
+
+
+class TargetAvailabilityTimeslotResponse(TargetResponseModel):
+    id: int
+    start_at: datetime
+    end_at: datetime
+    day_date: date
+
+
+class TargetAvailabilityGroupResponse(TargetResponseModel):
+    id: int
+    code: str
+
+
+class TargetLecturerAvailabilitySelectionResponse(TargetResponseModel):
+    lecturer_id: int
+    timeslot_id: int
+    state: str
+    load_preference: str
+    source: str
+
+
+class TargetGroupAvailabilitySelectionResponse(TargetResponseModel):
+    group_id: int
+    timeslot_id: int
+    selected: bool
+    source: str
+
+
+class TargetAvailabilityResponse(TargetResponseModel):
+    round: TargetAvailabilityRoundResponse
+    timeslots: list[TargetAvailabilityTimeslotResponse]
+    lecturer_id: int | None = None
+    selected_timeslot_ids: list[int] = Field(default_factory=list)
+    groups: list[TargetAvailabilityGroupResponse] = Field(default_factory=list)
+    selected_by_group: dict[int, list[int]] | list[TargetGroupAvailabilitySelectionResponse] | None = None
+    selected_by_lecturer: list[TargetLecturerAvailabilitySelectionResponse] = Field(default_factory=list)
+
+
+class TargetLecturerAvailabilityWriteResponse(TargetResponseModel):
+    round_id: int
+    lecturer_id: int
+    selected_count: int
+    total_slots: int
+    source: str
+
+
+class TargetGroupAvailabilityWriteResponse(TargetResponseModel):
+    round_id: int
+    group_id: int
+    selected_count: int
+    total_slots: int
+    source: str
+
+
+class TargetInvitationDecisionResponse(TargetResponseModel):
+    round_id: int
+    lecturer_id: int
+    response: str
+
+
+class TargetInvitationCreateResponse(TargetResponseModel):
+    round_id: str
+    invited_count: int
+
+
+class TargetInvitationReminderResponse(TargetResponseModel):
+    round_id: int
+    lecturer_id: int
+    status: str
+    resent: bool
+
+
+class TargetGroupPreferenceTimeslotResponse(TargetResponseModel):
+    timeslot_id: int
+    start_at: datetime
+    end_at: datetime
+    selected: bool | None
+    source: str | None
+
+
+class TargetGroupPreferencesResponse(TargetResponseModel):
+    round_id: int
+    group_id: int
+    timeslots: list[TargetGroupPreferenceTimeslotResponse]
+
+
+class TargetPortalInvitationRoundResponse(TargetResponseModel):
+    id: str
+    name: str
+    type: str
+    registration_deadline: datetime | None
+
+
+class TargetPortalInvitationResponse(TargetResponseModel):
+    id: str
+    round: TargetPortalInvitationRoundResponse
+    status: str
+    responded_at: datetime | None
+
+
+class TargetLecturerPortalSessionResponse(TargetResponseModel):
+    id: int
+    round_id: int
+    start_at: datetime
+    end_at: datetime
+    status: str
+    group_id: int
+    group_code: str
+    project_code: str
+    room_code: str | None
+    round_type: str
+
+
+class TargetLeaderPortalSessionResponse(TargetLecturerPortalSessionResponse):
+    room_id: int | None
+
+
+class TargetPortalProjectMemberResponse(TargetResponseModel):
+    id: int
+    code: str
+    name: str | None
+    role: str
+    status: str
+
+
+class TargetPortalProjectLeaderResponse(TargetResponseModel):
+    id: int
+    code: str
+    name: str | None
+
+
+class TargetPortalProjectGroupResponse(TargetResponseModel):
+    id: int
+    code: str
+    member_count: int
+    leader: TargetPortalProjectLeaderResponse | None
+    members: list[TargetPortalProjectMemberResponse]
+
+
+class TargetSupervisedProjectResponse(TargetResponseModel):
+    id: int
+    code: str
+    title: str
+    title_vi: str | None
+    title_en: str | None
+    status: str
+    semester_id: int
+    semester_code: str
+    supervisor_type: str
+    group: TargetPortalProjectGroupResponse | None
+
+
+class TargetPortalRemediationResponse(TargetResponseModel):
+    id: int
+    group_id: int
+    group_code: str
+    status: str
+    due_at: datetime
+    verifier_lecturer_id: int | None
+    note: str | None
+    round_type: str
+
+
+class TargetLeaderDashboardGroupResponse(TargetResponseModel):
+    id: str
+    code: str
+    member_count: int
+    max_members: int
+
+
+class TargetLeaderDashboardProjectResponse(TargetResponseModel):
+    id: str
+    code: str
+    title_vi: str
+    title_en: str | None
+    status: str
+
+
+class TargetLeaderDashboardSupervisorResponse(TargetResponseModel):
+    id: str
+    name: str
+
+
+class TargetLeaderDashboardRoundResponse(TargetResponseModel):
+    id: str
+    name: str
+    type: str
+    status: str
+
+
+class TargetLeaderDashboardSessionResponse(TargetResponseModel):
+    id: str
+    date: str
+    start_time: str
+    end_time: str
+    room: str | None
+
+
+class TargetLeaderDashboardResultResponse(TargetResponseModel):
+    round_type: str
+    kind: str
+    value: str
+    date: str
+
+
+class TargetLeaderDashboardRemediationResponse(TargetResponseModel):
+    deadline: datetime
+    status: str
+
+
+class TargetLeaderDashboardResponse(TargetResponseModel):
+    group: TargetLeaderDashboardGroupResponse | None
+    project: TargetLeaderDashboardProjectResponse | None
+    main_supervisor: TargetLeaderDashboardSupervisorResponse | None
+    co_supervisor: TargetLeaderDashboardSupervisorResponse | None
+    current_round: TargetLeaderDashboardRoundResponse | None
+    preference_status: str | None
+    deadline: datetime | None
+    upcoming_session: TargetLeaderDashboardSessionResponse | None
+    latest_result: TargetLeaderDashboardResultResponse | None
+    remediation: TargetLeaderDashboardRemediationResponse | None
+
+
+class TargetScheduleDiscardResponse(TargetResponseModel):
+    id: int
+    deleted: bool
+
+
+class TargetPublishBlockerResponse(TargetResponseModel):
+    code: str
+    message: str
+    room_id: int | None = None
+    session_id: int | None = None
+    round_id: int | None = None
+    schedule_version_id: int | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    round_type: str | None = None
+    version_status: str | None = None
+
+
+class TargetPublishReadinessResponse(TargetResponseModel):
+    ready: bool
+    version_id: int | None
+    blockers: list[TargetPublishBlockerResponse]
+
+
+class TargetPublishResponse(TargetResponseModel):
+    round_id: int
+    version_id: int
+    status: str
+    recipient_count: int
+
+
+class TargetControlledChangeResponse(TargetResponseModel):
+    change_kind: str
+    schedule_version_id: int
+    replacement_version_id: int | None
+    session_id: int
+    status: str
+    before_council_id: int | None
+    after_council_id: int | None
+    version_id: int
+    source_version_id: int
+
+
+class TargetEntityStatusResponse(TargetResponseModel):
+    id: int
+    status: str
+
+
+class TargetGroupProgressResponse(TargetResponseModel):
+    group_id: int
+    group_code: str
+    project_name: str
+    group_status: str
+    review_1_1: str | None
+    review_1: str | None
+    review_2_1: str | None
+    review_2: str | None
+    defense_1_1: str | None
+    review_3: str | None
+    defense_1_2: str | None
+    defense_1: str | None
+    defense_2: str | None
+    result_verifier_lecturer_id: int | None
+    remediation_status: str | None
+    remediation_due_at: datetime | None
+    remediation_verifier_lecturer_id: int | None
+
+
+class TargetRemediationResponse(TargetResponseModel):
+    id: int
+    group_id: int
+    group_code: str
+    status: str
+    ui_status: str
+    due_at: datetime
+    verifier_lecturer_id: int | None
+    note: str | None
+    round_type: str
 
 
 class AuditResponse(ResponseModel):
