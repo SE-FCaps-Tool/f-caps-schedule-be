@@ -185,6 +185,7 @@ def create_app() -> FastAPI:
         if app.openapi_schema:
             return app.openapi_schema
         schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+        schema.setdefault("info", {})["x-be-wire-case"] = "snake_case"
         schema.setdefault("components", {}).setdefault("schemas", {}).update(
             ApiErrorEnvelope.model_json_schema(ref_template="#/components/schemas/{model}")
             .pop("$defs", {})
