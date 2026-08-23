@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api_contract import parse_external_id, success_payload
+from app.api_contract import ApiDataEnvelope, parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.response_models import (
@@ -15,6 +15,7 @@ from app.response_models import (
     CommitteeEnvelopeResponse,
     CommitteeListEnvelopeResponse,
     CommitteePreviewEnvelopeResponse,
+    TargetEntityStatusResponse,
 )
 from app.services.committee_service import (
     bulk_delete_committees,
@@ -96,7 +97,11 @@ def get_one(committee_id: Annotated[str, Path(alias="committeeId")], db: Db, use
     return success_payload(get_committee(db, resolved))
 
 
-@router.delete("/committees/{committeeId}")
+@router.delete(
+    "/committees/{committeeId}",
+    response_model=ApiDataEnvelope[TargetEntityStatusResponse],
+    response_model_exclude_unset=True,
+)
 def remove(committee_id: Annotated[str, Path(alias="committeeId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     resolved = parse_external_id(committee_id, prefix="cmt")
