@@ -9,9 +9,10 @@ from pydantic import Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api_contract import RequestModel, success_payload
+from app.api_contract import ApiDataEnvelope, RequestModel, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.response_models import TargetControlledChangeResponse, TargetEntityStatusResponse
 from app.routes.schedule_operations import (
     ControlledChangePayload,
     RescheduleRequestPayload,
@@ -43,20 +44,32 @@ def _version_for_session(session_id: int, db: Session) -> int:
     return int(version_id)
 
 
-@router.post("/sessions/{sessionId}/actions/change-room")
+@router.post(
+    "/sessions/{sessionId}/actions/change-room",
+    response_model=ApiDataEnvelope[TargetControlledChangeResponse],
+    response_model_exclude_unset=True,
+)
 def change_session_room(session_id: Annotated[int, Path(alias="sessionId")], payload: ChangeRoomPayload, db: Db, user: User) -> dict[str, Any]:
     version_id = _version_for_session(session_id, db)
     edit = ControlledChangePayload(room_id=payload.room_id, reason=payload.reason)
     return success_payload(controlled_change(version_id=version_id, session_id=session_id, payload=edit, db=db, user=user))
 
 
-@router.post("/sessions/{sessionId}/actions/replace-reviewer")
+@router.post(
+    "/sessions/{sessionId}/actions/replace-reviewer",
+    response_model=ApiDataEnvelope[TargetControlledChangeResponse],
+    response_model_exclude_unset=True,
+)
 def replace_session_reviewer(session_id: Annotated[int, Path(alias="sessionId")], payload: ReplaceReviewerPayload, db: Db, user: User) -> dict[str, Any]:
     version_id = _version_for_session(session_id, db)
     edit = ControlledChangePayload(reviewer_ids=payload.reviewer_ids, result_owner_id=payload.result_owner_id, reason=payload.reason)
     return success_payload(controlled_change(version_id=version_id, session_id=session_id, payload=edit, db=db, user=user))
 
 
-@router.post("/sessions/{sessionId}/actions/postpone")
+@router.post(
+    "/sessions/{sessionId}/actions/postpone",
+    response_model=ApiDataEnvelope[TargetEntityStatusResponse],
+    response_model_exclude_unset=True,
+)
 def postpone_target_session(session_id: Annotated[int, Path(alias="sessionId")], payload: RescheduleRequestPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(postpone_session(session_id, payload, db, user))
