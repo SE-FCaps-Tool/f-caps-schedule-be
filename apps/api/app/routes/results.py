@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api_contract import success_payload
+from app.api_contract import ApiDataEnvelope, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.domain.enums import DefenseType, GroupStatus, ResultOutcome
@@ -19,6 +19,7 @@ from app.response_models import (
     ActionResponse,
     ResultDetailResponse,
     ResultWriteResponse,
+    TargetRemediationResponse,
 )
 from app.routes.schedule_operations import _actor_id
 from app.services.access import (
@@ -149,7 +150,11 @@ def get_result(session_id: Annotated[int, Path(alias="sessionId")], db: Db, user
     }
 
 
-@router.get("/remediation")
+@router.get(
+    "/remediation",
+    response_model=ApiDataEnvelope[list[TargetRemediationResponse]],
+    response_model_exclude_unset=True,
+)
 def list_remediation_cases(
     db: Db,
     user: User,
