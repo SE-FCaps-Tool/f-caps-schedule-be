@@ -195,8 +195,11 @@ CHECKLIST_OPERATIONS: tuple[ApiOperation, ...] = (
 )
 
 
+SNAKE_KEY = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)+$")
+
+
 def _camel_case_key(key: str) -> str:
-    if "_" not in key:
+    if not SNAKE_KEY.fullmatch(key):
         return key
     head, *rest = key.split("_")
     return head + "".join(word[:1].upper() + word[1:] for word in rest if word)
