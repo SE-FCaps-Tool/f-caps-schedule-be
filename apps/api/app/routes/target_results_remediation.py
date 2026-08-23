@@ -10,9 +10,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api_contract import success_payload
+from app.api_contract import ApiDataEnvelope, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.response_models import TargetEntityStatusResponse
 from app.routes.results import (
     OverdueFailPayload,
     RemediationDecisionPayload,
@@ -40,7 +41,11 @@ class TargetResultPayload(BaseModel):
     remediation: TargetRemediation | None = None
 
 
-@router.post("/remediations/{remediationId}/verify")
+@router.post(
+    "/remediations/{remediationId}/verify",
+    response_model=ApiDataEnvelope[TargetEntityStatusResponse],
+    response_model_exclude_unset=True,
+)
 def verify_remediation(remediation_id: Annotated[int, Path(alias="remediationId")], payload: RemediationDecisionPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(decide_remediation(remediation_id, payload, db, user))
 
