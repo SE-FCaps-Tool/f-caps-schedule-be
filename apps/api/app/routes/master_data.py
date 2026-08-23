@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api_contract import (
+    ApiDataEnvelope,
     RequestModel,
     dual_name_query,
     external_id,
@@ -65,6 +66,11 @@ from app.response_models import (
     RoundResponse,
     SeedFixtureResponse,
     SemesterResponse,
+    TargetLecturerResponse,
+    TargetProjectListItemResponse,
+    TargetRoomResponse,
+    TargetSemesterResponse,
+    TargetStudentResponse,
 )
 from app.scheduler.validator import _eligible
 from app.services.access import (
@@ -412,7 +418,11 @@ class LeaderPayload(RequestModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
-@router.get("/semesters")
+@router.get(
+    "/semesters",
+    response_model=ApiDataEnvelope[list[TargetSemesterResponse]],
+    response_model_exclude_unset=True,
+)
 def list_semesters(
     db: Db,
     user: User,
@@ -567,7 +577,11 @@ def list_majors(db: Db, user: User) -> list[dict[str, object]]:
     return [dict(row) for row in rows]
 
 
-@router.get("/students")
+@router.get(
+    "/students",
+    response_model=ApiDataEnvelope[list[TargetStudentResponse]],
+    response_model_exclude_unset=True,
+)
 def list_students(
     db: Db,
     user: User,
@@ -633,7 +647,12 @@ def list_projects(
     return [dict(row) for row in rows]
 
 
-@router.get("/semesters/{semesterId}/projects", tags=["target-groups-projects"])
+@router.get(
+    "/semesters/{semesterId}/projects",
+    tags=["target-groups-projects"],
+    response_model=ApiDataEnvelope[list[TargetProjectListItemResponse]],
+    response_model_exclude_unset=True,
+)
 def list_semester_projects(
     semester_id: Annotated[int, Path(alias="semesterId")],
     db: Db,
@@ -705,7 +724,11 @@ def list_semester_projects(
     return success_payload(items, meta={"page": page, "pageSize": page_size, "total": total})
 
 
-@router.get("/lecturers")
+@router.get(
+    "/lecturers",
+    response_model=ApiDataEnvelope[list[TargetLecturerResponse]],
+    response_model_exclude_unset=True,
+)
 def list_lecturers(
     db: Db,
     user: User,
@@ -781,7 +804,11 @@ def create_lecturer(payload: LecturerCreate, db: Db, user: User) -> dict[str, ob
     return dict(row)
 
 
-@router.get("/rooms")
+@router.get(
+    "/rooms",
+    response_model=ApiDataEnvelope[list[TargetRoomResponse]],
+    response_model_exclude_unset=True,
+)
 def list_rooms(
     db: Db,
     user: User,
