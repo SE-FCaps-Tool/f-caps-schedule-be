@@ -11,9 +11,14 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api_contract import success_payload
+from app.api_contract import ApiDataEnvelope, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.response_models import (
+    TargetPublishReadinessResponse,
+    TargetPublishResponse,
+    TargetRoomResponse,
+)
 from app.routes.room_assignment import (
     RoomAssignmentPayload,
     RoomSuggestionPayload,
@@ -76,7 +81,11 @@ def _manager(user: CurrentUser) -> None:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Manager permission required."})
 
 
-@router.patch("/rooms/{roomId}")
+@router.patch(
+    "/rooms/{roomId}",
+    response_model=ApiDataEnvelope[TargetRoomResponse],
+    response_model_exclude_unset=True,
+)
 def update_room(room_id: Annotated[int, Path(alias="roomId")], payload: RoomUpdateTarget, db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     current = db.execute(text("SELECT id, code, name, capacity, active, room_type::text AS room_type FROM rooms WHERE id = :id"), {"id": room_id}).mappings().one_or_none()
@@ -104,7 +113,11 @@ def update_room(room_id: Annotated[int, Path(alias="roomId")], payload: RoomUpda
     return success_payload(dict(row))
 
 
-@router.get("/rounds/{roundId}/publish-readiness")
+@router.get(
+    "/rounds/{roundId}/publish-readiness",
+    response_model=ApiDataEnvelope[TargetPublishReadinessResponse],
+    response_model_exclude_unset=True,
+)
 def publish_readiness(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     _manager(user)
     version = db.execute(text("SELECT id, status::text AS status FROM schedule_versions WHERE round_id = :round_id AND status = 'ACTIVE' ORDER BY id DESC LIMIT 1"), {"round_id": round_id}).mappings().one_or_none()
@@ -121,6 +134,10 @@ def publish_readiness(round_id: Annotated[int, Path(alias="roundId")], db: Db, u
     return success_payload({"ready": not blockers, "versionId": int(version["id"]), "blockers": blockers})
 
 
-@router.post("/rounds/{roundId}/actions/publish")
+@router.post(
+    "/rounds/{roundId}/actions/publish",
+    response_model=ApiDataEnvelope[TargetPublishResponse],
+    response_model_exclude_unset=True,
+)
 def publish_target_schedule(round_id: Annotated[int, Path(alias="roundId")], payload: PublishTargetPayload, db: Db, user: User) -> dict[str, Any]:
     return success_payload(publish_schedule(round_id, payload.version_id, db, user))
