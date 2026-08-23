@@ -22,7 +22,13 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api_contract import RequestModel, dual_name_query, parse_external_id, success_payload
+from app.api_contract import (
+    ApiDataEnvelope,
+    RequestModel,
+    dual_name_query,
+    parse_external_id,
+    success_payload,
+)
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
 from app.database import get_db
@@ -46,6 +52,7 @@ from app.response_models import (
     RoundGroupResponse,
     SemesterResponse,
     SessionResponse,
+    TargetGroupProgressResponse,
     TimeslotResponse,
 )
 from app.routes.master_data import _insert_timeframe_slots, password_hasher
@@ -803,7 +810,11 @@ def list_reschedule_requests(
     return [dict(row) for row in rows]
 
 
-@router.get("/reports/group-progress")
+@router.get(
+    "/reports/group-progress",
+    response_model=ApiDataEnvelope[list[TargetGroupProgressResponse]],
+    response_model_exclude_unset=True,
+)
 def group_progress_report(
     db: Db,
     user: User,
