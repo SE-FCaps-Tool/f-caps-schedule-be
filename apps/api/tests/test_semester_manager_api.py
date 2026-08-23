@@ -85,7 +85,7 @@ def test_semester_create_patch_and_set_current_are_atomic(client):
         headers=MANAGER_HEADERS,
     )
     assert duplicate_active.status_code == 409
-    assert duplicate_active.json()["detail"]["code"] == "ACTIVE_SEMESTER_EXISTS"
+    assert duplicate_active.json()["error"]["code"] == "ACTIVE_SEMESTER_EXISTS"
 
     patched = client.patch(
         f"/api/v1/semesters/{created_body['id']}",

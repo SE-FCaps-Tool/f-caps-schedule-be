@@ -2,7 +2,7 @@ def test_protected_me_endpoint_rejects_anonymous_user(client):
     response = client.get("/api/v1/me")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Authentication required"
+    assert response.json()["error"]["message"] == "Authentication required"
 
 
 def test_protected_me_endpoint_accepts_active_session(client):
@@ -23,7 +23,9 @@ def test_cookie_mutation_requires_double_submit_csrf(client):
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "CSRF validation failed"
+    body = response.json()["error"]
+    assert body["code"] == "CSRF_INVALID"
+    assert body["message"] == "CSRF validation failed."
 
 
 def test_cors_allows_local_frontend_origins_with_credentials(client):

@@ -73,12 +73,12 @@ def test_target_route_422_uses_structured_error_envelope(client):
     assert "detail" not in body
 
 
-def test_legacy_route_403_keeps_detail_shape(client):
+def test_legacy_route_403_uses_the_shared_error_envelope(client):
     response = client.post(
         "/api/v1/admin/seed-fixture",
         headers={"X-Test-Session": "active-manager"},
     )
     assert response.status_code == 403
     body = response.json()
-    assert "detail" in body, body
-    assert "error" not in body
+    assert "detail" not in body, body
+    assert set(body["error"]) == {"code", "message", "details"}

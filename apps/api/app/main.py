@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -7,24 +8,25 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .api_contract import error_payload, legacy_contract_headers
+from .api_contract import ApiErrorEnvelope, camelize, error_payload, legacy_contract_headers
 from .auth import CurrentUser, get_current_user
 from .config import get_settings
 from .database import get_engine
 from .response_models import HealthResponse, PublicMeResponse
 from .routes.auth_routes import router as auth_router
+from .routes.committee_contract import router as committee_contract_router
 from .routes.manager_extensions import router as manager_extensions_router
 from .routes.master_data import router as master_data_router
 from .routes.operations import router as operations_router
 from .routes.results import router as results_router
-from .routes.committee_contract import router as committee_contract_router
-from .routes.round_committee_contract import router as round_committee_contract_router
 from .routes.room_assignment import router as room_assignment_router
+from .routes.round_committee_contract import router as round_committee_contract_router
 from .routes.schedule_operations import router as schedule_operations_router
 from .routes.target_group_project import router as target_group_project_router
 from .routes.target_operations import router as target_operations_router
@@ -36,18 +38,28 @@ from .routes.target_schedule_contract import router as target_schedule_contract_
 from .routes.target_timeframe_contract import router as target_timeframe_contract_router
 from .services.route_telemetry import record_route_usage
 
+VALIDATION_ERROR_FIELDS = ("type", "loc", "msg")
 
-def _is_target_route(request: Request) -> bool:
-    """True when the matched route belongs to a ``target_*`` contract router.
 
-    Legacy routes keep their existing ``{"detail": ...}`` error shape during
-    the migration (see plan.md's compatibility policy); only routes tagged
-    ``target-*`` switch to the spec's ``{"error": {...}}`` envelope.
+def error_response(status_code: int, code: str, message: str, *, details: dict | None = None, headers: dict | None = None) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content=camelize(error_payload(code, message, details=details)),
+        headers=headers,
+    )
+
+
+def _public_validation_errors(errors: list) -> list[dict]:
+    """Keep only the locator and reason.
+
+    Pydantic also reports ``input``, which echoes the submitted body back to
+    the caller and would expose sign-in fields on the auth route.
     """
 
-    route = request.scope.get("route")
-    tags = getattr(route, "tags", None) or []
-    return any(str(tag).startswith("target-") for tag in tags)
+    return [
+        {field: error[field] for field in VALIDATION_ERROR_FIELDS if field in error}
+        for error in errors
+    ]
 
 
 def create_app() -> FastAPI:
@@ -96,7 +108,7 @@ def create_app() -> FastAPI:
             csrf_cookie = request.cookies.get("scheduler_csrf")
             csrf_header = request.headers.get("X-CSRF-Token")
             if not _valid_csrf(settings, session_token=cookie_session, cookie_value=csrf_cookie, header_value=csrf_header):
-                response = JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+                response = error_response(403, "CSRF_INVALID", "CSRF validation failed.")
             else:
                 response = await call_next(request)
         else:
@@ -136,37 +148,71 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
 
     @app.exception_handler(HTTPException)
-    async def _target_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-        if not _is_target_route(request):
-            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
+    async def _http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
         detail = exc.detail
         if isinstance(detail, dict):
             code = str(detail.get("code", "HTTP_ERROR"))
             message = str(detail.get("message", code))
             raw_details = detail.get("details")
-            details = raw_details if isinstance(raw_details, dict) else {}
+            details = dict(raw_details) if isinstance(raw_details, dict) else {}
+            # Handlers attach diagnostics such as ``violations`` beside code and
+            # message; keeping them preserves what callers already read.
+            for key, value in detail.items():
+                if key not in {"code", "message", "details"}:
+                    details.setdefault(key, value)
         else:
             code = "HTTP_ERROR"
             message = str(detail)
             details = {}
-        return JSONResponse(
-            status_code=exc.status_code,
-            content=error_payload(code, message, details=details),
+        return error_response(
+            exc.status_code,
+            code,
+            message,
+            details=jsonable_encoder(details),
             headers=exc.headers,
         )
 
     @app.exception_handler(RequestValidationError)
-    async def _target_validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-        if not _is_target_route(request):
-            return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
-        return JSONResponse(
-            status_code=422,
-            content=error_payload(
-                "VALIDATION_ERROR",
-                "Request validation failed.",
-                details={"errors": jsonable_encoder(exc.errors())},
-            ),
+    async def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        return error_response(
+            422,
+            "VALIDATION_ERROR",
+            "Request validation failed.",
+            details={"errors": _public_validation_errors(jsonable_encoder(exc.errors()))},
         )
+
+    def custom_openapi() -> dict:
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+        schema.setdefault("components", {}).setdefault("schemas", {}).update(
+            ApiErrorEnvelope.model_json_schema(ref_template="#/components/schemas/{model}")
+            .pop("$defs", {})
+            | {"ApiErrorEnvelope": ApiErrorEnvelope.model_json_schema(ref_template="#/components/schemas/{model}")}
+        )
+        schema["components"]["schemas"]["ApiErrorEnvelope"].pop("$defs", None)
+        error_content = {"application/json": {"schema": {"$ref": "#/components/schemas/ApiErrorEnvelope"}}}
+        for path, operations in schema.get("paths", {}).items():
+            if not path.startswith("/api/"):
+                continue
+            for operation in operations.values():
+                if not isinstance(operation, dict):
+                    continue
+                responses = operation.setdefault("responses", {})
+                # "default" rather than an enumerated 4xx list: every handler can
+                # raise any status, and guessing which ones would misdescribe them.
+                responses["default"] = {"description": "Error", "content": error_content}
+                if "422" in responses:
+                    responses["422"] = {"description": "Validation Error", "content": error_content}
+        # No operation references FastAPI's built-in validation schemas any
+        # more; leaving them would make client generators emit dead types.
+        for orphan in ("HTTPValidationError", "ValidationError"):
+            if orphan not in json.dumps(schema["paths"]):
+                schema["components"]["schemas"].pop(orphan, None)
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi
 
     @app.get("/health", tags=["system"], response_model=HealthResponse)
     def health() -> dict[str, str]:
