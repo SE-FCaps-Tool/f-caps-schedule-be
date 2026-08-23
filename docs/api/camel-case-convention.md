@@ -15,3 +15,18 @@ Requests are accepted under either spelling while the frontend migrates. Every r
 Sending both spellings of the same query parameter with different values is rejected with `422 AMBIGUOUS_PARAM` rather than resolved silently, so a half-migrated caller fails loudly instead of reading the wrong data.
 
 Path parameter names were renamed to camelCase in the route templates. A URL never carries parameter names, so this changes the generated client signatures and nothing else.
+
+## OpenAPI artifacts
+
+Frontend code generation reads the committed files under `apps/api/`. It does not fetch either contract from a runtime endpoint.
+
+- `openapi.json` describes the wire format currently returned by the backend. It is also the contract used by Swagger and regression checks.
+- `openapi.camel.json` previews the future camelCase response wire format so frontend types can be generated before the backend response cutover.
+
+Both files contain `info.x-be-commit`, which identifies the backend commit used to generate the artifact. Frontend builds should retain that value with their generated types so a mismatch is visible during rollback or deployment review.
+
+The backend check can regenerate both files and detect drift with:
+
+```powershell
+uv run --directory apps/api python ../../tools/check_openapi_spec.py
+```
