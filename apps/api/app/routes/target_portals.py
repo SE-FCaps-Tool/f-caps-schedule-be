@@ -10,10 +10,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api_contract import success_payload
+from app.api_contract import ApiDataEnvelope, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.domain.registration_phase import effective_registration_deadline
+from app.response_models import (
+    TargetLeaderDashboardResponse,
+    TargetLeaderPortalSessionResponse,
+    TargetLecturerPortalSessionResponse,
+    TargetPortalInvitationResponse,
+    TargetPortalRemediationResponse,
+    TargetSupervisedProjectResponse,
+)
 from app.services.access import lecturer_id_for_account, student_id_for_account
 
 router = APIRouter(prefix="/api/v1", tags=["target-portals"])
@@ -45,7 +53,11 @@ def _student_id(db: Session, user: CurrentUser) -> int:
     return int(student_id)
 
 
-@router.get("/lecturer/me/invitations")
+@router.get(
+    "/lecturer/me/invitations",
+    response_model=ApiDataEnvelope[list[TargetPortalInvitationResponse]],
+    response_model_exclude_unset=True,
+)
 def lecturer_invitations(db: Db, user: User) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
@@ -85,7 +97,11 @@ def lecturer_invitations(db: Db, user: User) -> dict[str, Any]:
     return success_payload(invitations)
 
 
-@router.get("/lecturer/me/sessions")
+@router.get(
+    "/lecturer/me/sessions",
+    response_model=ApiDataEnvelope[list[TargetLecturerPortalSessionResponse]],
+    response_model_exclude_unset=True,
+)
 def lecturer_sessions(db: Db, user: User) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
@@ -105,7 +121,11 @@ def lecturer_sessions(db: Db, user: User) -> dict[str, Any]:
     return success_payload([dict(row) for row in rows], meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
 
-@router.get("/lecturer/me/supervised-projects")
+@router.get(
+    "/lecturer/me/supervised-projects",
+    response_model=ApiDataEnvelope[list[TargetSupervisedProjectResponse]],
+    response_model_exclude_unset=True,
+)
 def lecturer_supervised_projects(db: Db, user: User) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
@@ -170,7 +190,11 @@ def lecturer_supervised_projects(db: Db, user: User) -> dict[str, Any]:
     return success_payload(projects, meta={"page": 1, "pageSize": len(projects), "total": len(projects)})
 
 
-@router.get("/lecturer/me/remediations")
+@router.get(
+    "/lecturer/me/remediations",
+    response_model=ApiDataEnvelope[list[TargetPortalRemediationResponse]],
+    response_model_exclude_unset=True,
+)
 def lecturer_remediations(db: Db, user: User) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
@@ -205,7 +229,11 @@ def _local_session(session: Any | None) -> dict[str, Any] | None:
     }
 
 
-@router.get("/leader/me/dashboard")
+@router.get(
+    "/leader/me/dashboard",
+    response_model=ApiDataEnvelope[TargetLeaderDashboardResponse],
+    response_model_exclude_unset=True,
+)
 def leader_dashboard(db: Db, user: User) -> dict[str, Any]:
     student_id = _student_id(db, user)
     group = db.execute(
@@ -362,7 +390,11 @@ def leader_dashboard(db: Db, user: User) -> dict[str, Any]:
     )
 
 
-@router.get("/leader/me/sessions")
+@router.get(
+    "/leader/me/sessions",
+    response_model=ApiDataEnvelope[list[TargetLeaderPortalSessionResponse]],
+    response_model_exclude_unset=True,
+)
 def leader_sessions(db: Db, user: User) -> dict[str, Any]:
     student_id = _student_id(db, user)
     group_ids = _leader_group_ids(db, student_id)

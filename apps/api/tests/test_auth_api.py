@@ -19,7 +19,7 @@ def test_local_login_sets_session_and_csrf_and_logout_revokes_session(client):
     me = client.get("/api/v1/auth/me")
     assert me.status_code == 200
     assert me.json()["role"] == "MANAGER"
-    assert me.json()["account_id"] is not None
+    assert me.json()["accountId"] is not None
 
     blocked = client.post("/api/v1/rounds/1/transition", json={"target_status": "OPEN_REGISTRATION"})
     assert blocked.status_code == 403

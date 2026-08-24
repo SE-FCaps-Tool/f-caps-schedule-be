@@ -2,7 +2,6 @@ from uuid import uuid4
 
 import pytest
 
-
 MANAGER_HEADERS = {"X-Test-Session": "active-manager"}
 
 
@@ -39,7 +38,7 @@ def test_semester_list_detail_and_filters_expose_complete_contract(client):
     assert detail_body["id"] == item["id"]
     assert detail_body["code"] == item["code"]
     assert detail_body["status"] == item["status"]
-    assert detail_body["academic_year"] == item["academicYear"]
+    assert detail_body["academicYear"] == item["academicYear"]
 
     filtered = client.get(
         "/api/v1/semesters",
@@ -75,9 +74,9 @@ def test_semester_create_patch_and_set_current_are_atomic(client):
     assert created.status_code == 201
     created_body = created.json()
     assert created_body["status"] == "ACTIVE"
-    assert created_body["academic_year"] == "2036-2037"
+    assert created_body["academicYear"] == "2036-2037"
     assert created_body["note"] == payload["note"]
-    assert created_body["created_by"]["email"]
+    assert created_body["createdBy"]["email"]
 
     duplicate_active = client.post(
         "/api/v1/semesters",
@@ -85,7 +84,7 @@ def test_semester_create_patch_and_set_current_are_atomic(client):
         headers=MANAGER_HEADERS,
     )
     assert duplicate_active.status_code == 409
-    assert duplicate_active.json()["detail"]["code"] == "ACTIVE_SEMESTER_EXISTS"
+    assert duplicate_active.json()["error"]["code"] == "ACTIVE_SEMESTER_EXISTS"
 
     patched = client.patch(
         f"/api/v1/semesters/{created_body['id']}",

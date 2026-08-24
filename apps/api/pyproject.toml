@@ -35,3 +35,8 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint.flake8-bugbear]
+# dual_name_query returns a FastAPI Depends marker, same as Query/Depends:
+# evaluating it once at import time is the intended usage, not a mutable default.
+extend-immutable-calls = ["app.api_contract.dual_name_query"]

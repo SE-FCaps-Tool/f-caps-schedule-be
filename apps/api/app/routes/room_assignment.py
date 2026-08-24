@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api_contract import RequestModel, dual_name_query
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
 from app.response_models import (
@@ -39,7 +40,7 @@ class RoomAssignmentPayload(BaseModel):
     room_id: int = Field(alias="roomId", gt=0)
 
 
-class RoomAssignmentItem(BaseModel):
+class RoomAssignmentItem(RequestModel):
     session_id: int = Field(gt=0)
     room_id: int = Field(gt=0)
 
@@ -91,13 +92,15 @@ def _active_version_or_error(db: Session, round_id: int) -> int:
     return int(version_id)
 
 
-@router.get("/rounds/{round_id}/rooms/available", response_model=list[AvailableRoomResponse])
+@router.get("/rounds/{roundId}/rooms/available", response_model=list[AvailableRoomResponse])
 def list_available_rooms(
-    round_id: int,
+    round_id: Annotated[int, Path(alias="roundId")],
     db: Db,
     user: User,
-    timeslot_id: int | None = Query(default=None, gt=0),
-    room_type: Literal["NORMAL", "SEMINAR", "LAB"] | None = Query(default=None),
+    timeslot_id: int | None = dual_name_query("timeslotId", "timeslot_id", int, gt=0),
+    room_type: Literal["NORMAL", "SEMINAR", "LAB"] | None = dual_name_query(
+        "roomType", "room_type", Literal["NORMAL", "SEMINAR", "LAB"]
+    ),
 ) -> list[dict[str, object]]:
     _require(user)
     _round_or_404(db, round_id)
@@ -129,9 +132,9 @@ def list_available_rooms(
     return [dict(row) for row in rows]
 
 
-@router.put("/sessions/{session_id}/room", response_model=RoomAssignmentResponse)
+@router.put("/sessions/{sessionId}/room", response_model=RoomAssignmentResponse)
 def assign_session_room(
-    session_id: int,
+    session_id: Annotated[int, Path(alias="sessionId")],
     payload: RoomAssignmentPayload,
     db: Db,
     user: User,
@@ -188,17 +191,17 @@ def assign_session_room(
         raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Room is already occupied during this session.", "room_id": payload.room_id}) from exc
 
 
-@router.post("/rounds/{round_id}/rooms/suggest", response_model=RoomSuggestionsResponse)
-def suggest_rooms(round_id: int, db: Db, user: User) -> dict[str, object]:
+@router.post("/rounds/{roundId}/rooms/suggest", response_model=RoomSuggestionsResponse)
+def suggest_rooms(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, object]:
     _require(user)
     _round_or_404(db, round_id)
     _active_version_or_error(db, round_id)
     return {"suggestions": build_room_suggestions(db, round_id)}
 
 
-@router.post("/rounds/{round_id}/rooms/apply-suggestions", response_model=RoomSuggestionApplyResponse)
+@router.post("/rounds/{roundId}/rooms/apply-suggestions", response_model=RoomSuggestionApplyResponse)
 def apply_room_suggestions(
-    round_id: int,
+    round_id: Annotated[int, Path(alias="roundId")],
     payload: RoomSuggestionPayload,
     db: Db,
     user: User,

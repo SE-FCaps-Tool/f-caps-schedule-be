@@ -8,12 +8,17 @@ making the registry the source of runtime authorization decisions.
 
 from __future__ import annotations
 
+import inspect
 import re
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
+from fastapi import Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 EnvelopeDataT = TypeVar("EnvelopeDataT")
 
@@ -195,11 +200,111 @@ CHECKLIST_OPERATIONS: tuple[ApiOperation, ...] = (
 )
 
 
+SNAKE_KEY = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)+$")
+
+
 def _camel_case_key(key: str) -> str:
-    if "_" not in key:
+    if not SNAKE_KEY.fullmatch(key):
         return key
     head, *rest = key.split("_")
     return head + "".join(word[:1].upper() + word[1:] for word in rest if word)
+
+
+def camelize_openapi(spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Return an OpenAPI copy with only wire field names converted to camelCase."""
+
+    result = deepcopy(dict(spec))
+
+    def transform_schema(schema: Any) -> Any:
+        if isinstance(schema, list):
+            return [transform_schema(item) for item in schema]
+        if not isinstance(schema, dict):
+            return schema
+
+        transformed = dict(schema)
+        if isinstance(schema.get("properties"), dict):
+            transformed["properties"] = {
+                _camel_case_key(name): transform_schema(value)
+                for name, value in schema["properties"].items()
+            }
+        if isinstance(schema.get("required"), list):
+            transformed["required"] = [
+                _camel_case_key(name) if isinstance(name, str) else name
+                for name in schema["required"]
+            ]
+        for key in (
+            "additionalProperties",
+            "contains",
+            "contentSchema",
+            "else",
+            "if",
+            "items",
+            "not",
+            "propertyNames",
+            "then",
+            "unevaluatedItems",
+            "unevaluatedProperties",
+        ):
+            if key in schema:
+                transformed[key] = transform_schema(schema[key])
+        for key in ("allOf", "anyOf", "oneOf", "prefixItems"):
+            if isinstance(schema.get(key), list):
+                transformed[key] = [transform_schema(item) for item in schema[key]]
+        if isinstance(schema.get("dependentSchemas"), dict):
+            transformed["dependentSchemas"] = {
+                _camel_case_key(name): transform_schema(value)
+                for name, value in schema["dependentSchemas"].items()
+            }
+        return transformed
+
+    def camelize_query_parameters(parameters: Any) -> None:
+        if not isinstance(parameters, list):
+            return
+        for parameter in parameters:
+            if not isinstance(parameter, dict) or parameter.get("in") != "query":
+                continue
+            name = parameter.get("name")
+            if isinstance(name, str):
+                parameter["name"] = _camel_case_key(name)
+
+    def camelize_body_schemas(body: Any) -> None:
+        if not isinstance(body, dict) or not isinstance(body.get("content"), dict):
+            return
+        for media_type in body["content"].values():
+            if isinstance(media_type, dict) and "schema" in media_type:
+                media_type["schema"] = transform_schema(media_type["schema"])
+
+    def camelize_response_schemas(responses: Any) -> None:
+        if not isinstance(responses, dict):
+            return
+        for response in responses.values():
+            camelize_body_schemas(response)
+
+    components = result.setdefault("components", {})
+    schemas = components.get("schemas", {})
+    if isinstance(schemas, dict):
+        components["schemas"] = {name: transform_schema(schema) for name, schema in schemas.items()}
+    parameters = components.get("parameters", {})
+    if isinstance(parameters, dict):
+        camelize_query_parameters(list(parameters.values()))
+    for request_body in (components.get("requestBodies") or {}).values():
+        camelize_body_schemas(request_body)
+    camelize_response_schemas(components.get("responses"))
+
+    for path_item in result.get("paths", {}).values():
+        if not isinstance(path_item, dict):
+            continue
+        camelize_query_parameters(path_item.get("parameters"))
+        for operation in path_item.values():
+            if not isinstance(operation, dict):
+                continue
+            camelize_query_parameters(operation.get("parameters"))
+            camelize_body_schemas(operation.get("requestBody"))
+            camelize_response_schemas(operation.get("responses"))
+
+    # The marker travels with the document so a consumer can tell the two apart.
+    result.setdefault("info", {})["x-be-wire-case"] = "camelCase"
+    return result
 
 
 def camelize(value: Any) -> Any:
@@ -218,6 +323,22 @@ def camelize(value: Any) -> Any:
     if isinstance(value, tuple):
         return tuple(camelize(item) for item in value)
     return value
+
+
+class CamelJSONResponse(JSONResponse):
+    """The app's ``default_response_class`` — camelizes every JSON body on the way out.
+
+    FastAPI hands ``render()`` the content *after* ``response_model`` serialization, so
+    this is the one place that catches legacy ``ResponseModel`` fields (declared snake_case,
+    no alias) and raw dict/SQL-row returns alike, without touching route handlers.
+    ``camelize()`` is idempotent on already-camelCase keys, so ``TargetResponseModel``
+    output (already aliased) passes through unchanged. ``StreamingResponse``/``Response``
+    (``.xlsx``/``.ics`` exports) never go through a response class's ``render()`` for JSON
+    content, so they are untouched by design.
+    """
+
+    def render(self, content: Any) -> bytes:
+        return super().render(camelize(content))
 
 
 def success_payload(data: Any, *, meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -240,6 +361,81 @@ class PaginationMeta(BaseModel):
 class ApiDataEnvelope(BaseModel, Generic[EnvelopeDataT]):
     data: EnvelopeDataT
     meta: PaginationMeta | None = None
+
+
+class RequestModel(BaseModel):
+    """Accepts a field under either its camelCase or its declared name.
+
+    Subclasses keep their own ``extra`` setting; only aliasing is shared.
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+def dual_name_query(
+    camel_name: str,
+    legacy_name: str,
+    annotation: Any,
+    *,
+    default: Any = None,
+    required: bool = False,
+    **constraints: Any,
+) -> Any:
+    """Accept one query parameter under its camelCase or its legacy snake_case name.
+
+    Only ``camel_name`` reaches the OpenAPI document, so generated clients learn
+    a single spelling; ``legacy_name`` keeps working until the frontend has
+    finished migrating.  Sending both with different values is rejected rather
+    than silently resolved, so a half-migrated caller fails loudly.
+
+    ``required`` reproduces the 422 a plain mandatory query parameter would give:
+    FastAPI can no longer enforce it, because either spelling satisfies it.
+    """
+
+    optional = annotation | None
+
+    def resolve(modern: Any = None, legacy: Any = None) -> Any:
+        if modern is not None and legacy is not None and modern != legacy:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "AMBIGUOUS_PARAM",
+                    "message": f"Send either {camel_name} or {legacy_name}, not both with different values.",
+                    "details": {"param": camel_name, "legacyParam": legacy_name},
+                },
+            )
+        value = modern if modern is not None else legacy
+        if value is None:
+            if required:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "VALIDATION_ERROR",
+                        "message": f"Query parameter {camel_name} is required.",
+                        "details": {"param": camel_name},
+                    },
+                )
+            return default
+        return value
+
+    resolve.__signature__ = inspect.Signature(
+        [
+            inspect.Parameter(
+                "modern",
+                inspect.Parameter.KEYWORD_ONLY,
+                annotation=optional,
+                default=Query(default=None, alias=camel_name, **constraints),
+            ),
+            inspect.Parameter(
+                "legacy",
+                inspect.Parameter.KEYWORD_ONLY,
+                annotation=optional,
+                default=Query(default=None, alias=legacy_name, include_in_schema=False, **constraints),
+            ),
+        ]
+    )
+    resolve.__annotations__ = {"modern": optional, "legacy": optional}
+    return Depends(resolve)
 
 
 class ApiErrorBody(BaseModel):
