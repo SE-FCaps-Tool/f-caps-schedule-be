@@ -1036,7 +1036,7 @@ async def import_projects(
                 with db.begin_nested():
                     db.execute(text("INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en)"), {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title, "title_vi": title_vi, "title_en": title_en})
                 created += 1
-            except Exception:  # noqa: BLE001 - any row failure must be recorded and skipped, not abort the batch.
+            except Exception:
                 errors.append({"row": index, "code": "PROJECT_DUPLICATE_OR_INVALID"})
     return {"created": created, "skipped": len(errors), "errors": errors}
 
@@ -1090,7 +1090,7 @@ async def import_groups(
                     if leader_count != 1:
                         raise ValueError("Exactly one leader is required")
                 created += 1
-            except Exception:  # noqa: BLE001 - any row failure must be recorded and skipped, not abort the batch.
+            except Exception:
                 errors.append({"group_code": group_code, "code": "GROUP_INVALID", "message": "Invalid group row; verify project, students and exactly one leader."})
     return {"created": created, "skipped": len(errors), "errors": errors}
 

@@ -56,7 +56,7 @@ def process_outbox(
             if job["dedupe_key"]:
                 db.execute(text("UPDATE notifications SET status = 'SENT', sent_at = now() WHERE dedupe_key = :dedupe_key"), {"dedupe_key": job["dedupe_key"]})
             sent += 1
-        except Exception:  # noqa: BLE001 - a failed delivery must be persisted and retried.
+        except Exception:
             db.execute(text("UPDATE outbox_jobs SET status = 'FAILED' WHERE id = :id"), {"id": job["id"]})
             if job["dedupe_key"]:
                 db.execute(text("UPDATE notifications SET status = 'FAILED' WHERE dedupe_key = :dedupe_key"), {"dedupe_key": job["dedupe_key"]})
