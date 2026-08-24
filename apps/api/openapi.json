@@ -584,6 +584,28 @@
         "title": "ActionResponse",
         "type": "object"
       },
+      "ApiDataEnvelope_GroupOverviewResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/GroupOverviewResponse"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiDataEnvelope[GroupOverviewResponse]",
+        "type": "object"
+      },
       "ApiDataEnvelope_TargetAvailabilityResponse_": {
         "properties": {
           "data": {
@@ -3169,6 +3191,449 @@
           "code"
         ],
         "title": "GroupMutationResponse",
+        "type": "object"
+      },
+      "GroupOverviewMemberResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "fullName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fullname"
+          },
+          "leftAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leftat"
+          },
+          "membershipId": {
+            "title": "Membershipid",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "studentCode": {
+            "title": "Studentcode",
+            "type": "string"
+          },
+          "studentId": {
+            "title": "Studentid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "membershipId",
+          "studentId",
+          "studentCode",
+          "role",
+          "status"
+        ],
+        "title": "GroupOverviewMemberResponse",
+        "type": "object"
+      },
+      "GroupOverviewProgressResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "groupStatus": {
+            "title": "Groupstatus",
+            "type": "string"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/GroupOverviewRoundResponse"
+            },
+            "title": "Rounds",
+            "type": "array"
+          }
+        },
+        "required": [
+          "groupStatus"
+        ],
+        "title": "GroupOverviewProgressResponse",
+        "type": "object"
+      },
+      "GroupOverviewProjectResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "coSupervisor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupOverviewSupervisorResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mainSupervisor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupOverviewSupervisorResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status"
+        ],
+        "title": "GroupOverviewProjectResponse",
+        "type": "object"
+      },
+      "GroupOverviewRemediationResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "dueAt": {
+            "format": "date-time",
+            "title": "Dueat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "roundType": {
+            "title": "Roundtype",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "verifierLecturerId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifierlecturerid"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "dueAt",
+          "roundType"
+        ],
+        "title": "GroupOverviewRemediationResponse",
+        "type": "object"
+      },
+      "GroupOverviewResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "leader": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupOverviewMemberResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memberCount": {
+            "title": "Membercount",
+            "type": "integer"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/GroupOverviewMemberResponse"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/GroupOverviewProgressResponse"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupOverviewProjectResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remediation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupOverviewRemediationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "semester": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/GroupOverviewWarningResponse"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "memberCount",
+          "progress"
+        ],
+        "title": "GroupOverviewResponse",
+        "type": "object"
+      },
+      "GroupOverviewResultResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "enteredAt": {
+            "format": "date-time",
+            "title": "Enteredat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "verifyStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifystatus"
+          }
+        },
+        "required": [
+          "id",
+          "outcome",
+          "enteredAt"
+        ],
+        "title": "GroupOverviewResultResponse",
+        "type": "object"
+      },
+      "GroupOverviewRoundResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupOverviewResultResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "roomCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roomcode"
+          },
+          "roundId": {
+            "title": "Roundid",
+            "type": "integer"
+          },
+          "roundStatus": {
+            "title": "Roundstatus",
+            "type": "string"
+          },
+          "roundType": {
+            "title": "Roundtype",
+            "type": "string"
+          },
+          "scheduledAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduledat"
+          },
+          "sessionId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessionid"
+          },
+          "sessionStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessionstatus"
+          }
+        },
+        "required": [
+          "roundId",
+          "roundType",
+          "roundStatus"
+        ],
+        "title": "GroupOverviewRoundResponse",
+        "type": "object"
+      },
+      "GroupOverviewSupervisorResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "fullName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fullname"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "code"
+        ],
+        "title": "GroupOverviewSupervisorResponse",
+        "type": "object"
+      },
+      "GroupOverviewWarningResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "GroupOverviewWarningResponse",
         "type": "object"
       },
       "GroupResponse": {
@@ -13496,7 +13961,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "c006dd2bf776ed36a0768ddda65aae14f01111bb",
+    "x-be-commit": "a48c394d3376e05dbef7cc45731daec5c1434834",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -15776,6 +16241,75 @@
         "summary": "Approve Dropout",
         "tags": [
           "management"
+        ]
+      }
+    },
+    "/api/v1/groups/{groupId}/overview": {
+      "get": {
+        "description": "Return the bounded read model used by the Manager Group 360 screen.",
+        "operationId": "get_group_overview_api_v1_groups__groupId__overview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "title": "Groupid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiDataEnvelope_GroupOverviewResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get Group Overview",
+        "tags": [
+          "manager-ui-compatibility"
         ]
       }
     },
