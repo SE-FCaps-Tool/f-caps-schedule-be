@@ -1,0 +1,512 @@
+{
+  "GET /rounds": {
+    "method": "GET",
+    "url": "/api/v1/rounds",
+    "status": 200,
+    "body": [
+      {
+        "id": 164,
+        "semester_id": 1,
+        "name": "Bảo vệ kỳ 2 (Defense 1.2)",
+        "description": "Imported from su26_defense_1.2_SE.xlsx; sheet Kỹ thuật phần mềm; Review 1.1 result = Bảo vệ kỳ 2.",
+        "type": "DEFENSE_1_2",
+        "status": "SCHEDULED",
+        "reviewer_count": 5,
+        "result_owner_mode": false,
+        "group_selection_mode": true,
+        "session_duration_minutes": 45,
+        "start_date": "2026-09-04",
+        "end_date": "2026-09-06",
+        "registration_deadline": "2026-08-30T16:59:00Z",
+        "group_preference_deadline": null,
+        "h12_sessions_per_part": 4,
+        "h12_sessions_per_day": 8,
+        "h12_semester_quota": null,
+        "max_groups_per_timeslot": null,
+        "max_minutes_per_part": null,
+        "max_minutes_per_day": null,
+        "timeframe_id": 33,
+        "timeframe_version_id": 65,
+        "soft_weights": {},
+        "room_types": [
+          "NORMAL",
+          "SEMINAR"
+        ]
+      }
+    ]
+  },
+  "GET /dashboard": {
+    "method": "GET",
+    "url": "/api/v1/dashboard",
+    "status": 200,
+    "body": {
+      "current_semester": {
+        "id": 1,
+        "code": "SU26",
+        "name": "Summer 2026",
+        "status": "ACTIVE"
+      },
+      "totals": {
+        "projects": 74,
+        "groups": 29,
+        "students": 104,
+        "lecturers": 27
+      },
+      "availability": {
+        "invited": 27,
+        "responded": 27
+      },
+      "groups": {
+        "total": 16,
+        "scheduled": 16,
+        "unscheduled": 0
+      },
+      "pending_reschedule_requests": 0,
+      "changes": 0,
+      "version": {
+        "version_id": 14,
+        "id": null,
+        "round_id": 164,
+        "version_no": null,
+        "status": "ACTIVE",
+        "ui_status": null,
+        "is_active": null,
+        "solver_status": null,
+        "total_score": null,
+        "soft_scores": {},
+        "random_seed": null,
+        "created_at": "2026-08-22T18:02:39.049961Z",
+        "activated_at": null,
+        "type": "DEFENSE_1_2",
+        "semester_id": 1,
+        "semester_code": "SU26",
+        "generated_at": "2026-08-23T11:42:41.305998Z"
+      },
+      "lecturer_load": [
+        {
+          "id": 2,
+          "lecturer_code": "GV-DUC-DNM",
+          "display_name": "Đặng Ngọc Minh Đức",
+          "session_count": 6
+        },
+        {
+          "id": 1,
+          "lecturer_code": "GV-PHUONG-LHK",
+          "display_name": "Lâm Hữu Khánh Phương",
+          "session_count": 6
+        },
+        {
+          "id": 13,
+          "lecturer_code": "GV-AN-NDH",
+          "display_name": "Ngô Đăng Hà An",
+          "session_count": 5
+        },
+        {
+          "id": 14,
+          "lecturer_code": "GV-DUONG-VTT",
+          "display_name": "Vũ Thị Thùy Dương",
+          "session_count": 5
+        },
+        {
+          "id": 15,
+          "lecturer_code": "GV-HUNG-LD",
+          "display_name": "Lại Đức Hùng",
+          "session_count": 5
+        },
+        {
+          "id": 17,
+          "lecturer_code": "GV-KHANH-KT",
+          "display_name": "Kiều Trọng Khánh",
+          "session_count": 5
+        },
+        {
+          "id": 11,
+          "lecturer_code": "GV-LAM-NN",
+          "display_name": "Nguyễn Ngọc Lâm",
+          "session_count": 5
+        },
+        {
+          "id": 9,
+          "lecturer_code": "GV-LONG-T",
+          "display_name": "Trương Long",
+          "session_count": 5
+        },
+        {
+          "id": 6,
+          "lecturer_code": "GV-PHUC-NT",
+          "display_name": "Nguyễn Tấn Phúc",
+          "session_count": 5
+        },
+        {
+          "id": 10,
+          "lecturer_code": "GV-TAI-NT",
+          "display_name": "Nguyễn Trọng Tài",
+          "session_count": 5
+        }
+      ],
+      "attention_groups": [],
+      "attention": {
+        "no_leader": 5,
+        "under_four": 8,
+        "remediation_overdue": 0,
+        "unscheduled": 0
+      }
+    }
+  },
+  "GET /rounds/{id}/registration-summary": {
+    "method": "GET",
+    "url": "/api/v1/rounds/164/registration-summary",
+    "status": 200,
+    "body": {
+      "data": {
+        "invited": 27,
+        "responded": 18,
+        "lecturerAvailability": 27,
+        "groupAvailability": 16
+      }
+    }
+  },
+  "GET /rounds/{id}/scheduling-readiness": {
+    "method": "GET",
+    "url": "/api/v1/rounds/164/scheduling-readiness",
+    "status": 200,
+    "body": {
+      "data": {
+        "ready": true,
+        "blockers": [],
+        "unusableCommittees": [],
+        "id": 164,
+        "status": "SCHEDULED",
+        "groups": 16,
+        "timeslots": 45,
+        "acceptedInvitations": 18
+      }
+    }
+  },
+  "GET /timeframes": {
+    "method": "GET",
+    "url": "/api/v1/timeframes",
+    "status": 200,
+    "body": {
+      "data": [
+        {
+          "id": 33,
+          "name": "Normal",
+          "type": "COUNCIL",
+          "archivedAt": null,
+          "createdAt": "2026-08-22T14:18:30.481573Z",
+          "updatedAt": "2026-08-22T16:29:30.885471Z",
+          "version": {
+            "id": 65,
+            "number": 2,
+            "status": "ACTIVE",
+            "reason": null,
+            "createdAt": "2026-08-22T16:29:30.885471Z"
+          },
+          "revisions": [
+            {
+              "id": 65,
+              "versionNumber": 2,
+              "status": "ACTIVE",
+              "startTime": "07:00:00",
+              "endTime": "20:30:00",
+              "blockDurationMinutes": 135,
+              "groupDurationMinutes": 45,
+              "breakBetweenBlocksMinutes": 15,
+              "manualTimelines": null,
+              "breakWindows": [
+                {
+                  "name": "Nghỉ trưa",
+                  "startTime": "11:45:00",
+                  "endTime": "12:30:00"
+                }
+              ],
+              "changeReason": null,
+              "createdBy": 2,
+              "createdAt": "2026-08-22T16:29:30.885471Z",
+              "timeframeId": 33
+            },
+            {
+              "id": 57,
+              "versionNumber": 1,
+              "status": "SUPERSEDED",
+              "startTime": "07:00:00",
+              "endTime": "20:30:00",
+              "blockDurationMinutes": 135,
+              "groupDurationMinutes": 45,
+              "breakBetweenBlocksMinutes": 15,
+              "manualTimelines": null,
+              "breakWindows": [
+                {
+                  "name": "Nghỉ trưa",
+                  "startTime": "11:45:00",
+                  "endTime": "12:30:00"
+                }
+              ],
+              "changeReason": null,
+              "createdBy": 2,
+              "createdAt": "2026-08-22T14:18:30.481573Z",
+              "timeframeId": 33
+            }
+          ],
+          "startTime": "07:00:00",
+          "endTime": "20:30:00",
+          "blockDurationMinutes": 135,
+          "groupDurationMinutes": 45,
+          "breakBetweenBlocksMinutes": 15,
+          "manualTimelines": null,
+          "breakWindows": [
+            {
+              "name": "Nghỉ trưa",
+              "startTime": "11:45:00",
+              "endTime": "12:30:00"
+            }
+          ],
+          "blocksPerDay": 5,
+          "groupsPerBlock": 3,
+          "capacityPerDay": 15,
+          "unusedMinutes": 45,
+          "breakWindowMinutes": 45,
+          "appliedBlockBreakMinutes": 45,
+          "totalBreakMinutes": 90,
+          "blocks": [
+            {
+              "sequenceNumber": 1,
+              "startTime": "07:00:00",
+              "endTime": "09:15:00",
+              "durationMinutes": 135,
+              "groupsPerBlock": 3,
+              "groupDurationMinutes": 45,
+              "groupSlots": [
+                {
+                  "sequenceNumber": 1,
+                  "startTime": "07:00:00",
+                  "endTime": "07:45:00"
+                },
+                {
+                  "sequenceNumber": 2,
+                  "startTime": "07:45:00",
+                  "endTime": "08:30:00"
+                },
+                {
+                  "sequenceNumber": 3,
+                  "startTime": "08:30:00",
+                  "endTime": "09:15:00"
+                }
+              ]
+            },
+            {
+              "sequenceNumber": 2,
+              "startTime": "09:30:00",
+              "endTime": "11:45:00",
+              "durationMinutes": 135,
+              "groupsPerBlock": 3,
+              "groupDurationMinutes": 45,
+              "groupSlots": [
+                {
+                  "sequenceNumber": 1,
+                  "startTime": "09:30:00",
+                  "endTime": "10:15:00"
+                },
+                {
+                  "sequenceNumber": 2,
+                  "startTime": "10:15:00",
+                  "endTime": "11:00:00"
+                },
+                {
+                  "sequenceNumber": 3,
+                  "startTime": "11:00:00",
+                  "endTime": "11:45:00"
+                }
+              ]
+            },
+            {
+              "sequenceNumber": 3,
+              "startTime": "12:30:00",
+              "endTime": "14:45:00",
+              "durationMinutes": 135,
+              "groupsPerBlock": 3,
+              "groupDurationMinutes": 45,
+              "groupSlots": [
+                {
+                  "sequenceNumber": 1,
+                  "startTime": "12:30:00",
+                  "endTime": "13:15:00"
+                },
+                {
+                  "sequenceNumber": 2,
+                  "startTime": "13:15:00",
+                  "endTime": "14:00:00"
+                },
+                {
+                  "sequenceNumber": 3,
+                  "startTime": "14:00:00",
+                  "endTime": "14:45:00"
+                }
+              ]
+            },
+            {
+              "sequenceNumber": 4,
+              "startTime": "15:00:00",
+              "endTime": "17:15:00",
+              "durationMinutes": 135,
+              "groupsPerBlock": 3,
+              "groupDurationMinutes": 45,
+              "groupSlots": [
+                {
+                  "sequenceNumber": 1,
+                  "startTime": "15:00:00",
+                  "endTime": "15:45:00"
+                },
+                {
+                  "sequenceNumber": 2,
+                  "startTime": "15:45:00",
+                  "endTime": "16:30:00"
+                },
+                {
+                  "sequenceNumber": 3,
+                  "startTime": "16:30:00",
+                  "endTime": "17:15:00"
+                }
+              ]
+            },
+            {
+              "sequenceNumber": 5,
+              "startTime": "17:30:00",
+              "endTime": "19:45:00",
+              "durationMinutes": 135,
+              "groupsPerBlock": 3,
+              "groupDurationMinutes": 45,
+              "groupSlots": [
+                {
+                  "sequenceNumber": 1,
+                  "startTime": "17:30:00",
+                  "endTime": "18:15:00"
+                },
+                {
+                  "sequenceNumber": 2,
+                  "startTime": "18:15:00",
+                  "endTime": "19:00:00"
+                },
+                {
+                  "sequenceNumber": 3,
+                  "startTime": "19:00:00",
+                  "endTime": "19:45:00"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 1,
+        "total": 1
+      }
+    }
+  },
+  "POST /rounds (legacy, manual)": {
+    "method": "POST",
+    "url": "/api/v1/rounds",
+    "status": 201,
+    "body": {
+      "id": 197,
+      "semester_id": 1,
+      "name": null,
+      "description": null,
+      "type": "REVIEW_3",
+      "status": "DRAFT",
+      "reviewer_count": 3,
+      "result_owner_mode": false,
+      "group_selection_mode": false,
+      "session_duration_minutes": 30,
+      "start_date": "2026-09-10",
+      "end_date": "2026-09-12",
+      "registration_deadline": null,
+      "group_preference_deadline": null,
+      "h12_sessions_per_part": 4,
+      "h12_sessions_per_day": 8,
+      "h12_semester_quota": null,
+      "max_groups_per_timeslot": null,
+      "max_minutes_per_part": null,
+      "max_minutes_per_day": null,
+      "timeframe_id": null,
+      "timeframe_version_id": null,
+      "soft_weights": {},
+      "room_types": [
+        "NORMAL"
+      ]
+    }
+  },
+  "_timeframe_id_used": 33,
+  "POST /semesters/{id}/rounds (timeframe)": {
+    "method": "POST",
+    "url": "/api/v1/semesters/1/rounds",
+    "status": 201,
+    "body": {
+      "data": {
+        "id": 196,
+        "semesterId": 1,
+        "name": "Snapshot probe timeframe branch",
+        "description": null,
+        "type": "REVIEW_1",
+        "status": "DRAFT",
+        "reviewerCount": 2,
+        "resultOwnerMode": false,
+        "groupSelectionMode": false,
+        "sessionDurationMinutes": 45,
+        "startDate": "2026-09-01",
+        "endDate": "2026-09-03",
+        "registrationDeadline": "2026-08-28T16:59:00Z",
+        "groupPreferenceDeadline": null,
+        "h12SessionsPerPart": 4,
+        "h12SessionsPerDay": 8,
+        "h12SemesterQuota": null,
+        "maxGroupsPerTimeslot": 3,
+        "maxMinutesPerPart": null,
+        "maxMinutesPerDay": null,
+        "softWeights": {},
+        "timeframeId": 33,
+        "timeframeVersionId": 65,
+        "roomTypes": [
+          "NORMAL"
+        ]
+      }
+    }
+  },
+  "POST /semesters/{id}/rounds (manual)": {
+    "method": "POST",
+    "url": "/api/v1/semesters/1/rounds",
+    "status": 201,
+    "body": {
+      "data": {
+        "id": 198,
+        "semesterId": 1,
+        "name": "Snapshot probe manual branch",
+        "description": null,
+        "type": "REVIEW_1",
+        "status": "DRAFT",
+        "reviewerCount": 2,
+        "resultOwnerMode": false,
+        "groupSelectionMode": false,
+        "sessionDurationMinutes": 45,
+        "startDate": "2026-09-01",
+        "endDate": "2026-09-01",
+        "registrationDeadline": "2026-08-28T16:59:00Z",
+        "groupPreferenceDeadline": null,
+        "h12SessionsPerPart": 4,
+        "h12SessionsPerDay": 8,
+        "h12SemesterQuota": null,
+        "maxGroupsPerTimeslot": 3,
+        "maxMinutesPerPart": null,
+        "maxMinutesPerDay": null,
+        "softWeights": {},
+        "timeframeId": null,
+        "timeframeVersionId": null,
+        "roomTypes": [
+          "NORMAL"
+        ]
+      }
+    }
+  }
+}

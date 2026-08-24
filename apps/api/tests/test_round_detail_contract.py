@@ -68,7 +68,7 @@ def test_round_update_accepts_pre_grading_deadline_and_rejects_after_start(clien
             json={"registrationDeadline": "2030-02-02T16:59:00Z"},
         )
         assert late.status_code == 422, late.text
-        assert late.json()["detail"]["code"] == "ROUND_DEADLINE_INVALID"
+        assert late.json()["error"]["code"] == "ROUND_DEADLINE_INVALID"
     finally:
         with Session(engine) as db, db.begin():
             db.execute(text("DELETE FROM rounds WHERE id = :id"), {"id": round_id})

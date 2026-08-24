@@ -131,7 +131,7 @@ def test_activation_materializes_planned_null_room_sessions_and_rejects_stale_pr
     stale = client.post(f"/api/v1/schedule/versions/{version_id}/activate", headers=headers)
     if replacement:
         assert stale.status_code == 409, stale.text
-        assert stale.json()["detail"]["code"] == "DRAFT_ASSIGNMENT_STALE"
+        assert stale.json()["error"]["code"] == "DRAFT_ASSIGNMENT_STALE"
         return
     pytest.skip("Fixture has no second project available for provenance mutation")
 

@@ -45,9 +45,9 @@ def test_import_lecturers_creates_accounts_and_returns_temp_passwords(client):
     assert body["errors"] == []
     assert len(body["accounts"]) == 1
     account = body["accounts"][0]
-    assert account["lecturer_code"] == code.upper()
+    assert account["lecturerCode"] == code.upper()
     assert account["email"] == email
-    assert len(account["temp_password"]) >= 12
+    assert len(account["tempPassword"]) >= 12
 
     lecturers = client.get("/api/v1/lecturers", headers=ADMIN_HEADERS, params={"search": code}).json()["data"]
     assert any(item["lecturerCode"] == code.upper() for item in lecturers)
@@ -90,7 +90,7 @@ def test_import_lecturers_rejects_file_without_template_header(client):
     response = _upload(client, buffer.getvalue())
 
     assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "IMPORT_INVALID_FILE"
+    assert response.json()["error"]["code"] == "IMPORT_INVALID_FILE"
 
 
 @pytest.mark.integration

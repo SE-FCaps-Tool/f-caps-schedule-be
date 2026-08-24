@@ -39,12 +39,12 @@ def test_manager_can_create_semester_and_duplicate_code_is_rejected(client):
         assert created.status_code == 201
         assert created.json()["code"] == code.upper()
         assert created.json()["status"] == "ACTIVE"
-        assert created.json()["start_date"] == "2030-01-01"
-        assert created.json()["end_date"] == "2030-04-15"
+        assert created.json()["startDate"] == "2030-01-01"
+        assert created.json()["endDate"] == "2030-04-15"
 
         duplicate = client.post("/api/v1/semesters", json=payload, headers=headers)
         assert duplicate.status_code == 409
-        assert duplicate.json()["detail"]["code"] == "DATA_DUPLICATE"
+        assert duplicate.json()["error"]["code"] == "DATA_DUPLICATE"
     finally:
         _restore_current_semester(client, original_active_id, headers)
 
@@ -118,7 +118,7 @@ def test_invalid_semester_duration_is_rejected(client, start_date, end_date):
         headers={"X-Test-Session": "active-manager"},
     )
     assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "SEMESTER_DURATION_INVALID"
+    assert response.json()["error"]["code"] == "SEMESTER_DURATION_INVALID"
 
 
 def test_semester_end_before_start_is_rejected_as_date_invalid(client):
@@ -133,7 +133,7 @@ def test_semester_end_before_start_is_rejected_as_date_invalid(client):
         headers={"X-Test-Session": "active-manager"},
     )
     assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "SEMESTER_DATE_INVALID"
+    assert response.json()["error"]["code"] == "SEMESTER_DATE_INVALID"
 
 
 def test_manager_only_endpoint_rejects_lecturer(client):
@@ -253,7 +253,7 @@ def test_group_mutation_validates_leader_and_rolls_back_atomically(client):
         headers=headers,
     )
     assert invalid.status_code == 422
-    assert invalid.json()["detail"]["code"] == "LEADER_REQUIRED"
+    assert invalid.json()["error"]["code"] == "LEADER_REQUIRED"
     assert len(client.get("/api/v1/groups", headers=headers).json()) == before
 
 
@@ -333,4 +333,4 @@ def test_group_can_be_created_before_project_and_assigned_later(client):
         headers=headers,
     )
     assert conflict.status_code == 409
-    assert conflict.json()["detail"]["code"] == "PROJECT_ALREADY_ASSIGNED"
+    assert conflict.json()["error"]["code"] == "PROJECT_ALREADY_ASSIGNED"

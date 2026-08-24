@@ -14,7 +14,7 @@ from io import BytesIO
 from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,7 +22,13 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api_contract import parse_external_id, success_payload
+from app.api_contract import (
+    ApiDataEnvelope,
+    RequestModel,
+    dual_name_query,
+    parse_external_id,
+    success_payload,
+)
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
 from app.database import get_db
@@ -46,6 +52,7 @@ from app.response_models import (
     RoundGroupResponse,
     SemesterResponse,
     SessionResponse,
+    TargetGroupProgressResponse,
     TimeslotResponse,
 )
 from app.routes.master_data import _insert_timeframe_slots, password_hasher
@@ -95,7 +102,7 @@ class ProjectUpdate(BaseModel):
     supervisors: list[str] | None = None
 
 
-class GroupUpdate(BaseModel):
+class GroupUpdate(RequestModel):
     code: str | None = Field(default=None, min_length=1, max_length=64)
     project_id: int | None = Field(
         default=None, gt=0, description="Gán/đổi project cho nhóm. Truyền null để bỏ gán."
@@ -123,7 +130,7 @@ class RoundUpdate(BaseModel):
     timeframe_id: int | None = Field(default=None, alias="timeframeId", gt=0)
 
 
-class TimeslotUpdate(BaseModel):
+class TimeslotUpdate(RequestModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     active: bool | None = None
@@ -134,7 +141,7 @@ class QuotaUpdate(BaseModel):
     quota: int = Field(gt=0)
 
 
-class SemesterUpdate(BaseModel):
+class SemesterUpdate(RequestModel):
     code: str | None = Field(default=None, min_length=1, max_length=32)
     name: str | None = Field(default=None, min_length=1, max_length=160)
     note: str | None = Field(default=None, max_length=1000)
@@ -146,8 +153,8 @@ def _row_with_json(row: Any) -> dict[str, Any]:
     return dict(row)
 
 
-@router.patch("/semesters/{semester_id}", response_model=SemesterResponse)
-def update_semester(semester_id: int, payload: SemesterUpdate, db: Db, user: User) -> dict[str, Any]:
+@router.patch("/semesters/{semesterId}", response_model=SemesterResponse)
+def update_semester(semester_id: Annotated[int, Path(alias="semesterId")], payload: SemesterUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     current = db.execute(
         text(
@@ -328,21 +335,21 @@ def _round_detail_payload(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get(
-    "/rounds/{round_id}",
+    "/rounds/{roundId}",
     response_model=RoundDetailEnvelopeResponse,
     response_model_exclude_none=True,
 )
-def get_round_detail(round_id: int, db: Db, user: User) -> dict[str, Any]:
+def get_round_detail(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     return _round_detail_payload(_load_round_detail(round_id, db))
 
 
 @router.patch(
-    "/rounds/{round_id}",
+    "/rounds/{roundId}",
     response_model=RoundDetailEnvelopeResponse,
     response_model_exclude_none=True,
 )
-def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dict[str, Any]:
+def update_round(round_id: Annotated[int, Path(alias="roundId")], payload: RoundUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     values = payload.model_dump(exclude_unset=True)
     if not values:
@@ -449,8 +456,8 @@ def update_round(round_id: int, payload: RoundUpdate, db: Db, user: User) -> dic
     return _round_detail_payload(_load_round_detail(round_id, db))
 
 
-@router.patch("/projects/{project_id}", response_model=ProjectMutationResponse)
-def update_project(project_id: str, payload: ProjectUpdate, db: Db, user: User) -> dict[str, Any]:
+@router.patch("/projects/{projectId}", response_model=ProjectMutationResponse)
+def update_project(project_id: Annotated[str, Path(alias="projectId")], payload: ProjectUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     try:
         project_id = parse_external_id(project_id, prefix="prj")
@@ -521,8 +528,8 @@ def update_project(project_id: str, payload: ProjectUpdate, db: Db, user: User) 
     return dict(db.execute(text("SELECT id, code, title, title_vi, title_en, status, semester_id FROM projects WHERE id = :id"), {"id": project_id}).mappings().one())
 
 
-@router.get("/projects/{project_id}", response_model=ProjectDetailResponse)
-def get_project_detail(project_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/projects/{projectId}", response_model=ProjectDetailResponse)
+def get_project_detail(project_id: Annotated[int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     row = db.execute(
         text(
@@ -549,8 +556,8 @@ def get_project_detail(project_id: int, db: Db, user: User) -> dict[str, Any]:
     return {**dict(row), "supervisors": supervisor_items, "group": dict(group) if group else None}
 
 
-@router.patch("/groups/{group_id}", response_model=GroupResponse)
-def update_group(group_id: int, payload: GroupUpdate, db: Db, user: User) -> dict[str, Any]:
+@router.patch("/groups/{groupId}", response_model=GroupResponse)
+def update_group(group_id: Annotated[int, Path(alias="groupId")], payload: GroupUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     changes = payload.model_dump(exclude_unset=True)
     if "project_id" in changes and changes["project_id"] is not None:
@@ -601,8 +608,8 @@ def update_group(group_id: int, payload: GroupUpdate, db: Db, user: User) -> dic
     return dict(row)
 
 
-@router.get("/groups/{group_id}", response_model=GroupDetailResponse)
-def get_group_detail(group_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/groups/{groupId}", response_model=GroupDetailResponse)
+def get_group_detail(group_id: Annotated[int, Path(alias="groupId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     row = db.execute(
         text(
@@ -621,8 +628,8 @@ def get_group_detail(group_id: int, db: Db, user: User) -> dict[str, Any]:
     return {**dict(row), "members": [dict(item) for item in members]}
 
 
-@router.get("/rounds/{round_id}/invitations", response_model=list[InvitationResponse])
-def list_round_invitations(round_id: int, db: Db, user: User) -> list[dict[str, Any]]:
+@router.get("/rounds/{roundId}/invitations", response_model=list[InvitationResponse])
+def list_round_invitations(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
@@ -640,8 +647,8 @@ def list_round_invitations(round_id: int, db: Db, user: User) -> list[dict[str, 
     return [dict(row) for row in rows]
 
 
-@router.post("/rounds/{round_id}/invitations/{lecturer_id}/resend", response_model=ActionResponse, response_model_exclude_none=True)
-def resend_invitation(round_id: int, lecturer_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.post("/rounds/{roundId}/invitations/{lecturerId}/resend", response_model=ActionResponse, response_model_exclude_none=True)
+def resend_invitation(round_id: Annotated[int, Path(alias="roundId")], lecturer_id: Annotated[int, Path(alias="lecturerId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
         ensure_round_semester_writable(db, round_id)
@@ -652,8 +659,8 @@ def resend_invitation(round_id: int, lecturer_id: int, db: Db, user: User) -> di
     return {"round_id": round_id, "lecturer_id": lecturer_id, "status": "PENDING", "resent": True}
 
 
-@router.get("/rounds/{round_id}/groups", response_model=list[RoundGroupResponse])
-def list_round_groups(round_id: int, db: Db, user: User) -> list[dict[str, Any]]:
+@router.get("/rounds/{roundId}/groups", response_model=list[RoundGroupResponse])
+def list_round_groups(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
@@ -673,8 +680,8 @@ def list_round_groups(round_id: int, db: Db, user: User) -> list[dict[str, Any]]
     return [{**dict(row), "ui_status": status_alias.get(str(row["status"]), row["status"])} for row in rows]
 
 
-@router.patch("/timeslots/{timeslot_id}", response_model=TimeslotResponse)
-def update_timeslot(timeslot_id: int, payload: TimeslotUpdate, db: Db, user: User) -> dict[str, Any]:
+@router.patch("/timeslots/{timeslotId}", response_model=TimeslotResponse)
+def update_timeslot(timeslot_id: Annotated[int, Path(alias="timeslotId")], payload: TimeslotUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     values = payload.model_dump(exclude_unset=True)
     if values.get("start_at") and values.get("end_at") and values["end_at"] <= values["start_at"]:
@@ -699,8 +706,8 @@ def update_timeslot(timeslot_id: int, payload: TimeslotUpdate, db: Db, user: Use
     return dict(db.execute(text("SELECT id, round_day_id, start_at, end_at, part, active FROM timeslots WHERE id = :id"), {"id": timeslot_id}).mappings().one())
 
 
-@router.delete("/timeslots/{timeslot_id}", response_model=ActionResponse, response_model_exclude_none=True)
-def disable_timeslot(timeslot_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.delete("/timeslots/{timeslotId}", response_model=ActionResponse, response_model_exclude_none=True)
+def disable_timeslot(timeslot_id: Annotated[int, Path(alias="timeslotId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
         row = db.execute(text("SELECT ts.id, r.id AS round_id, r.status FROM timeslots ts JOIN round_days rd ON rd.id = ts.round_day_id JOIN rounds r ON r.id = rd.round_id WHERE ts.id = :id FOR UPDATE"), {"id": timeslot_id}).mappings().one_or_none()
@@ -714,8 +721,8 @@ def disable_timeslot(timeslot_id: int, db: Db, user: User) -> dict[str, Any]:
     return dict(row)
 
 
-@router.get("/semesters/{semester_id}/lecturer-quotas", response_model=list[QuotaResponse])
-def list_lecturer_quotas(semester_id: int, db: Db, user: User) -> list[dict[str, Any]]:
+@router.get("/semesters/{semesterId}/lecturer-quotas", response_model=list[QuotaResponse])
+def list_lecturer_quotas(semester_id: Annotated[int, Path(alias="semesterId")], db: Db, user: User) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
@@ -732,8 +739,8 @@ def list_lecturer_quotas(semester_id: int, db: Db, user: User) -> list[dict[str,
     return [dict(row) for row in rows]
 
 
-@router.put("/semesters/{semester_id}/lecturer-quotas/{lecturer_id}", response_model=QuotaResponse)
-def set_lecturer_quota(semester_id: int, lecturer_id: int, payload: QuotaUpdate, db: Db, user: User) -> dict[str, Any]:
+@router.put("/semesters/{semesterId}/lecturer-quotas/{lecturerId}", response_model=QuotaResponse)
+def set_lecturer_quota(semester_id: Annotated[int, Path(alias="semesterId")], lecturer_id: Annotated[int, Path(alias="lecturerId")], payload: QuotaUpdate, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     with db.begin():
         ensure_semester_writable(db, semester_id)
@@ -749,7 +756,13 @@ def set_lecturer_quota(semester_id: int, lecturer_id: int, payload: QuotaUpdate,
 
 
 @router.get("/sessions", response_model=list[SessionResponse])
-def list_sessions(db: Db, user: User, round_id: int | None = None, version_id: int | None = None, status_filter: str | None = None) -> list[dict[str, Any]]:
+def list_sessions(
+    db: Db,
+    user: User,
+    round_id: int | None = dual_name_query("roundId", "round_id", int),
+    version_id: int | None = dual_name_query("versionId", "version_id", int),
+    status_filter: str | None = dual_name_query("statusFilter", "status_filter", str),
+) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
@@ -768,8 +781,8 @@ def list_sessions(db: Db, user: User, round_id: int | None = None, version_id: i
     return [dict(row) for row in rows]
 
 
-@router.get("/sessions/{session_id}", response_model=SessionResponse)
-def get_session_detail(session_id: int, db: Db, user: User) -> dict[str, Any]:
+@router.get("/sessions/{sessionId}", response_model=SessionResponse)
+def get_session_detail(session_id: Annotated[int, Path(alias="sessionId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     rows = list_sessions(db, user)
     for row in rows:
@@ -779,7 +792,11 @@ def get_session_detail(session_id: int, db: Db, user: User) -> dict[str, Any]:
 
 
 @router.get("/reschedule-requests", response_model=list[RescheduleRequestResponse])
-def list_reschedule_requests(db: Db, user: User, status_filter: str | None = None) -> list[dict[str, Any]]:
+def list_reschedule_requests(
+    db: Db,
+    user: User,
+    status_filter: str | None = dual_name_query("statusFilter", "status_filter", str),
+) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
@@ -793,11 +810,15 @@ def list_reschedule_requests(db: Db, user: User, status_filter: str | None = Non
     return [dict(row) for row in rows]
 
 
-@router.get("/reports/group-progress")
+@router.get(
+    "/reports/group-progress",
+    response_model=ApiDataEnvelope[list[TargetGroupProgressResponse]],
+    response_model_exclude_unset=True,
+)
 def group_progress_report(
-    semester_id: int,
     db: Db,
     user: User,
+    semester_id: int = dual_name_query("semesterId", "semester_id", int, required=True),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
 ) -> dict[str, Any]:
@@ -851,7 +872,11 @@ def group_progress_report(
 
 
 @router.get("/results", response_model=list[ResultResponse])
-def list_results(db: Db, user: User, round_id: int | None = None) -> list[dict[str, Any]]:
+def list_results(
+    db: Db,
+    user: User,
+    round_id: int | None = dual_name_query("roundId", "round_id", int),
+) -> list[dict[str, Any]]:
     _require(user, "ADMIN", "MANAGER")
     rows = db.execute(
         text(
@@ -1076,8 +1101,8 @@ def _xlsx_response(workbook: Workbook, filename: str) -> StreamingResponse:
     return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-@router.get("/exports/round/{round_id}.xlsx")
-def export_round(round_id: int, db: Db, user: User) -> StreamingResponse:
+@router.get("/exports/round/{roundId}.xlsx")
+def export_round(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> StreamingResponse:
     _require(user, "ADMIN", "MANAGER")
     workbook = Workbook()
     sheet = workbook.active
@@ -1089,8 +1114,8 @@ def export_round(round_id: int, db: Db, user: User) -> StreamingResponse:
     return _xlsx_response(workbook, f"round-{round_id}.xlsx")
 
 
-@router.get("/exports/semester/{semester_id}/schedule.xlsx")
-def export_semester_schedule(semester_id: int, db: Db, user: User) -> StreamingResponse:
+@router.get("/exports/semester/{semesterId}/schedule.xlsx")
+def export_semester_schedule(semester_id: Annotated[int, Path(alias="semesterId")], db: Db, user: User) -> StreamingResponse:
     _require(user, "ADMIN", "MANAGER")
     workbook = Workbook()
     sheet = workbook.active
@@ -1102,8 +1127,8 @@ def export_semester_schedule(semester_id: int, db: Db, user: User) -> StreamingR
     return _xlsx_response(workbook, f"semester-{semester_id}-schedule.xlsx")
 
 
-@router.get("/exports/semester/{semester_id}/results.xlsx")
-def export_semester_results(semester_id: int, db: Db, user: User) -> StreamingResponse:
+@router.get("/exports/semester/{semesterId}/results.xlsx")
+def export_semester_results(semester_id: Annotated[int, Path(alias="semesterId")], db: Db, user: User) -> StreamingResponse:
     _require(user, "ADMIN", "MANAGER")
     workbook = Workbook()
     sheet = workbook.active

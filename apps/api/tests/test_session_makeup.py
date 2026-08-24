@@ -59,4 +59,4 @@ def test_makeup_target_session_not_found(client):
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"]["code"] == "SESSION_NOT_FOUND"
+    assert response.json()["error"]["code"] == "SESSION_NOT_FOUND"
