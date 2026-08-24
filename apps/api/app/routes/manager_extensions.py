@@ -93,6 +93,17 @@ def _json(value: Any) -> str:
     return json.dumps(value, default=str)
 
 
+def _parse_group_overview_id(value: str | int) -> int:
+    """Accept both target ``grp_<id>`` and migration-era numeric IDs."""
+    try:
+        return parse_external_id(value, prefix="grp")
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "VALIDATION_ERROR", "message": "group_id must be a valid group identifier."},
+        ) from exc
+
+
 class ProjectUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     code: str | None = Field(default=None, min_length=1, max_length=64)
@@ -631,9 +642,10 @@ def get_group_detail(group_id: Annotated[int, Path(alias="groupId")], db: Db, us
 
 
 @router.get("/groups/{groupId}/overview", response_model=ApiDataEnvelope[GroupOverviewResponse])
-def get_group_overview(group_id: Annotated[int, Path(alias="groupId")], db: Db, user: User) -> dict[str, Any]:
+def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db: Db, user: User) -> dict[str, Any]:
     """Return the bounded read model used by the Manager Group 360 screen."""
     _require(user, "ADMIN", "MANAGER")
+    group_id = _parse_group_overview_id(group_id)
     group = db.execute(
         text(
             "SELECT g.id, g.code, g.status, p.id AS project_id, p.code AS project_code, "

@@ -16,3 +16,9 @@ def test_phase03_target_group_project_routes_are_in_openapi():
         ("get", "/api/v1/projects/{projectId}/results"),
     }
     assert {(method, path) for path, item in paths.items() for method in item} >= expected
+
+
+def test_group_overview_accepts_public_group_identifier_in_openapi():
+    operation = create_app().openapi()["paths"]["/api/v1/groups/{groupId}/overview"]["get"]
+    parameter = next(item for item in operation["parameters"] if item["name"] == "groupId")
+    assert {item["type"] for item in parameter["schema"]["anyOf"]} == {"string", "integer"}
