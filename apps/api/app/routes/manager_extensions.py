@@ -667,7 +667,7 @@ def list_round_groups(round_id: Annotated[int, Path(alias="roundId")], db: Db, u
         text(
             "SELECT g.id AS group_id, g.code AS group_code, g.status, p.code AS project_code, "
             "COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en, "
-            "COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_member_count, "
+            "COUNT(DISTINCT gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_member_count, "
             "MAX(a.display_name) FILTER (WHERE gm.membership_role = 'LEADER' AND gm.status = 'ACTIVE') AS leader_name, "
             "COUNT(DISTINCT gsp.timeslot_id) FILTER (WHERE gsp.selected) AS selected_slot_count "
             "FROM round_groups rg JOIN groups g ON g.id = rg.group_id JOIN projects p ON p.id = g.project_id "
