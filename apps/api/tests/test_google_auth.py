@@ -4,7 +4,7 @@ import base64
 import hashlib
 
 from app.config import Settings
-from app.routes.auth_routes import _pkce_challenge, google_start
+from app.routes.auth_routes import _frontend_redirect, _pkce_challenge, google_start
 
 
 def test_pkce_challenge_uses_base64url_sha256_without_padding() -> None:
@@ -40,3 +40,12 @@ def test_google_start_redirects_with_pkce_and_oidc_parameters() -> None:
     assert "accounts.google.com/o/oauth2/v2/auth" in response.headers["location"]
     assert "code_challenge_method=S256" in response.headers["location"]
     assert "nonce=" in response.headers["location"]
+
+
+def test_frontend_redirect_carries_server_resolved_roles() -> None:
+    response = _frontend_redirect(
+        Settings(app_env="test", frontend_url="https://schedule.example.com"),
+        ["ADMIN", "MANAGER"],
+    )
+
+    assert response.headers["location"] == "https://schedule.example.com/auth/callback?roles=ADMIN%2CMANAGER"
