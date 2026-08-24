@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     session_cookie_name: str = "scheduler_session"
     session_idle_minutes: int = 60
     session_absolute_hours: int = 168
+    frontend_url: str = "http://localhost:5173"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""
     cors_origins: str = (
         "http://localhost:3000,http://localhost:5173,"
         "http://127.0.0.1:3000,http://127.0.0.1:5173"

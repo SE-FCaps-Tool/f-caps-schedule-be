@@ -24,6 +24,10 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgresql+psycopg://scheduler:scheduler@postgres:5432/scheduler
+      FRONTEND_URL: http://localhost:5173
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/auth/google/callback}
       SEED_FIXTURE: ${SEED_FIXTURE:-true}
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
     ports:
@@ -44,6 +48,10 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgresql+psycopg://scheduler:scheduler@postgres:5432/scheduler
+      FRONTEND_URL: http://localhost:5173
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/auth/google/callback}
       SEED_FIXTURE: ${SEED_FIXTURE:-true}
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
     volumes:

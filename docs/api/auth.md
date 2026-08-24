@@ -51,6 +51,25 @@ await fetch(`${API_URL}/api/v1/auth/login`, {
 
 Backend xóa session cookie và `scheduler_csrf`. FE nên reset toàn bộ cached user/query sau khi gọi.
 
+## Google OAuth
+
+Google login dùng server-side OAuth Authorization Code + PKCE. Google chỉ được liên kết với
+account đã tồn tại trong `accounts` và đang `ACTIVE`; email chưa được admin tạo trước sẽ bị từ
+chối. Role vẫn lấy từ `account_roles`, không lấy từ Google.
+
+### `GET /api/v1/auth/google/start`
+
+- **Auth:** public.
+- Redirect người dùng sang Google với `state`, `nonce` và PKCE cookies ngắn hạn.
+- Cần cấu hình `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` và `GOOGLE_REDIRECT_URI`.
+
+### `GET /api/v1/auth/google/callback`
+
+- Google redirect về endpoint này với authorization code.
+- BE xác minh code, ID token, issuer, audience, nonce và `email_verified`, sau đó tạo cùng loại
+  session/CSRF cookie như login mật khẩu.
+- Thành công redirect về FE `/auth/callback`; thất bại redirect về `/login?oauth_error=...`.
+
 ## `GET /api/v1/auth/me`
 
 Trả identity của session hiện tại.

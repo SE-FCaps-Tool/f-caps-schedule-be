@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     session_cookie_name: str = "scheduler_session"
     session_idle_minutes: int = 60
     session_absolute_hours: int = 168
+    frontend_url: str = "http://localhost:5173"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""
     cors_origins: str = (
         "http://localhost:3000,http://localhost:5173,"
         "http://127.0.0.1:3000,http://127.0.0.1:5173"
@@ -130,6 +134,10 @@ def create_semester(payload: SemesterCreate, db: Db, user: User, settings: Setti
 | `SESSION_IDLE_MINUTES` | `60` | Không hoạt động bao lâu thì phiên chết |
 | `SESSION_ABSOLUTE_HOURS` | `168` (7 ngày) | Hạn tuyệt đối của phiên |
 | `CORS_ORIGINS` | 4 origin localhost | Domain frontend được phép gọi API, phân tách bằng dấu phẩy |
+| `FRONTEND_URL` | `http://localhost:5173` | URL FE nhận redirect sau Google login |
+| `GOOGLE_CLIENT_ID` | trống | OAuth Web client ID từ Google Cloud |
+| `GOOGLE_CLIENT_SECRET` | trống | OAuth Web client secret, chỉ đặt trên BE |
+| `GOOGLE_REDIRECT_URI` | trống | Callback URI đã đăng ký chính xác trên Google Cloud |
 | `SEMESTER_MIN_DURATION_DAYS` | `105` | Luật nghiệp vụ — độ dài học kỳ tối thiểu |
 | `SEMESTER_MAX_DURATION_DAYS` | `120` | Độ dài học kỳ tối đa |
 | `SEED_FIXTURE` | `true` | *(Đọc bởi `tools/bootstrap_database.py`, không nằm trong `Settings`)* Có nạp dữ liệu mẫu lúc khởi động không |
