@@ -83,17 +83,22 @@ def test_database_rejects_overlapping_room_sessions_in_one_schedule_version():
         )
         version_id = cursor.fetchone()[0]
         cursor.execute(
-            "INSERT INTO sessions (schedule_version_id, group_id, timeslot_id, room_id, start_at, end_at) "
-            "VALUES (%s, %s, %s, %s, TIMESTAMPTZ '2030-01-01 09:00+07', TIMESTAMPTZ '2030-01-01 09:30+07')",
-            (version_id, group_id, timeslot_id, room_id),
+            "INSERT INTO councils (round_id, created_by, sealed_at) VALUES (%s, %s, now()) RETURNING id",
+            (round_id, account_id),
+        )
+        council_id = cursor.fetchone()[0]
+        cursor.execute(
+            "INSERT INTO sessions (schedule_version_id, group_id, timeslot_id, room_id, council_id, start_at, end_at) "
+            "VALUES (%s, %s, %s, %s, %s, TIMESTAMPTZ '2030-01-01 09:00+07', TIMESTAMPTZ '2030-01-01 09:30+07')",
+            (version_id, group_id, timeslot_id, room_id, council_id),
         )
 
         cursor.execute("SAVEPOINT overlap_check")
         with pytest.raises(ExclusionViolation):
             cursor.execute(
-                "INSERT INTO sessions (schedule_version_id, group_id, timeslot_id, room_id, start_at, end_at) "
-                "VALUES (%s, %s, %s, %s, TIMESTAMPTZ '2030-01-01 09:15+07', TIMESTAMPTZ '2030-01-01 09:45+07')",
-                (version_id, group_two_id, timeslot_id, room_id),
+                "INSERT INTO sessions (schedule_version_id, group_id, timeslot_id, room_id, council_id, start_at, end_at) "
+                "VALUES (%s, %s, %s, %s, %s, TIMESTAMPTZ '2030-01-01 09:15+07', TIMESTAMPTZ '2030-01-01 09:45+07')",
+                (version_id, group_two_id, timeslot_id, room_id, council_id),
             )
         cursor.execute("ROLLBACK TO SAVEPOINT overlap_check")
 

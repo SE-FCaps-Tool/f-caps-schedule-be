@@ -87,8 +87,8 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
             "registration_deadline": registration_deadline,
             "group_preference_deadline": group_preference_deadline,
             "session_duration_minutes": 30,
-            "start_date": "2030-01-25",
-            "end_date": "2030-03-01",
+            "startDate": "2030-01-25",
+            "endDate": "2030-03-01",
             "h12_sessions_per_part": 3,
             "h12_sessions_per_day": 7,
             "h12_semester_quota": 24,
@@ -98,8 +98,8 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     )
     assert round_response.status_code == 201, round_response.text
     round_id = round_response.json()["id"]
-    assert round_response.json()["h12_sessions_per_part"] == 3
-    assert round_response.json()["soft_weights"] == {"S1": 1, "S8": 2}
+    assert round_response.json()["h12SessionsPerPart"] == 3
+    assert round_response.json()["softWeights"] == {"S1": 1, "S8": 2}
     availability_view = client.get(f"/api/v1/rounds/{round_response.json()['id']}/my-availability", headers=manager_headers)
     assert availability_view.status_code == 200, availability_view.text
     assert "timeslots" in availability_view.json()
@@ -107,12 +107,12 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     assert incomplete_transition.status_code == 422, incomplete_transition.text
 
     lecturer = client.get("/api/v1/lecturers", headers=manager_headers).json()["data"][0]
-    invited = client.post(f"/api/v1/rounds/{round_id}/invitations", json={"lecturer_ids": [lecturer["id"]]}, headers=manager_headers)
+    invited = client.post(f"/api/v1/rounds/{round_id}/invitations", json={"lecturerIds": [lecturer["id"]]}, headers=manager_headers)
     assert invited.status_code == 200, invited.text
-    lecturer_headers = {"X-Test-Session": f"active-lecturer:{lecturer['account_id']}"}
+    lecturer_headers = {"X-Test-Session": f"active-lecturer:{lecturer['accountId']}"}
     pending_write = client.post(
         f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
-        json={"selected_timeslot_ids": []},
+        json={"selectedTimeslotIds": []},
         headers=lecturer_headers,
     )
     assert pending_write.status_code == 403, pending_write.text
@@ -126,7 +126,7 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     assert accepted.status_code == 200, accepted.text
     draft_write = client.post(
         f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
-        json={"selected_timeslot_ids": []},
+        json={"selectedTimeslotIds": []},
         headers=lecturer_headers,
     )
     assert draft_write.status_code == 409, draft_write.text
@@ -138,7 +138,7 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     assert opened.status_code == 200, opened.text
     accepted_write = client.post(
         f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
-        json={"selected_timeslot_ids": []},
+        json={"selectedTimeslotIds": []},
         headers=lecturer_headers,
     )
     assert accepted_write.status_code == 200, accepted_write.text
@@ -162,11 +162,11 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     assert closed_target_write.status_code == 409, closed_target_write.text
     invitations = client.get("/api/v1/my/invitations", headers=lecturer_headers)
     assert invitations.status_code == 200, invitations.text
-    assert any(item["round_id"] == round_id and item["lecturer_id"] == lecturer["id"] and item["status"] == "ACCEPTED" for item in invitations.json())
+    assert any(item["roundId"] == round_id and item["lecturerId"] == lecturer["id"] and item["status"] == "ACCEPTED" for item in invitations.json())
     lecturer_remediation = client.get("/api/v1/remediation", headers=lecturer_headers)
     assert lecturer_remediation.status_code == 200, lecturer_remediation.text
     notifications = client.get("/api/v1/notifications", headers=manager_headers).json()
-    assert any(item["event_type"] == "REVIEW_INVITATION" and item["payload"]["round_id"] == round_id for item in notifications)
+    assert any(item["eventType"] == "REVIEW_INVITATION" and item["payload"]["roundId"] == round_id for item in notifications)
 
     major_id = client.get("/api/v1/majors", headers=manager_headers).json()[0]["id"]
     project = client.post(
@@ -178,17 +178,17 @@ def test_round_configuration_conflict_scope_and_invitation_notification(client):
     projects = client.get("/api/v1/projects", headers=manager_headers)
     assert projects.status_code == 200, projects.text
     assert any(item["id"] == project.json()["id"] for item in projects.json())
-    own_headers = {"X-Test-Session": f"active-lecturer:{lecturer['account_id']}"}
-    conflict = client.post(f"/api/v1/lecturers/{lecturer['id']}/conflicts", json={"project_id": project.json()["id"], "reason": "Declared conflict"}, headers=own_headers)
+    own_headers = {"X-Test-Session": f"active-lecturer:{lecturer['accountId']}"}
+    conflict = client.post(f"/api/v1/lecturers/{lecturer['id']}/conflicts", json={"projectId": project.json()["id"], "reason": "Declared conflict"}, headers=own_headers)
     assert conflict.status_code == 200, conflict.text
     lecturers = client.get("/api/v1/lecturers", headers=manager_headers)
     assert lecturers.status_code == 200, lecturers.text
     lecturer_details = next(item for item in lecturers.json()["data"] if item["id"] == lecturer["id"])
-    assert lecturer_details["account_id"] == lecturer["account_id"]
+    assert lecturer_details["accountId"] == lecturer["accountId"]
     assert lecturer_details["email"]
-    assert lecturer_details["display_name"]
-    assert lecturer_details["account_status"] in {"ACTIVE", "INACTIVE"}
-    assert {item["project_id"] for item in lecturer_details["conflicts"]} >= {project.json()["id"]}
+    assert lecturer_details["displayName"]
+    assert lecturer_details["accountStatus"] in {"ACTIVE", "INACTIVE"}
+    assert {item["projectId"] for item in lecturer_details["conflicts"]} >= {project.json()["id"]}
 
 
 @pytest.mark.integration
@@ -200,14 +200,14 @@ def test_worker_creates_availability_reminder_from_shared_event_source(client):
     deadline = (datetime.now(UTC) + timedelta(hours=12)).isoformat()
     round_response = client.post(
         "/api/v1/rounds",
-        json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "room_types": ["NORMAL"], "session_duration_minutes": 30, "registration_deadline": deadline},
+        json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "room_types": ["NORMAL"], "session_duration_minutes": 30, "registration_deadline": deadline, "startDate": "2030-03-01", "endDate": "2030-03-01"},
         headers=manager_headers,
     )
     assert round_response.status_code == 201, round_response.text
     round_id = round_response.json()["id"]
     lecturer = client.get("/api/v1/lecturers", headers=manager_headers).json()["data"][0]
-    assert client.post(f"/api/v1/rounds/{round_id}/invitations", json={"lecturer_ids": [lecturer["id"]]}, headers=manager_headers).status_code == 200
-    lecturer_headers = {"X-Test-Session": f"active-lecturer:{lecturer['account_id']}"}
+    assert client.post(f"/api/v1/rounds/{round_id}/invitations", json={"lecturerIds": [lecturer["id"]]}, headers=manager_headers).status_code == 200
+    lecturer_headers = {"X-Test-Session": f"active-lecturer:{lecturer['accountId']}"}
     assert client.post(f"/api/v1/rounds/{round_id}/invitations/{lecturer['id']}/response", json={"response": "ACCEPTED"}, headers=lecturer_headers).status_code == 200
     manager_rounds = client.get("/api/v1/my/rounds", headers=manager_headers)
     assert manager_rounds.status_code == 200, manager_rounds.text
@@ -218,4 +218,4 @@ def test_worker_creates_availability_reminder_from_shared_event_source(client):
     with Session(get_engine(get_settings().database_url)) as db:
         assert process_availability_reminders(db) >= 1
     notifications = client.get("/api/v1/notifications", headers=manager_headers).json()
-    assert any(item["event_type"] == "AVAILABILITY_REMINDER" and item["payload"]["round_id"] == round_id for item in notifications)
+    assert any(item["eventType"] == "AVAILABILITY_REMINDER" and item["payload"]["roundId"] == round_id for item in notifications)

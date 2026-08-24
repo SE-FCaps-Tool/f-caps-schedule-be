@@ -26,6 +26,8 @@ def _prepare_published_session(client, day_date: str) -> dict:
             "reviewer_count": 3,
             "room_types": ["NORMAL"],
             "session_duration_minutes": 30,
+            "startDate": day_date,
+            "endDate": day_date,
         },
         headers=manager,
     )
@@ -37,38 +39,45 @@ def _prepare_published_session(client, day_date: str) -> dict:
         headers=manager,
     )
     assert day_response.status_code == 201, day_response.text
-    timeslot_id = day_response.json()["timeslot_ids"][0]
+    timeslot_id = day_response.json()["timeslotIds"][0]
     group = next(
-        item for item in client.get("/api/v1/groups", headers=manager).json() if item["status"] == "PENDING_D11" and item["leader_count"] == 1
+        item for item in client.get("/api/v1/groups", headers=manager).json() if item["status"] == "PENDING_D11" and item["leaderCount"] == 1
     )
     rooms = client.get("/api/v1/rooms", headers=manager).json()["data"]
     resource_response = client.post(
         f"/api/v1/rounds/{round_id}/resources",
-        json={"group_ids": [group["id"]], "timeslot_ids": [timeslot_id], "room_ids": [rooms[0]["id"]]},
+        json={"groupIds": [group["id"]], "timeslotIds": [timeslot_id], "room_ids": [rooms[0]["id"]]},
         headers=manager,
     )
     assert resource_response.status_code == 200, resource_response.text
     lecturers = client.get("/api/v1/lecturers", headers=manager).json()["data"]
-    for lecturer in lecturers[:6]:
+    for lecturer in lecturers:
         availability = client.post(
             f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
-            json={"selected_timeslot_ids": [timeslot_id]},
+            json={"selectedTimeslotIds": [timeslot_id]},
             headers=manager,
         )
         assert availability.status_code == 200, availability.text
+    for target_status in ("OPEN_REGISTRATION", "REGISTRATION_CLOSED"):
+        transitioned = client.post(
+            f"/api/v1/rounds/{round_id}/transition",
+            json={"targetStatus": target_status},
+            headers=manager,
+        )
+        assert transitioned.status_code == 200, transitioned.text
     run = client.post(
         f"/api/v1/rounds/{round_id}/schedule/run",
-        json={"time_limit_seconds": 2, "random_seed": 7},
+        json={"timeLimitSeconds": 2, "randomSeed": 7},
         headers=manager,
     )
     assert run.status_code == 201, run.text
-    version_id = run.json()["version_id"]
+    version_id = run.json()["versionId"]
     detail = client.get(f"/api/v1/schedule/versions/{version_id}", headers=manager)
     assert detail.status_code == 200, detail.text
     activated = client.post(f"/api/v1/schedule/versions/{version_id}/activate", headers=manager)
     assert activated.status_code == 200, activated.text
     session = client.get(f"/api/v1/schedule/versions/{version_id}", headers=manager).json()["sessions"][0]
-    room = client.put(f"/api/v1/sessions/{session['id']}/room", json={"room_id": rooms[0]["id"]}, headers=manager)
+    room = client.put(f"/api/v1/sessions/{session['id']}/room", json={"roomId": rooms[0]["id"]}, headers=manager)
     assert room.status_code == 200, room.text
     published = client.post(f"/api/v1/rounds/{round_id}/schedule/publish/{version_id}", headers=manager)
     assert published.status_code == 200, published.text
@@ -84,7 +93,7 @@ def _prepare_published_session(client, day_date: str) -> dict:
 
 @pytest.mark.integration
 def test_activation_persists_one_sealed_council_per_materialized_session(client):
-    state = _prepare_published_session(client, "2041-05-01")
+    state = _prepare_published_session(client, "2054-05-01")
     engine = get_engine(get_settings().database_url)
     with engine.begin() as db:
         rows = db.execute(
@@ -103,13 +112,13 @@ def test_activation_persists_one_sealed_council_per_materialized_session(client)
             text("SELECT COUNT(*) FROM council_members WHERE council_id = :council_id"),
             {"council_id": rows[0]["council_id"]},
         ).scalar_one()
-    assert member_count == len(state["session"]["reviewer_ids"])
-    assert state["session"]["council_id"] == rows[0]["council_id"]
+    assert member_count == len(state["session"]["reviewerIds"])
+    assert state["session"]["councilId"] == rows[0]["council_id"]
 
 
 @pytest.mark.integration
 def test_sealed_council_rejects_member_insert_update_delete(client):
-    state = _prepare_published_session(client, "2041-05-02")
+    state = _prepare_published_session(client, "2054-05-02")
     engine = get_engine(get_settings().database_url)
     with engine.begin() as db:
         council_id, lecturer_id = db.execute(
@@ -148,16 +157,32 @@ def test_sealed_council_rejects_member_insert_update_delete(client):
     ],
 )
 def test_controlled_change_has_explicit_council_and_version_branch(client, name, payload_delta, expected_kind, replacement):
-    state = _prepare_published_session(client, f"2041-05-{3 + ['reviewer_only', 'time_room_only', 'mixed'].index(name):02d}")
+    state = _prepare_published_session(client, f"2054-05-{3 + ['reviewer_only', 'time_room_only', 'mixed'].index(name):02d}")
     session = state["session"]
-    reviewers = session["reviewer_ids"]
+    reviewers = session["reviewerIds"]
     if payload_delta.get("reviewer_offset"):
-        reviewers = state["lecturers"][3:6]
-        reviewers = [item["id"] for item in reviewers]
+        with get_engine(get_settings().database_url).begin() as db:
+            supervisor_ids = {
+                row[0]
+                for row in db.execute(
+                    text(
+                        "SELECT ps.lecturer_id FROM project_supervisors ps "
+                        "JOIN schedule_assignments sa ON sa.project_id = ps.project_id "
+                        "JOIN sessions s ON s.id = :session_id AND s.schedule_version_id = sa.schedule_version_id "
+                        "WHERE sa.group_id = s.group_id"
+                    ),
+                    {"session_id": session["id"]},
+                ).all()
+            }
+        reviewers = [
+            item["id"]
+            for item in state["lecturers"]
+            if item["id"] not in supervisor_ids and item["id"] not in session["reviewerIds"]
+        ][:3]
     payload = {
-        "timeslot_id": session["timeslot_id"],
-        "room_id": state["rooms"][payload_delta.get("room_offset", 0)]["id"],
-        "reviewer_ids": reviewers,
+        "timeslotId": session["timeslotId"],
+        "roomId": state["rooms"][payload_delta.get("room_offset", 0)]["id"],
+        "reviewerIds": reviewers,
         "reason": f"Phase 5 {name}",
     }
     response = client.post(
@@ -167,14 +192,14 @@ def test_controlled_change_has_explicit_council_and_version_branch(client, name,
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["change_kind"] == expected_kind
-    assert body["schedule_version_id"] == state["version_id"]
-    assert (body["replacement_version_id"] is not None) is replacement
-    assert body["session_id"] == session["id"]
+    assert body["changeKind"] == expected_kind
+    assert body["scheduleVersionId"] == state["version_id"]
+    assert (body["replacementVersionId"] is not None) is replacement
+    assert body["sessionId"] == session["id"]
     assert body["status"] in {"PUBLISHED", "REPLACED"}
     if not replacement:
-        assert body["before_council_id"] != body["after_council_id"]
-        assert body["replacement_version_id"] is None
+        assert body["beforeCouncilId"] != body["afterCouncilId"]
+        assert body["replacementVersionId"] is None
     else:
         source = client.get(f"/api/v1/schedule/versions/{state['version_id']}", headers=state["manager"]).json()
         assert source["status"] == "DISCARDED"

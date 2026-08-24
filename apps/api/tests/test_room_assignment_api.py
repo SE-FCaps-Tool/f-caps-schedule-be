@@ -7,6 +7,85 @@ import os
 import psycopg
 import pytest
 
+
+def _prepare_active_schedule(client, day_date: str) -> tuple[int, int]:
+    """Create the active, room-unassigned schedule required by room operations."""
+    manager = {"X-Test-Session": "active-manager"}
+    admin = {"X-Test-Session": "active-admin"}
+    seeded = client.post("/api/v1/admin/seed-fixture", headers=admin)
+    assert seeded.status_code in {200, 201}, seeded.text
+    semester = next(
+        item
+        for item in client.get("/api/v1/semesters", headers=manager).json()["data"]
+        if item["code"] == "SE-2026-2027"
+    )
+    created_round = client.post(
+        "/api/v1/rounds",
+        json={
+            "semester_id": semester["id"],
+            "type": "REVIEW_3",
+            "reviewer_count": 3,
+            "room_types": ["NORMAL"],
+            "session_duration_minutes": 30,
+            "startDate": day_date,
+            "endDate": day_date,
+        },
+        headers=manager,
+    )
+    assert created_round.status_code == 201, created_round.text
+    round_id = created_round.json()["id"]
+    created_day = client.post(
+        f"/api/v1/rounds/{round_id}/days",
+        json={
+            "day_date": day_date,
+            "slots": [
+                {
+                    "start_at": f"{day_date}T09:00:00+07:00",
+                    "end_at": f"{day_date}T09:30:00+07:00",
+                }
+            ],
+        },
+        headers=manager,
+    )
+    assert created_day.status_code == 201, created_day.text
+    timeslot_id = created_day.json()["timeslotIds"][0]
+    group = next(
+        item
+        for item in client.get("/api/v1/groups", headers=manager).json()
+        if item["status"] == "PENDING_D11" and item["leaderCount"] == 1
+    )
+    resource = client.post(
+        f"/api/v1/rounds/{round_id}/resources",
+        json={"groupIds": [group["id"]], "timeslotIds": [timeslot_id], "roomIds": [client.get("/api/v1/rooms", headers=manager).json()["data"][0]["id"]]},
+        headers=manager,
+    )
+    assert resource.status_code == 200, resource.text
+    lecturers = client.get("/api/v1/lecturers", params={"pageSize": 100}, headers=manager).json()["data"]
+    for lecturer in lecturers:
+        availability = client.post(
+            f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
+            json={"selectedTimeslotIds": [timeslot_id]},
+            headers=manager,
+        )
+        assert availability.status_code == 200, availability.text
+    for target_status in ("OPEN_REGISTRATION", "REGISTRATION_CLOSED"):
+        transitioned = client.post(
+            f"/api/v1/rounds/{round_id}/transition",
+            json={"targetStatus": target_status},
+            headers=manager,
+        )
+        assert transitioned.status_code == 200, transitioned.text
+    run = client.post(
+        f"/api/v1/rounds/{round_id}/schedule/run",
+        json={"timeLimitSeconds": 2, "randomSeed": 13},
+        headers=manager,
+    )
+    assert run.status_code == 201, run.text
+    version_id = run.json()["versionId"]
+    activated = client.post(f"/api/v1/schedule/versions/{version_id}/activate", headers=manager)
+    assert activated.status_code == 200, activated.text
+    return round_id, timeslot_id
+
 DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql://scheduler:scheduler@localhost:5432/scheduler"
 ).replace("postgresql+psycopg://", "postgresql://")
@@ -38,18 +117,17 @@ def test_all_four_room_assignment_endpoints_enforce_manager_scope(client):
 
 @pytest.mark.integration
 def test_available_rooms_filters_active_allowed_and_true_interval_conflicts(client):
-    seeded = client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
-    assert seeded.status_code in {200, 201}, seeded.text
+    round_id, timeslot_id = _prepare_active_schedule(client, "2060-01-01")
 
     without_type = client.get(
-        "/api/v1/rounds/1/rooms/available",
+        f"/api/v1/rounds/{round_id}/rooms/available",
         headers={"X-Test-Session": "active-manager"},
     )
     assert without_type.status_code == 200, without_type.text
 
     response = client.get(
-        "/api/v1/rounds/1/rooms/available",
-        params={"timeslot_id": 1, "room_type": "NORMAL"},
+        f"/api/v1/rounds/{round_id}/rooms/available",
+        params={"timeslot_id": timeslot_id, "room_type": "NORMAL"},
         headers={"X-Test-Session": "active-manager"},
     )
     assert response.status_code == 200, response.text
@@ -63,7 +141,8 @@ def test_available_rooms_filters_active_allowed_and_true_interval_conflicts(clie
 @pytest.mark.integration
 def test_assign_suggest_apply_are_planned_only_atomic_and_idempotent(client):
     headers = {"X-Test-Session": "active-manager"}
-    suggestion = client.post("/api/v1/rounds/1/rooms/suggest", headers=headers)
+    round_id, _ = _prepare_active_schedule(client, "2060-01-02")
+    suggestion = client.post(f"/api/v1/rounds/{round_id}/rooms/suggest", headers=headers)
     assert suggestion.status_code == 200, suggestion.text
     data = suggestion.json()["data"]
     pairs = data.get("suggestions", data)
@@ -73,7 +152,7 @@ def test_assign_suggest_apply_are_planned_only_atomic_and_idempotent(client):
 
     pair = {"session_id": pairs[0]["sessionId"], "room_id": pairs[0]["roomId"]}
     applied = client.post(
-        "/api/v1/rounds/1/rooms/apply-suggestions",
+        f"/api/v1/rounds/{round_id}/rooms/apply-suggestions",
         json={"assignments": [pair]},
         headers=headers,
     )

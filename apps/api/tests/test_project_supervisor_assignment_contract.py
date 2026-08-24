@@ -35,7 +35,7 @@ def test_manager_can_assign_supervisors_to_existing_target_project(client):
     )
     assert updated.status_code == 200, updated.text
 
-    listed = client.get(f"/api/v1/semesters/{semester['id']}/projects", headers=headers)
+    listed = client.get(f"/api/v1/semesters/{semester['id']}/projects?pageSize=200", headers=headers)
     assert listed.status_code == 200, listed.text
     project = next(item for item in listed.json()["data"] if item["id"] == project_id)
     assert project["nameVi"] == "Supervisor assignment contract"

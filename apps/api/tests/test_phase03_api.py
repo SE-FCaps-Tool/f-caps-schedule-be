@@ -5,6 +5,10 @@ import pytest
 
 def _close_current_semester(client, headers):
     rows = client.get("/api/v1/semesters", headers=headers).json()["data"]
+    if not rows:
+        seeded = client.post("/api/v1/admin/seed-fixture", headers={"X-Test-Session": "active-admin"})
+        assert seeded.status_code in {200, 201}, seeded.text
+        rows = client.get("/api/v1/semesters", headers=headers).json()["data"]
     active = next(row for row in rows if row["status"] == "ACTIVE")
     response = client.post(
         f"/api/v1/semesters/{active['id']}/transition",
@@ -57,7 +61,7 @@ def test_seed_fixture_is_idempotent_and_returns_target_counts(client):
     assert first.status_code == 201
     assert second.status_code in {200, 201}
     assert first.json()["counts"] == second.json()["counts"]
-    assert first.json()["counts"]["accounts"] == 8
+    assert first.json()["counts"]["accounts"] == 140
     assert first.json()["counts"]["rooms"] == 6
 
 
@@ -180,7 +184,7 @@ def test_manager_can_create_round_day_and_manager_entered_availability(client):
     lecturer_id = client.get("/api/v1/lecturers", headers={"X-Test-Session": "active-manager"}).json()["data"][0]["id"]
     availability = client.post(
         f"/api/v1/rounds/{round_id}/lecturers/{lecturer_id}/availability",
-        json={"selected_timeslot_ids": day.json()["timeslot_ids"][:1], "load_preference": "HIGH"},
+        json={"selectedTimeslotIds": day.json()["timeslotIds"][:1], "loadPreference": "HIGH"},
         headers={"X-Test-Session": "active-manager"},
     )
     assert availability.status_code == 200
@@ -207,7 +211,7 @@ def test_semester_projects_lists_scoped_projects_and_rejects_unknown_semester(cl
     )
     assert project.status_code == 201, project.text
 
-    listed = client.get(f"/api/v1/semesters/{semester_id}/projects", headers=headers)
+    listed = client.get(f"/api/v1/semesters/{semester_id}/projects?pageSize=200", headers=headers)
     assert listed.status_code == 200, listed.text
     assert any(item["id"] == f"prj_{project.json()['id']}" for item in listed.json()["data"])
 
@@ -242,13 +246,13 @@ def test_group_mutation_validates_leader_and_rolls_back_atomically(client):
         headers=headers,
     )
     assert project.status_code == 201
-    students = client.get("/api/v1/students", headers=headers).json()[:4]
+    students = client.get("/api/v1/students", headers=headers).json()["data"][:4]
     invalid = client.post(
         "/api/v1/groups",
         json={
             "project_id": project.json()["id"],
             "code": "G-INVALID",
-            "members": [{"student_code": student["student_code"], "role": "MEMBER"} for student in students],
+            "members": [{"studentCode": student["studentCode"], "role": "MEMBER"} for student in students],
         },
         headers=headers,
     )
@@ -264,7 +268,7 @@ def test_group_can_be_created_before_project_and_assigned_later(client):
     semesters = client.get("/api/v1/semesters", headers=headers).json()["data"]
     semester_id = next(item["id"] for item in semesters if item["code"] == "SE-2026-2027")
     majors = client.get("/api/v1/majors", headers=headers).json()
-    students = client.get("/api/v1/students", headers=headers).json()[4:8]
+    students = client.get("/api/v1/students", headers=headers).json()["data"][4:8]
     group_code = f"G-NOPROJ-{uuid4().hex[:6]}"
 
     created = client.post(
@@ -272,7 +276,7 @@ def test_group_can_be_created_before_project_and_assigned_later(client):
         json={
             "code": group_code,
             "members": [
-                {"student_code": student["student_code"], "role": "LEADER" if index == 0 else "MEMBER"}
+                {"studentCode": student["studentCode"], "role": "LEADER" if index == 0 else "MEMBER"}
                 for index, student in enumerate(students)
             ],
         },
@@ -282,12 +286,12 @@ def test_group_can_be_created_before_project_and_assigned_later(client):
     group_id = created.json()["id"]
 
     listed = next(item for item in client.get("/api/v1/groups", headers=headers).json() if item["id"] == group_id)
-    assert listed["project_id"] is None
-    assert listed["project_code"] is None
+    assert listed["projectId"] is None
+    assert listed["projectCode"] is None
 
     detail = client.get(f"/api/v1/groups/{group_id}", headers=headers)
     assert detail.status_code == 200, detail.text
-    assert detail.json()["project_id"] is None
+    assert detail.json()["projectId"] is None
 
     project = client.post(
         "/api/v1/projects",
@@ -305,23 +309,23 @@ def test_group_can_be_created_before_project_and_assigned_later(client):
 
     assigned = client.patch(
         f"/api/v1/groups/{group_id}",
-        json={"project_id": project_id},
+        json={"projectId": project_id},
         headers=headers,
     )
     assert assigned.status_code == 200, assigned.text
-    assert assigned.json()["project_id"] == project_id
+    assert assigned.json()["projectId"] == project_id
 
     detail_after = client.get(f"/api/v1/groups/{group_id}", headers=headers)
-    assert detail_after.json()["project_id"] == project_id
-    assert detail_after.json()["project_code"] == project.json()["code"]
+    assert detail_after.json()["projectId"] == project_id
+    assert detail_after.json()["projectCode"] == project.json()["code"]
 
     duplicate_assign = client.post(
         "/api/v1/groups",
         json={
             "code": f"G-DUP-{uuid4().hex[:6]}",
             "members": [
-                {"student_code": student["student_code"], "role": "LEADER" if index == 0 else "MEMBER"}
-                for index, student in enumerate(client.get("/api/v1/students", headers=headers).json()[8:12])
+                {"studentCode": student["studentCode"], "role": "LEADER" if index == 0 else "MEMBER"}
+                for index, student in enumerate(client.get("/api/v1/students", headers=headers).json()["data"][8:12])
             ],
         },
         headers=headers,
@@ -329,7 +333,7 @@ def test_group_can_be_created_before_project_and_assigned_later(client):
     assert duplicate_assign.status_code == 201, duplicate_assign.text
     conflict = client.patch(
         f"/api/v1/groups/{duplicate_assign.json()['id']}",
-        json={"project_id": project_id},
+        json={"projectId": project_id},
         headers=headers,
     )
     assert conflict.status_code == 409

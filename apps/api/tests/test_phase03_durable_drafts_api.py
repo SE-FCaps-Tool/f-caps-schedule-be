@@ -35,6 +35,8 @@ def _prepare_round(client, headers: dict[str, str], day_date: str) -> tuple[int,
             "reviewer_count": 3,
             "room_types": ["NORMAL"],
             "session_duration_minutes": 30,
+            "startDate": day_date,
+            "endDate": day_date,
         },
         headers=headers,
     )
@@ -49,15 +51,15 @@ def _prepare_round(client, headers: dict[str, str], day_date: str) -> tuple[int,
         headers=headers,
     )
     assert day.status_code == 201, day.text
-    slot_id = day.json()["timeslot_ids"][0]
+    slot_id = day.json()["timeslotIds"][0]
     group = next(
         item
         for item in client.get("/api/v1/groups", headers=headers).json()
-        if item["status"] == "PENDING_D11" and item["leader_count"] == 1
+        if item["status"] == "PENDING_D11" and item["leaderCount"] == 1
     )
     rooms = client.get("/api/v1/rooms", headers=headers)
     room_id = rooms.json()["data"][0]["id"] if rooms.status_code == 200 and rooms.json()["data"] else None
-    resources = {"group_ids": [group["id"]], "timeslot_ids": [slot_id]}
+    resources = {"groupIds": [group["id"]], "timeslotIds": [slot_id]}
     if room_id is not None:
         resources["room_ids"] = [room_id]
     assigned = client.post(f"/api/v1/rounds/{round_id}/resources", json=resources, headers=headers)
@@ -66,17 +68,24 @@ def _prepare_round(client, headers: dict[str, str], day_date: str) -> tuple[int,
     for lecturer in lecturers[:6]:
         availability = client.post(
             f"/api/v1/rounds/{round_id}/lecturers/{lecturer['id']}/availability",
-            json={"selected_timeslot_ids": [slot_id]},
+            json={"selectedTimeslotIds": [slot_id]},
             headers=headers,
         )
         assert availability.status_code == 200, availability.text
+    for target_status in ("OPEN_REGISTRATION", "REGISTRATION_CLOSED"):
+        transitioned = client.post(
+            f"/api/v1/rounds/{round_id}/transition",
+            json={"targetStatus": target_status},
+            headers=headers,
+        )
+        assert transitioned.status_code == 200, transitioned.text
     return round_id, slot_id
 
 
 def _run(client, headers: dict[str, str], round_id: int) -> dict:
     response = client.post(
         f"/api/v1/rounds/{round_id}/schedule/run",
-        json={"random_seed": 17, "time_limit_seconds": 2},
+            json={"randomSeed": 17, "timeLimitSeconds": 2},
         headers=headers,
     )
     assert response.status_code == 201, response.text
@@ -90,13 +99,13 @@ def test_generate_creates_draft_assignments_and_zero_operational_sessions(client
     run = _run(client, headers, round_id)
     assert run["status"] == "DRAFT"
     assert len(run["versions"]) == 3
-    assert {version["objective_profile"] for version in run["versions"]} == {
+    assert {version["objectiveProfile"] for version in run["versions"]} == {
         "LECTURER_COMPACT",
         "LOAD_BALANCED",
         "EARLY_FINISH",
     }
 
-    version_id = run["version_id"]
+    version_id = run["versionId"]
     detail = client.get(f"/api/v1/schedule/versions/{version_id}", headers=headers)
     assert detail.status_code == 200, detail.text
     body = detail.json()
@@ -109,8 +118,13 @@ def test_generate_creates_draft_assignments_and_zero_operational_sessions(client
         assert cursor.fetchone()[0] == "SCHEDULING"
         cursor.execute("SELECT COUNT(*) FROM sessions WHERE schedule_version_id = %s", (version_id,))
         assert cursor.fetchone()[0] == 0
-        cursor.execute("SELECT COUNT(*) FROM session_reviewers WHERE schedule_version_id = %s", (version_id,))
-        assert cursor.fetchone()[0] == 0
+        cursor.execute(
+            "SELECT COUNT(*) FROM schedule_assignment_reviewers sar "
+            "JOIN schedule_assignments sa ON sa.id = sar.assignment_id "
+            "WHERE sa.schedule_version_id = %s",
+            (version_id,),
+        )
+        assert cursor.fetchone()[0] == 3
         cursor.execute("SELECT COUNT(*) FROM schedule_assignments WHERE schedule_version_id = %s", (version_id,))
         assert cursor.fetchone()[0] > 0
 
@@ -120,7 +134,7 @@ def test_activation_materializes_planned_null_room_sessions_and_rejects_stale_pr
     headers = {"X-Test-Session": "active-manager"}
     round_id, _ = _prepare_round(client, headers, "2041-03-01")
     run = _run(client, headers, round_id)
-    version_id = run["version_id"]
+    version_id = run["versionId"]
 
     with _db() as connection, connection.cursor() as cursor:
         cursor.execute(
@@ -128,7 +142,12 @@ def test_activation_materializes_planned_null_room_sessions_and_rejects_stale_pr
             (version_id,),
         )
         group_id, project_id = cursor.fetchone()
-        cursor.execute("SELECT id FROM projects WHERE id <> %s LIMIT 1", (project_id,))
+        cursor.execute(
+            "SELECT p.id FROM projects p "
+            "WHERE p.id <> %s AND NOT EXISTS "
+            "(SELECT 1 FROM groups g WHERE g.project_id = p.id) LIMIT 1",
+            (project_id,),
+        )
         replacement = cursor.fetchone()
         if replacement:
             cursor.execute("UPDATE groups SET project_id = %s WHERE id = %s", (replacement[0], group_id))
@@ -147,7 +166,7 @@ def test_activation_and_publish_transition_sessions_atomically(client):
     headers = {"X-Test-Session": "active-manager"}
     round_id, _ = _prepare_round(client, headers, "2042-03-01")
     run = _run(client, headers, round_id)
-    version_id = run["version_id"]
+    version_id = run["versionId"]
     activated = client.post(f"/api/v1/schedule/versions/{version_id}/activate", headers=headers)
     assert activated.status_code == 200, activated.text
 
@@ -160,6 +179,15 @@ def test_activation_and_publish_transition_sessions_atomically(client):
         )
         rows = cursor.fetchall()
         assert rows and all(status == "PLANNED" and room_id is None for status, room_id in rows)
+
+    session_id = client.get(f"/api/v1/schedule/versions/{version_id}", headers=headers).json()["sessions"][0]["id"]
+    room_id = client.get("/api/v1/rooms", headers=headers).json()["data"][0]["id"]
+    assigned_room = client.put(
+        f"/api/v1/sessions/{session_id}/room",
+        json={"roomId": room_id},
+        headers=headers,
+    )
+    assert assigned_room.status_code == 200, assigned_room.text
 
     published = client.post(
         f"/api/v1/rounds/{round_id}/schedule/publish/{version_id}", headers=headers

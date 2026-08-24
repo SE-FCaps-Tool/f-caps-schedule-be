@@ -144,7 +144,7 @@ def test_scheduler_requires_accepted_lecturers_and_intersects_group_preference(c
         headers=manager,
     )
     assert day_response.status_code == 201, day_response.text
-    timeslot_id = day_response.json()["timeslot_ids"][0]
+    timeslot_id = day_response.json()["timeslotIds"][0]
 
     with Session(get_engine(get_settings().database_url)) as db, db.begin():
         db.execute(
@@ -154,14 +154,14 @@ def test_scheduler_requires_accepted_lecturers_and_intersects_group_preference(c
 
     invitation_response = client.post(
         f"/api/v1/rounds/{round_id}/invitations",
-        json={"lecturer_ids": [lecturer["id"] for lecturer in lecturers]},
+        json={"lecturerIds": [lecturer["id"] for lecturer in lecturers]},
         headers=manager,
     )
     assert invitation_response.status_code == 200, invitation_response.text
 
     opened = client.post(
         f"/api/v1/rounds/{round_id}/transition",
-        json={"target_status": "OPEN_REGISTRATION"},
+        json={"targetStatus": "OPEN_REGISTRATION"},
         headers=manager,
     )
     assert opened.status_code == 200, opened.text
@@ -216,29 +216,29 @@ def test_scheduler_requires_accepted_lecturers_and_intersects_group_preference(c
 
     run = client.post(
         f"/api/v1/rounds/{round_id}/schedule/run",
-        json={"time_limit_seconds": 5, "random_seed": 17},
+        json={"timeLimitSeconds": 5, "randomSeed": 17},
         headers=manager,
     )
     assert run.status_code == 201, run.text
     body = run.json()
-    assert body["scheduled_count"] == 1
+    assert body["scheduledCount"] == 1
     assert body["unscheduled"] == []
 
     activated = client.post(
-        f"/api/v1/schedule/versions/{body['version_id']}/activate",
+        f"/api/v1/schedule/versions/{body['versionId']}/activate",
         headers=manager,
     )
     assert activated.status_code == 200, activated.text
 
     detail = client.get(
-        f"/api/v1/schedule/versions/{body['version_id']}", headers=manager
+        f"/api/v1/schedule/versions/{body['versionId']}", headers=manager
     )
     assert detail.status_code == 200, detail.text
     session = detail.json()["sessions"][0]
-    assert session["timeslot_id"] == timeslot_id
-    assert set(session["reviewer_ids"]).issubset({lecturer["id"] for lecturer in lecturers})
+    assert session["timeslotId"] == timeslot_id
+    assert set(session["reviewerIds"]).issubset({lecturer["id"] for lecturer in lecturers})
 
-    assigned_lecturer_id = session["reviewer_ids"][0]
+    assigned_lecturer_id = session["reviewerIds"][0]
     lecturer_sessions = client.get(
         "/api/v1/lecturer/me/sessions",
         headers={

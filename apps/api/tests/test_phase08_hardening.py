@@ -76,7 +76,7 @@ def test_round_operation_and_locked_round_unlock_are_authorized_and_audited(clie
     semester_id = next(item["id"] for item in client.get("/api/v1/semesters", headers=manager_headers).json()["data"] if item["code"] == "SE-2026-2027")
     round_response = client.post(
         "/api/v1/rounds",
-        json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "room_types": ["NORMAL"], "session_duration_minutes": 30},
+        json={"semester_id": semester_id, "type": "REVIEW_1", "reviewer_count": 2, "room_types": ["NORMAL"], "session_duration_minutes": 30, "startDate": "2030-03-01", "endDate": "2030-03-01"},
         headers=manager_headers,
     )
     assert round_response.status_code == 201, round_response.text
