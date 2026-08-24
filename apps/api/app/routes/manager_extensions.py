@@ -69,6 +69,7 @@ _PHASE3_PROVENANCE_TABLE = "schedule_assignments"
 router = APIRouter(prefix="/api/v1", tags=["manager-ui-compatibility"])
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
+ImportFile = Annotated[UploadFile, File(...)]
 
 
 def _require(user: CurrentUser, *roles: str) -> None:
@@ -946,9 +947,9 @@ def _lecturer_import_rows(upload: UploadFile) -> list[tuple[int, dict[str, Any]]
 
 @router.post("/lecturers/import", status_code=status.HTTP_201_CREATED, response_model=LecturerImportResponse)
 async def import_lecturers(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    file: ImportFile,
+    db: Db,
+    user: User,
 ) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     rows = _lecturer_import_rows(file)
@@ -992,9 +993,9 @@ async def import_lecturers(
 
 @router.post("/projects/import", status_code=status.HTTP_201_CREATED, response_model=ImportResponse)
 async def import_projects(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    file: ImportFile,
+    db: Db,
+    user: User,
 ) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     sheets = _workbook_rows(file)
@@ -1035,16 +1036,16 @@ async def import_projects(
                 with db.begin_nested():
                     db.execute(text("INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en)"), {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title, "title_vi": title_vi, "title_en": title_en})
                 created += 1
-            except Exception:
+            except Exception:  # noqa: BLE001 - any row failure must be recorded and skipped, not abort the batch.
                 errors.append({"row": index, "code": "PROJECT_DUPLICATE_OR_INVALID"})
     return {"created": created, "skipped": len(errors), "errors": errors}
 
 
 @router.post("/groups/import", status_code=status.HTTP_201_CREATED, response_model=ImportResponse)
 async def import_groups(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    file: ImportFile,
+    db: Db,
+    user: User,
 ) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     sheets = _workbook_rows(file)
@@ -1089,7 +1090,7 @@ async def import_groups(
                     if leader_count != 1:
                         raise ValueError("Exactly one leader is required")
                 created += 1
-            except Exception:
+            except Exception:  # noqa: BLE001 - any row failure must be recorded and skipped, not abort the batch.
                 errors.append({"group_code": group_code, "code": "GROUP_INVALID", "message": "Invalid group row; verify project, students and exactly one leader."})
     return {"created": created, "skipped": len(errors), "errors": errors}
 
