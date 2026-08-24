@@ -1,4 +1,4 @@
-"""Export the current and target OpenAPI wire contracts."""
+"""Export the committed OpenAPI wire contract."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import json
 import os
 import subprocess
 import sys
-from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -37,19 +36,12 @@ def write_spec(path: Path, spec: dict[str, Any]) -> None:
 
 
 def main() -> None:
-    from app.api_contract import camelize_openapi
     from app.main import create_app
 
     commit = current_commit()
-    source_spec = create_app().openapi()
-
-    current_spec = deepcopy(source_spec)
-    current_spec.setdefault("info", {})["x-be-commit"] = commit
-    camel_spec = camelize_openapi(source_spec)
-    camel_spec.setdefault("info", {})["x-be-commit"] = commit
-
-    write_spec(API_ROOT / "openapi.json", current_spec)
-    write_spec(API_ROOT / "openapi.camel.json", camel_spec)
+    spec = create_app().openapi()
+    spec.setdefault("info", {})["x-be-commit"] = commit
+    write_spec(API_ROOT / "openapi.json", spec)
 
 
 if __name__ == "__main__":
