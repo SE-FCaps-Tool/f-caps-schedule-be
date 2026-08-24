@@ -4347,6 +4347,13 @@
       "LoginResponse": {
         "additionalProperties": true,
         "properties": {
+          "availableRoles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Available Roles",
+            "type": "array"
+          },
           "expiresAt": {
             "anyOf": [
               {
@@ -4355,19 +4362,30 @@
               },
               {
                 "type": "string"
+              },
+              {
+                "type": "null"
               }
             ],
             "title": "Expires At"
           },
+          "requiresRoleSelection": {
+            "default": false,
+            "title": "Requires Role Selection",
+            "type": "boolean"
+          },
           "role": {
-            "title": "Role",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
           }
         },
-        "required": [
-          "role",
-          "expiresAt"
-        ],
         "title": "LoginResponse",
         "type": "object"
       },
@@ -6677,6 +6695,33 @@
         "title": "ReviewerSummary",
         "type": "object"
       },
+      "RoleSelectionPayload": {
+        "properties": {
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "RoleSelectionPayload",
+        "type": "object"
+      },
+      "RoleSelectionResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "availableRoles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Available Roles",
+            "type": "array"
+          }
+        },
+        "title": "RoleSelectionResponse",
+        "type": "object"
+      },
       "RoomAssignmentItem": {
         "properties": {
           "roomId": {
@@ -8216,6 +8261,33 @@
       "ScheduleRunResponse": {
         "additionalProperties": true,
         "properties": {
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "objectiveLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Label"
+          },
+          "objectiveProfile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Profile"
+          },
           "scheduledCount": {
             "default": 0,
             "title": "Scheduled Count",
@@ -8241,6 +8313,14 @@
           "versionId": {
             "title": "Version Id",
             "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Versions",
+            "type": "array"
           }
         },
         "required": [
@@ -13624,6 +13704,33 @@
             ],
             "title": "Is Active"
           },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "objectiveLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Label"
+          },
+          "objectiveProfile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Profile"
+          },
           "randomSeed": {
             "anyOf": [
               {
@@ -13824,6 +13931,33 @@
             ],
             "title": "Is Active"
           },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "objectiveLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Label"
+          },
+          "objectiveProfile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Profile"
+          },
           "randomSeed": {
             "anyOf": [
               {
@@ -13961,7 +14095,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "be7d0342c7c7e7552f97d38ce91fdabb4e803a15",
+    "x-be-commit": "aa973c90ece602afe143ccba8fa80f16baa1a2ff",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -14772,6 +14906,88 @@
           }
         },
         "summary": "Authenticated Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/pending": {
+      "get": {
+        "operationId": "pending_role_selection_api_v1_auth_pending_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleSelectionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Pending Role Selection",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/select-role": {
+      "post": {
+        "operationId": "select_role_api_v1_auth_select_role_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleSelectionPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Select Role",
         "tags": [
           "auth"
         ]

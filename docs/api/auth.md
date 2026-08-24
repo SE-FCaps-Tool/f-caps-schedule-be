@@ -20,8 +20,17 @@ Dùng cho health check của FE/dev tooling, không dùng để xác định use
 - **Success `200`:**
 
 ```json
-{ "role": "MANAGER", "expires_at": "2026-08-19T03:00:00+00:00" }
+{ "role": "MANAGER", "expiresAt": "2026-08-19T03:00:00+00:00", "requiresRoleSelection": false, "availableRoles": ["MANAGER"] }
 ```
+
+Nếu account có nhiều role, BE chưa tạo session mà trả:
+
+```json
+{ "role": null, "expiresAt": null, "requiresRoleSelection": true, "availableRoles": ["ADMIN", "MANAGER", "LECTURER"] }
+```
+
+FE chuyển người dùng tới màn hình chọn role. Challenge được giữ trong HttpOnly cookie
+`scheduler_login_challenge` và hết hạn sau 10 phút.
 
 - **Set-Cookie:** session cookie HttpOnly và `scheduler_csrf` readable by JavaScript. Tên session cookie có thể cấu hình, vì vậy FE chỉ nên dùng `credentials: "include"`.
 - **`401`:** `Invalid credentials` nếu email/password sai hoặc account không active.
@@ -49,7 +58,7 @@ await fetch(`${API_URL}/api/v1/auth/login`, {
 { "status": "signed_out" }
 ```
 
-Backend xóa session cookie và `scheduler_csrf`. FE nên reset toàn bộ cached user/query sau khi gọi.
+Backend xóa session cookie, `scheduler_csrf` và login challenge nếu còn. FE nên reset toàn bộ cached user/query sau khi gọi.
 
 ## Google OAuth
 
@@ -69,6 +78,29 @@ chối. Role vẫn lấy từ `account_roles`, không lấy từ Google.
 - BE xác minh code, ID token, issuer, audience, nonce và `email_verified`, sau đó tạo cùng loại
   session/CSRF cookie như login mật khẩu.
 - Thành công redirect về FE `/auth/callback`; thất bại redirect về `/login?oauth_error=...`.
+- Account có nhiều role sẽ được redirect về `/auth/callback`, sau đó FE gọi `GET /api/v1/auth/pending`
+  và hiển thị màn hình chọn role. Google callback URL và các scope hiện tại không thay đổi.
+
+## Chọn role sau đăng nhập
+
+### `GET /api/v1/auth/pending`
+
+Đọc challenge HttpOnly của lần đăng nhập vừa xác thực.
+
+```json
+{ "availableRoles": ["ADMIN", "MANAGER", "LECTURER"] }
+```
+
+### `POST /api/v1/auth/select-role`
+
+- **Auth:** dùng challenge cookie, chưa cần session đầy đủ.
+- **Body:** `{ "role": "MANAGER" }`.
+- **Success:** tạo session gắn với role đã chọn và trả cùng shape `LoginResponse` với `role` đã chọn.
+- **403 `ROLE_NOT_ASSIGNED`:** role không thuộc account.
+- **401 `ROLE_SELECTION_EXPIRED`:** challenge đã dùng hoặc hết hạn; yêu cầu đăng nhập lại.
+
+Mọi request sau đó, bao gồm `GET /api/v1/auth/me`, dùng role đã gắn trong session. Không suy ra
+role bằng cách lấy role đầu tiên từ `account_roles` nữa.
 
 ## `GET /api/v1/auth/me`
 

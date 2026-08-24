@@ -25,8 +25,18 @@ class TargetResponseModel(ResponseModel):
 
 
 class LoginResponse(ResponseModel):
+    role: str | None = None
+    expires_at: datetime | str | None = None
+    requires_role_selection: bool = False
+    available_roles: list[str] = Field(default_factory=list)
+
+
+class RoleSelectionResponse(ResponseModel):
+    available_roles: list[str] = Field(default_factory=list)
+
+
+class RoleSelectionPayload(BaseModel):
     role: str
-    expires_at: datetime | str
 
 
 class LogoutResponse(ResponseModel):
