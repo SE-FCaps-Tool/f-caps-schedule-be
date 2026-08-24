@@ -39,6 +39,7 @@ from app.domain.round_setup import validate_round_configuration
 from app.response_models import (
     ActionResponse,
     GroupDetailResponse,
+    GroupOverviewResponse,
     GroupResponse,
     ImportResponse,
     InvitationResponse,
@@ -627,6 +628,117 @@ def get_group_detail(group_id: Annotated[int, Path(alias="groupId")], db: Db, us
         {"id": group_id},
     ).mappings().all()
     return {**dict(row), "members": [dict(item) for item in members]}
+
+
+@router.get("/groups/{groupId}/overview", response_model=ApiDataEnvelope[GroupOverviewResponse])
+def get_group_overview(group_id: Annotated[int, Path(alias="groupId")], db: Db, user: User) -> dict[str, Any]:
+    """Return the bounded read model used by the Manager Group 360 screen."""
+    _require(user, "ADMIN", "MANAGER")
+    group = db.execute(
+        text(
+            "SELECT g.id, g.code, g.status, p.id AS project_id, p.code AS project_code, "
+            "COALESCE(p.title_en, p.title_vi, p.title) AS project_name, p.status AS project_status, "
+            "sem.id AS semester_id, sem.code AS semester_code, sem.name AS semester_name "
+            "FROM groups g LEFT JOIN projects p ON p.id = g.project_id "
+            "LEFT JOIN semesters sem ON sem.id = p.semester_id WHERE g.id = :group_id"
+        ),
+        {"group_id": group_id},
+    ).mappings().one_or_none()
+    if group is None:
+        raise HTTPException(status_code=404, detail={"code": "GROUP_NOT_FOUND", "message": "Group does not exist."})
+
+    members = [dict(row) for row in db.execute(
+        text(
+            "SELECT gm.id AS membership_id, st.id AS student_id, st.student_code, "
+            "a.display_name AS full_name, gm.membership_role AS role, gm.status, gm.left_at "
+            "FROM group_memberships gm JOIN students st ON st.id = gm.student_id "
+            "LEFT JOIN accounts a ON a.id = st.account_id WHERE gm.group_id = :group_id "
+            "ORDER BY CASE WHEN gm.membership_role = 'LEADER' THEN 0 ELSE 1 END, st.student_code"
+        ),
+        {"group_id": group_id},
+    ).mappings().all()]
+    supervisors = db.execute(
+        text(
+            "SELECT ps.supervisor_type, l.id, l.lecturer_code AS code, a.display_name AS full_name "
+            "FROM project_supervisors ps JOIN lecturers l ON l.id = ps.lecturer_id "
+            "JOIN accounts a ON a.id = l.account_id WHERE ps.project_id = :project_id "
+            "ORDER BY ps.supervisor_type, l.id"
+        ),
+        {"project_id": group["project_id"] or 0},
+    ).mappings().all()
+    supervisor_map = {
+        str(row["supervisor_type"]): {"id": row["id"], "code": row["code"], "full_name": row["full_name"]}
+        for row in supervisors
+    }
+    progress_rows = db.execute(
+        text(
+            "SELECT r.id AS round_id, r.type AS round_type, r.status AS round_status, "
+            "s.id AS session_id, s.status AS session_status, s.start_at AS scheduled_at, rm.code AS room_code, "
+            "sr.id AS result_id, sr.outcome, sr.note, sr.entered_at, sr.verify_status, "
+            "rc.id AS remediation_id, rc.status AS remediation_status, rc.due_at, "
+            "rc.verifier_lecturer_id, rc.note AS remediation_note "
+            "FROM round_groups rg JOIN rounds r ON r.id = rg.round_id "
+            "LEFT JOIN LATERAL ("
+            "  SELECT s.* FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+            "  WHERE s.group_id = rg.group_id AND sv.round_id = r.id AND sv.status IN ('ACTIVE', 'PUBLISHED') "
+            "  ORDER BY sv.activated_at DESC NULLS LAST, sv.version_no DESC, s.id DESC LIMIT 1"
+            ") s ON TRUE LEFT JOIN rooms rm ON rm.id = s.room_id "
+            "LEFT JOIN session_results sr ON sr.session_id = s.id "
+            "LEFT JOIN remediation_cases rc ON rc.session_result_id = sr.id "
+            "WHERE rg.group_id = :group_id ORDER BY COALESCE(s.start_at, r.created_at), r.id"
+        ),
+        {"group_id": group_id},
+    ).mappings().all()
+
+    rounds: list[dict[str, Any]] = []
+    active_remediation: dict[str, Any] | None = None
+    for row in progress_rows:
+        result = None
+        if row["result_id"] is not None:
+            result = {
+                "id": row["result_id"], "outcome": str(row["outcome"]), "note": row["note"],
+                "entered_at": row["entered_at"], "verify_status": row["verify_status"],
+            }
+        rounds.append({
+            "round_id": row["round_id"], "round_type": str(row["round_type"]),
+            "round_status": str(row["round_status"]), "session_id": row["session_id"],
+            "session_status": str(row["session_status"]) if row["session_status"] is not None else None,
+            "scheduled_at": row["scheduled_at"], "room_code": row["room_code"], "result": result,
+        })
+        if row["remediation_id"] is not None and row["remediation_status"] not in {"PASSED", "FAILED"} and (
+            active_remediation is None or row["remediation_id"] > active_remediation["id"]
+        ):
+            active_remediation = {
+                "id": row["remediation_id"], "status": str(row["remediation_status"]),
+                "due_at": row["due_at"], "verifier_lecturer_id": row["verifier_lecturer_id"],
+                "note": row["remediation_note"], "round_type": str(row["round_type"]),
+            }
+
+    leader = next((member for member in members if str(member["role"]) == "LEADER" and str(member["status"]) == "ACTIVE"), None)
+    warnings: list[dict[str, str]] = []
+    if group["project_id"] is None:
+        warnings.append({"code": "NO_PROJECT", "message": "Group has no assigned project."})
+    if leader is None:
+        warnings.append({"code": "NO_LEADER", "message": "Group has no active leader."})
+    if len([member for member in members if str(member["status"]) == "ACTIVE"]) < 4:
+        warnings.append({"code": "FEWER_THAN_RECOMMENDED_MEMBERS", "message": "Group has fewer than recommended members."})
+
+    payload = {
+        "id": group["id"], "code": group["code"], "status": str(group["status"]),
+        "semester": {"id": group["semester_id"], "code": group["semester_code"], "name": group["semester_name"]}
+        if group["semester_id"] is not None else None,
+        "member_count": len([member for member in members if str(member["status"]) == "ACTIVE"]),
+        "leader": leader,
+        "members": members,
+        "project": {
+            "id": group["project_id"], "code": group["project_code"], "name": group["project_name"],
+            "status": str(group["project_status"]),
+            "main_supervisor": supervisor_map.get("MAIN"), "co_supervisor": supervisor_map.get("CO"),
+        } if group["project_id"] is not None else None,
+        "progress": {"group_status": str(group["status"]), "rounds": rounds},
+        "remediation": active_remediation, "warnings": warnings,
+    }
+    return success_payload(payload)
 
 
 @router.get("/rounds/{roundId}/invitations", response_model=list[InvitationResponse])

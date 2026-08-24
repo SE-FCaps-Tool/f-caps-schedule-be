@@ -7,6 +7,7 @@ def test_phase03_target_group_project_routes_are_in_openapi():
         ("get", "/api/v1/semesters/{semesterId}/groups"),
         ("post", "/api/v1/semesters/{semesterId}/groups"),
         ("get", "/api/v1/groups/{groupId}/members"),
+        ("get", "/api/v1/groups/{groupId}/overview"),
         ("post", "/api/v1/groups/{groupId}/actions/change-leader"),
         ("post", "/api/v1/groups/{groupId}/members/{membershipId}/actions/leave"),
         ("put", "/api/v1/groups/{groupId}/project"),

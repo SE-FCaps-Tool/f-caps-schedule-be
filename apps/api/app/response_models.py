@@ -169,6 +169,83 @@ class GroupDetailResponse(GroupResponse):
     members: list[GroupMemberResponse] = Field(default_factory=list)
 
 
+class GroupOverviewMemberResponse(TargetResponseModel):
+    membership_id: int
+    student_id: int
+    student_code: str
+    full_name: str | None = None
+    role: str
+    status: str
+    left_at: datetime | None = None
+
+
+class GroupOverviewSupervisorResponse(TargetResponseModel):
+    id: int
+    code: str
+    full_name: str | None = None
+
+
+class GroupOverviewProjectResponse(TargetResponseModel):
+    id: int
+    code: str
+    name: str
+    status: str
+    main_supervisor: GroupOverviewSupervisorResponse | None = None
+    co_supervisor: GroupOverviewSupervisorResponse | None = None
+
+
+class GroupOverviewResultResponse(TargetResponseModel):
+    id: int
+    outcome: str
+    note: str | None = None
+    entered_at: datetime
+    verify_status: str | None = None
+
+
+class GroupOverviewRoundResponse(TargetResponseModel):
+    round_id: int
+    round_type: str
+    round_status: str
+    session_id: int | None = None
+    session_status: str | None = None
+    scheduled_at: datetime | None = None
+    room_code: str | None = None
+    result: GroupOverviewResultResponse | None = None
+
+
+class GroupOverviewProgressResponse(TargetResponseModel):
+    group_status: str
+    rounds: list[GroupOverviewRoundResponse] = Field(default_factory=list)
+
+
+class GroupOverviewRemediationResponse(TargetResponseModel):
+    id: int
+    status: str
+    due_at: datetime
+    verifier_lecturer_id: int | None = None
+    note: str | None = None
+    round_type: str
+
+
+class GroupOverviewWarningResponse(TargetResponseModel):
+    code: str
+    message: str
+
+
+class GroupOverviewResponse(TargetResponseModel):
+    id: int
+    code: str
+    status: str
+    semester: dict[str, Any] | None = None
+    member_count: int
+    leader: GroupOverviewMemberResponse | None = None
+    members: list[GroupOverviewMemberResponse] = Field(default_factory=list)
+    project: GroupOverviewProjectResponse | None = None
+    progress: GroupOverviewProgressResponse
+    remediation: GroupOverviewRemediationResponse | None = None
+    warnings: list[GroupOverviewWarningResponse] = Field(default_factory=list)
+
+
 class LecturerResponse(ResponseModel):
     id: int
     lecturer_code: str
