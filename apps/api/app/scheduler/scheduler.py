@@ -1,11 +1,19 @@
 from collections import defaultdict
 from datetime import datetime
+from itertools import pairwise
+from typing import Any
 
 from ortools.sat.python import cp_model
 
 from app.domain.errors import DomainError
 from app.scheduler.candidates import generate_candidates, reason_for_unscheduled
-from app.scheduler.models import RoundInput, ScheduledSession, SolverResult
+from app.scheduler.models import (
+    Candidate,
+    RoundInput,
+    ScheduledSession,
+    SchedulerObjectiveProfile,
+    SolverResult,
+)
 from app.scheduler.validator import validate_schedule
 
 
@@ -21,12 +29,11 @@ def solve_schedule(
     reviewers: list[int],
     time_limit_seconds: float = 10,
     random_seed: int = 0,
+    objective_profile: SchedulerObjectiveProfile = "LEGACY",
+    candidate_pool: list[Candidate] | None = None,
 ) -> SolverResult:
-    candidates = generate_candidates(
-        context,
-        groups=groups,
-        timeslots=timeslots,
-        reviewers=reviewers,
+    candidates = candidate_pool if candidate_pool is not None else generate_candidates(
+        context, groups=groups, timeslots=timeslots, reviewers=reviewers
     )
     if not candidates:
         unscheduled = tuple(
@@ -38,7 +45,16 @@ def solve_schedule(
             )
             for group_id in sorted(groups)
         )
-        return SolverResult("PARTIAL", (), unscheduled, _empty_soft_scores(), random_seed, 0)
+        return SolverResult(
+            "PARTIAL",
+            (),
+            unscheduled,
+            _empty_soft_scores(),
+            random_seed,
+            0,
+            objective_profile,
+            _schedule_metrics(()),
+        )
 
     model = cp_model.CpModel()
     variables = [model.new_bool_var(f"candidate_{index}") for index in range(len(candidates))]
@@ -95,7 +111,7 @@ def solve_schedule(
     secondary_bound = sum(abs(score) for score in weighted_scores)
     balance_weight = (
         max(0, context.soft_weights.get("S1", 1))
-        if context.h12_semester_quota is not None
+        if context.h12_semester_quota is not None and objective_profile == "LEGACY"
         else 0
     )
     balance_expression = 0
@@ -120,10 +136,26 @@ def solve_schedule(
         balance_expression = balance_weight * (minimum_load - maximum_load)
         balance_bound = balance_weight * load_upper_bound
 
-    primary_bonus = secondary_bound + balance_bound + 1
+    profile_expression = 0
+    profile_bound = 0
+    if objective_profile == "LECTURER_COMPACT":
+        profile_expression, profile_bound = _add_compactness_objective(
+            model, variables, candidates, reviewers
+        )
+    elif objective_profile == "LOAD_BALANCED":
+        profile_expression, profile_bound = _add_load_balance_objective(
+            model, variables, candidates, reviewers, groups, context
+        )
+    elif objective_profile == "EARLY_FINISH":
+        profile_expression, profile_bound = _add_early_finish_objective(
+            model, variables, candidates
+        )
+
+    primary_bonus = secondary_bound + balance_bound + profile_bound + 1
     model.maximize(
         sum((primary_bonus + weighted_scores[index]) * variables[index] for index in range(len(candidates)))
         + balance_expression
+        + profile_expression
     )
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_seconds
@@ -177,6 +209,8 @@ def solve_schedule(
         soft_scores,
         random_seed,
         int(solver.objective_value),
+        objective_profile,
+        _schedule_metrics(sessions),
     )
 
 
@@ -221,6 +255,171 @@ def _add_resource_overlap_constraints(
 
 def _empty_soft_scores() -> dict[str, int]:
     return {f"S{i}": 0 for i in range(1, 10)}
+
+
+def _add_compactness_objective(
+    model: cp_model.CpModel,
+    variables: list[cp_model.IntVar],
+    candidates: list[Candidate],
+    reviewers: list[int],
+) -> tuple[cp_model.LinearExpr, int]:
+    """Reward directly adjacent occupied slots for each reviewer/day.
+
+    A reviewer can only occupy one candidate at a time because the overlap
+    constraints are already installed. The occupancy variables therefore let
+    the objective prefer one compact work block without changing feasibility.
+    Breaks represented by a real time gap are intentionally not considered
+    adjacent, so availability and configured breaks remain respected.
+    """
+    slots_by_reviewer_day: dict[tuple[int, str], dict[int, list[int]]] = defaultdict(dict)
+    slot_times: dict[tuple[str, int], tuple[datetime, datetime]] = {}
+    for index, candidate in enumerate(candidates):
+        slot_times[(candidate.day, candidate.timeslot_id)] = (candidate.start_at, candidate.end_at)
+        for reviewer_id in candidate.reviewer_ids:
+            bucket = slots_by_reviewer_day.setdefault((reviewer_id, candidate.day), {})
+            bucket.setdefault(candidate.timeslot_id, []).append(index)
+
+    adjacency_terms: list[cp_model.IntVar] = []
+    possible_edges = 0
+    for (reviewer_id, day), slot_map in slots_by_reviewer_day.items():
+        ordered_slots = sorted(
+            slot_map,
+            key=lambda slot_id: (slot_times[(day, slot_id)][0], slot_times[(day, slot_id)][1], slot_id),
+        )
+        occupied: list[cp_model.IntVar] = []
+        for slot_id in ordered_slots:
+            occupied_var = model.new_bool_var(f"occupied_{reviewer_id}_{day}_{slot_id}")
+            indexes = slot_map[slot_id]
+            model.add(occupied_var == sum(variables[index] for index in indexes))
+            occupied.append(occupied_var)
+        for previous_slot, current_slot, previous, current in zip(
+            ordered_slots, ordered_slots[1:], occupied, occupied[1:]
+        ):
+            previous_end = slot_times[(day, previous_slot)][1]
+            current_start = slot_times[(day, current_slot)][0]
+            if previous_end != current_start:
+                continue
+            possible_edges += 1
+            adjacent = model.new_bool_var(f"adjacent_{reviewer_id}_{day}_{current_slot}")
+            model.add_bool_and([previous, current]).only_enforce_if(adjacent)
+            model.add_bool_or([previous.Not(), current.Not()]).only_enforce_if(adjacent.Not())
+            adjacency_terms.append(adjacent)
+
+    return 100 * sum(adjacency_terms), possible_edges * 100
+
+
+def _add_load_balance_objective(
+    model: cp_model.CpModel,
+    variables: list[cp_model.IntVar],
+    candidates: list[Candidate],
+    reviewers: list[int],
+    groups: list[int],
+    context: RoundInput,
+) -> tuple[cp_model.LinearExpr, int]:
+    if not reviewers:
+        return 0, 0
+    load_upper_bound = max(context.existing_semester_load.values(), default=0) + len(groups)
+    loads: list[cp_model.IntVar] = []
+    minutes: list[cp_model.IntVar] = []
+    max_duration = max(
+        (max(0, int((candidate.end_at - candidate.start_at).total_seconds() // 60)) for candidate in candidates),
+        default=0,
+    )
+    minute_upper_bound = max_duration * len(groups)
+    for reviewer_id in reviewers:
+        load = model.new_int_var(0, load_upper_bound, f"profile_load_{reviewer_id}")
+        assigned = sum(
+            variables[index]
+            for index, candidate in enumerate(candidates)
+            if reviewer_id in candidate.reviewer_ids
+        )
+        model.add(load == context.existing_semester_load.get(reviewer_id, 0) + assigned)
+        loads.append(load)
+        minute_load = model.new_int_var(0, minute_upper_bound, f"profile_minutes_{reviewer_id}")
+        model.add(
+            minute_load
+            == sum(
+                max(0, int((candidate.end_at - candidate.start_at).total_seconds() // 60))
+                * variables[index]
+                for index, candidate in enumerate(candidates)
+                if reviewer_id in candidate.reviewer_ids
+            )
+        )
+        minutes.append(minute_load)
+
+    minimum_load = model.new_int_var(0, load_upper_bound, "profile_minimum_load")
+    maximum_load = model.new_int_var(0, load_upper_bound, "profile_maximum_load")
+    model.add_min_equality(minimum_load, loads)
+    model.add_max_equality(maximum_load, loads)
+    minimum_minutes = model.new_int_var(0, minute_upper_bound, "profile_minimum_minutes")
+    maximum_minutes = model.new_int_var(0, minute_upper_bound, "profile_maximum_minutes")
+    model.add_min_equality(minimum_minutes, minutes)
+    model.add_max_equality(maximum_minutes, minutes)
+    load_spread = maximum_load - minimum_load
+    minute_spread = maximum_minutes - minimum_minutes
+    compactness_expression, compactness_bound = _add_compactness_objective(
+        model, variables, candidates, reviewers
+    )
+    return (
+        -1000 * load_spread - minute_spread + compactness_expression,
+        load_upper_bound * 1000 + minute_upper_bound + compactness_bound,
+    )
+
+
+def _add_early_finish_objective(
+    model: cp_model.CpModel,
+    variables: list[cp_model.IntVar],
+    candidates: list[Candidate],
+) -> tuple[cp_model.LinearExpr, int]:
+    if not candidates:
+        return 0, 0
+    origin = min(candidate.start_at for candidate in candidates)
+    end_offsets = [max(0, int((candidate.end_at - origin).total_seconds() // 60)) for candidate in candidates]
+    start_offsets = [max(0, int((candidate.start_at - origin).total_seconds() // 60)) for candidate in candidates]
+    latest_end = model.new_int_var(0, max(end_offsets), "profile_latest_end")
+    for variable, end_offset in zip(variables, end_offsets):
+        model.add(latest_end >= end_offset).only_enforce_if(variable)
+    expression = -1000 * latest_end - sum(
+        start_offsets[index] * variables[index] for index in range(len(candidates))
+    )
+    return expression, max(end_offsets) * 1000 + max(start_offsets) * len(candidates)
+
+
+def _schedule_metrics(sessions: tuple[ScheduledSession, ...]) -> dict[str, Any]:
+    by_reviewer_day: dict[tuple[int, str], list[ScheduledSession]] = defaultdict(list)
+    loads: dict[int, int] = defaultdict(int)
+    minute_loads: dict[int, int] = defaultdict(int)
+    for session in sessions:
+        duration = max(0, int((session.end_at - session.start_at).total_seconds() // 60))
+        for reviewer_id in session.reviewer_ids:
+            by_reviewer_day[(reviewer_id, session.day)].append(session)
+            loads[reviewer_id] += 1
+            minute_loads[reviewer_id] += duration
+
+    block_count = 0
+    idle_minutes = 0
+    for reviewer_sessions in by_reviewer_day.values():
+        ordered = sorted(reviewer_sessions, key=lambda session: (session.start_at, session.end_at, session.group_id))
+        if not ordered:
+            continue
+        block_count += 1
+        for previous, current in pairwise(ordered):
+            gap = max(0, int((current.start_at - previous.end_at).total_seconds() // 60))
+            idle_minutes += gap
+            if gap > 0:
+                block_count += 1
+
+    latest_end = max((session.end_at for session in sessions), default=None)
+    load_values = list(loads.values())
+    minute_values = list(minute_loads.values())
+    return {
+        "reviewer_block_count": block_count,
+        "reviewer_idle_minutes": idle_minutes,
+        "reviewer_load_spread": max(load_values, default=0) - min(load_values, default=0),
+        "reviewer_minute_spread": max(minute_values, default=0) - min(minute_values, default=0),
+        "latest_end_at": latest_end.isoformat() if latest_end is not None else None,
+        "scheduled_groups": len(sessions),
+    }
 
 
 def _candidate_soft_scores(candidate: object, context: RoundInput) -> dict[str, int]:

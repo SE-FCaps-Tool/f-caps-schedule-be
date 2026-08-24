@@ -99,3 +99,69 @@ def test_solver_balances_reviewer_load_when_quota_and_s1_are_configured():
     assert set(loads) == set(reviewers)
     assert max(loads.values()) / min(loads.values()) <= 1.5
     assert validate_schedule(result.sessions, context).valid
+
+
+def test_solver_supports_all_manager_objective_profiles_and_reports_metrics():
+    groups = [1, 2, 3, 4]
+    reviewers = [10, 11]
+    base = datetime(2030, 1, 7, 9, tzinfo=UTC)
+    timeslots = [
+        (
+            index + 1,
+            base + timedelta(minutes=30 * index),
+            base + timedelta(minutes=30 * (index + 1)),
+            base.date().isoformat(),
+            "AM",
+        )
+        for index in range(4)
+    ]
+    context = RoundInput(
+        round_type="REVIEW_1_1",
+        expected_reviewer_count=1,
+        group_status={group_id: "PENDING_D11" for group_id in groups},
+        group_project={group_id: 1000 + group_id for group_id in groups},
+        project_supervisors={1000 + group_id: set() for group_id in groups},
+        lecturer_availability={(reviewer_id, slot[0]) for reviewer_id in reviewers for slot in timeslots},
+        conflicts=set(),
+        group_selected_slots={},
+        group_selection_mode=False,
+        prior_reviewer_ids={},
+        remediation_verifier_ids={},
+        h11_waiver_groups=set(),
+        h12_sessions_per_part=4,
+        h12_sessions_per_day=8,
+        h12_semester_quota=None,
+        existing_semester_load={},
+    )
+
+    results = {}
+    for profile in ("LECTURER_COMPACT", "LOAD_BALANCED", "EARLY_FINISH"):
+        result = solve_schedule(
+            context,
+            groups=groups,
+            timeslots=timeslots,
+            reviewers=reviewers,
+            time_limit_seconds=5,
+            random_seed=23,
+            objective_profile=profile,
+        )
+        results[profile] = result
+
+        assert result.objective_profile == profile
+        assert len(result.sessions) == len(groups)
+        assert result.metrics["scheduled_groups"] == len(groups)
+        assert result.metrics["latest_end_at"] is not None
+        assert validate_schedule(result.sessions, context).valid
+
+    assert results["LECTURER_COMPACT"].metrics["reviewer_block_count"] < results["LOAD_BALANCED"].metrics[
+        "reviewer_block_count"
+    ]
+    assert results["LECTURER_COMPACT"].metrics["reviewer_idle_minutes"] <= results["LOAD_BALANCED"].metrics[
+        "reviewer_idle_minutes"
+    ]
+    assert results["LOAD_BALANCED"].metrics["reviewer_load_spread"] <= results["LECTURER_COMPACT"].metrics[
+        "reviewer_load_spread"
+    ]
+    assert results["EARLY_FINISH"].metrics["latest_end_at"] < results["LECTURER_COMPACT"].metrics[
+        "latest_end_at"
+    ]

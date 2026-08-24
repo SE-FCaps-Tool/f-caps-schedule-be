@@ -68,7 +68,9 @@ def test_phase03_migration_reconstructs_legacy_drafts_and_cascades_scheduler_job
 def test_generate_persists_assignments_only_and_leaves_round_scheduling():
     from app.routes import schedule_operations
 
-    source = _function_source(schedule_operations, "run_scheduler")
+    source = _function_source(schedule_operations, "run_scheduler") + _function_source(
+        schedule_operations, "_persist_generated_schedule_draft"
+    )
     assert "schedule_assignments" in source
     assert "schedule_assignment_reviewers" in source
     assert "'DRAFT'" in source or '"DRAFT"' in source

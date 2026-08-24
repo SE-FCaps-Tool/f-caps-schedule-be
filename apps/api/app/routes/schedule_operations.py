@@ -31,7 +31,12 @@ from app.response_models import (
     VersionSummaryResponse,
 )
 from app.scheduler.candidates import generate_candidates
-from app.scheduler.models import RoundInput, ScheduledSession
+from app.scheduler.models import (
+    RoundInput,
+    ScheduledSession,
+    SchedulerObjectiveProfile,
+    SolverResult,
+)
 from app.scheduler.scheduler import solve_schedule
 from app.scheduler.snapshot import build_input_snapshot
 from app.scheduler.validator import validate_schedule
@@ -61,6 +66,12 @@ router = APIRouter(prefix="/api/v1", tags=["schedule-operations"])
 CONTROLLED_CHANGE_PATH = "/schedule/versions/{versionId}/sessions/{sessionId}/controlled-change"
 Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
+
+SCHEDULE_VARIANT_PROFILES: tuple[tuple[SchedulerObjectiveProfile, str], ...] = (
+    ("LECTURER_COMPACT", "Liền mạch GV"),
+    ("LOAD_BALANCED", "Cân bằng tải"),
+    ("EARLY_FINISH", "Kết thúc sớm"),
+)
 
 
 def _require(user: CurrentUser, *roles: str) -> None:
@@ -598,7 +609,8 @@ def list_schedule_versions(round_id: Annotated[int, Path(alias="roundId")], db: 
         db.execute(
             text(
                 "SELECT id, round_id, version_no, status, solver_status, total_score, soft_scores, "
-                "random_seed, created_at, activated_at FROM schedule_versions WHERE round_id = :round_id ORDER BY version_no"
+                "random_seed, algorithm_parameters, created_at, activated_at "
+                "FROM schedule_versions WHERE round_id = :round_id ORDER BY version_no"
             ),
             {"round_id": round_id},
         )
@@ -646,6 +658,12 @@ def _version_ui(row: Any) -> dict[str, Any]:
     payload = dict(row)
     payload["is_active"] = payload.get("status") in {"ACTIVE", "PUBLISHED"}
     payload["ui_status"] = payload.get("status")
+    parameters = payload.get("algorithm_parameters") or {}
+    payload["objective_profile"] = parameters.get("objective_profile")
+    payload["objective_label"] = parameters.get("objective_label")
+    payload["metrics"] = parameters.get("metrics") or {}
+    payload["scheduled_count"] = parameters.get("scheduled_count", payload["metrics"].get("scheduled_groups", 0))
+    payload["unscheduled_count"] = parameters.get("unscheduled_count", 0)
     return payload
 
 
@@ -700,6 +718,147 @@ def delete_draft_version(version_id: Annotated[int, Path(alias="versionId")], db
     return {"id": version_id, "deleted": True}
 
 
+def _persist_generated_schedule_draft(
+    db: Session,
+    *,
+    round_id: int,
+    context: RoundInput,
+    groups: list[int],
+    timeslots: list[tuple[Any, ...]],
+    payload: ScheduleRunPayload,
+    actor_id: int | None,
+    result: SolverResult,
+    profile: SchedulerObjectiveProfile,
+    profile_label: str,
+    version_no: int,
+) -> dict[str, Any]:
+    snapshot = build_input_snapshot(
+        round_id=round_id,
+        context=context,
+        groups=groups,
+        timeslots=[row[0] for row in timeslots],
+        reviewer_assignments={
+            session.group_id: list(session.reviewer_ids) for session in result.sessions
+        },
+        soft_weights=context.soft_weights,
+    )
+    snapshot["unscheduled"] = [reason.__dict__ for reason in result.unscheduled]
+    parameters = payload.model_dump()
+    parameters.update(
+        {
+            "objective_profile": profile,
+            "objective_label": profile_label,
+            "metrics": result.metrics,
+            "scheduled_count": len(result.sessions),
+            "unscheduled_count": len(result.unscheduled),
+        }
+    )
+    version_id = db.execute(
+        text(
+            "INSERT INTO schedule_versions (round_id, version_no, status, input_snapshot, algorithm_parameters, "
+            "random_seed, solver_status, total_score, soft_scores, created_by) VALUES "
+            "(:round_id, :version_no, 'DRAFT', CAST(:snapshot AS JSONB), CAST(:parameters AS JSONB), :seed, "
+            ":solver_status, :score, CAST(:soft_scores AS JSONB), :created_by) RETURNING id"
+        ),
+        {
+            "round_id": round_id,
+            "version_no": version_no,
+            "snapshot": _json(snapshot),
+            "parameters": _json(parameters),
+            "seed": result.random_seed,
+            "solver_status": result.status,
+            "score": result.objective,
+            "soft_scores": _json(result.soft_scores),
+            "created_by": actor_id,
+        },
+    ).scalar_one()
+
+    for session in result.sessions:
+        assignment_id = db.execute(
+            text(
+                "INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,start_at,end_at) "
+                "VALUES (:version_id,:group_id,:project_id,:timeslot_id,:start_at,:end_at) RETURNING id"
+            ),
+            {
+                "version_id": version_id,
+                "group_id": session.group_id,
+                "project_id": context.group_project[session.group_id],
+                "timeslot_id": session.timeslot_id,
+                "start_at": session.start_at,
+                "end_at": session.end_at,
+            },
+        ).scalar_one()
+        names = db.execute(
+            text(
+                "SELECT l.id, a.display_name FROM lecturers l JOIN accounts a ON a.id = l.account_id "
+                "WHERE l.id = ANY(:ids)"
+            ),
+            {"ids": list(session.reviewer_ids) or [0]},
+        ).all()
+        name_map = {row[0]: row[1] for row in names}
+        for reviewer_index, lecturer_id in enumerate(session.reviewer_ids):
+            db.execute(
+                text(
+                    "INSERT INTO schedule_assignment_reviewers (assignment_id, lecturer_id, is_result_owner, snapshot_name) "
+                    "VALUES (:assignment_id, :lecturer_id, :is_owner, :snapshot_name)"
+                ),
+                {
+                    "assignment_id": assignment_id,
+                    "lecturer_id": lecturer_id,
+                    "is_owner": context.result_owner_mode
+                    and context.round_type in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"}
+                    and reviewer_index == 0,
+                    "snapshot_name": name_map.get(lecturer_id, str(lecturer_id)),
+                },
+            )
+
+    job_status = "PARTIAL" if result.unscheduled else "COMPLETED"
+    db.execute(
+        text(
+            "INSERT INTO scheduler_jobs (round_id, status, input_snapshot, algorithm_parameters, random_seed, schedule_version_id) "
+            "VALUES (:round_id, :status, CAST(:snapshot AS JSONB), CAST(:parameters AS JSONB), :seed, :version_id)"
+        ),
+        {
+            "round_id": round_id,
+            "status": job_status,
+            "snapshot": _json(snapshot),
+            "parameters": _json(parameters),
+            "seed": result.random_seed,
+            "version_id": version_id,
+        },
+    )
+    db.execute(
+        text(
+            "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
+            "VALUES (:actor_id, 'SCHEDULER_RUN', 'schedule_version', :entity_id, CAST(:after_json AS JSONB))"
+        ),
+        {
+            "actor_id": actor_id,
+            "entity_id": str(version_id),
+            "after_json": _json(
+                {
+                    "round_id": round_id,
+                    "status": result.status,
+                    "objective_profile": profile,
+                }
+            ),
+        },
+    )
+    return {
+        "version_id": version_id,
+        "version_no": version_no,
+        "status": "DRAFT",
+        "objective_profile": profile,
+        "objective_label": profile_label,
+        "scheduled_count": len(result.sessions),
+        "unscheduled_count": len(result.unscheduled),
+        "unscheduled": [reason.__dict__ for reason in result.unscheduled],
+        "soft_scores": result.soft_scores,
+        "metrics": result.metrics,
+        "objective": result.objective,
+    }
+
+
 @router.post("/rounds/{roundId}/schedule/run", status_code=status.HTTP_201_CREATED, response_model=ScheduleRunResponse)
 def run_scheduler(round_id: Annotated[int, Path(alias="roundId")], payload: ScheduleRunPayload, db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
@@ -727,25 +886,12 @@ def run_scheduler(round_id: Annotated[int, Path(alias="roundId")], payload: Sche
                 raise DomainError("ROUND_TIMESLOTS_REQUIRED", "Add at least one active timeslot to this round before running the scheduler.")
             if not reviewers:
                 raise DomainError("ROUND_REVIEWERS_INSUFFICIENT", "No Reviewer is available on an active round timeslot.")
-            result = solve_schedule(
+            candidate_pool = generate_candidates(
                 context,
                 groups=groups,
                 timeslots=timeslots,
                 reviewers=reviewers,
-                time_limit_seconds=payload.time_limit_seconds,
-                random_seed=payload.random_seed,
             )
-            snapshot = build_input_snapshot(
-                round_id=round_id,
-                context=context,
-                groups=groups,
-                timeslots=[row[0] for row in timeslots],
-                reviewer_assignments={
-                    session.group_id: list(session.reviewer_ids) for session in result.sessions
-                },
-                soft_weights=context.soft_weights,
-            )
-            snapshot["unscheduled"] = [reason.__dict__ for reason in result.unscheduled]
             version_no = db.execute(
                 text(
                     "SELECT COALESCE(MAX(version_no), 0) + 1 FROM schedule_versions WHERE round_id = :round_id"
@@ -753,85 +899,44 @@ def run_scheduler(round_id: Annotated[int, Path(alias="roundId")], payload: Sche
                 {"round_id": round_id},
             ).scalar_one()
             actor_id = _actor_id(db, user)
-            version_id = db.execute(
-                text(
-                    "INSERT INTO schedule_versions (round_id, version_no, status, input_snapshot, algorithm_parameters, "
-                    "random_seed, solver_status, total_score, soft_scores, created_by) VALUES "
-                    "(:round_id, :version_no, 'DRAFT', CAST(:snapshot AS JSONB), CAST(:parameters AS JSONB), :seed, "
-                    ":solver_status, :score, CAST(:soft_scores AS JSONB), :created_by) RETURNING id"
-                ),
-                {
-                    "round_id": round_id,
-                    "version_no": version_no,
-                    "snapshot": _json(snapshot),
-                    "parameters": _json(payload.model_dump()),
-                    "seed": result.random_seed,
-                    "solver_status": result.status,
-                    "score": result.objective,
-                    "soft_scores": _json(result.soft_scores),
-                    "created_by": actor_id,
-                },
-            ).scalar_one()
-            for session in result.sessions:
-                assignment_id = db.execute(text(
-                    "INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,start_at,end_at) "
-                    "VALUES (:version_id,:group_id,:project_id,:timeslot_id,:start_at,:end_at) RETURNING id"
-                ), {"version_id": version_id, "group_id": session.group_id,
-                    "project_id": context.group_project[session.group_id], "timeslot_id": session.timeslot_id,
-                    "start_at": session.start_at, "end_at": session.end_at}).scalar_one()
-                names = db.execute(
-                    text(
-                        "SELECT l.id, a.display_name FROM lecturers l JOIN accounts a ON a.id = l.account_id "
-                        "WHERE l.id = ANY(:ids)"
-                    ),
-                    {"ids": list(session.reviewer_ids) or [0]},
-                ).all()
-                name_map = {row[0]: row[1] for row in names}
-                for reviewer_index, lecturer_id in enumerate(session.reviewer_ids):
-                    db.execute(
-                        text(
-                        "INSERT INTO schedule_assignment_reviewers (assignment_id, lecturer_id, is_result_owner, snapshot_name) "
-                        "VALUES (:assignment_id, :lecturer_id, :is_owner, :snapshot_name)"
-                        ),
-                        {
-                            "assignment_id": assignment_id,
-                            "lecturer_id": lecturer_id,
-                            "is_owner": context.result_owner_mode and context.round_type in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"} and reviewer_index == 0,
-                            "snapshot_name": name_map.get(lecturer_id, str(lecturer_id)),
-                        },
+            summaries = []
+            for variant_index, (profile, profile_label) in enumerate(SCHEDULE_VARIANT_PROFILES):
+                result = solve_schedule(
+                    context,
+                    groups=groups,
+                    timeslots=timeslots,
+                    reviewers=reviewers,
+                    time_limit_seconds=payload.time_limit_seconds,
+                    random_seed=payload.random_seed + variant_index,
+                    objective_profile=profile,
+                    candidate_pool=candidate_pool,
+                )
+                summaries.append(
+                    _persist_generated_schedule_draft(
+                        db,
+                        round_id=round_id,
+                        context=context,
+                        groups=groups,
+                        timeslots=timeslots,
+                        payload=payload,
+                        actor_id=actor_id,
+                        result=result,
+                        profile=profile,
+                        profile_label=profile_label,
+                        version_no=version_no + variant_index,
                     )
-            job_status = "PARTIAL" if result.unscheduled else "COMPLETED"
-            db.execute(
-                text(
-                    "INSERT INTO scheduler_jobs (round_id, status, input_snapshot, algorithm_parameters, random_seed, schedule_version_id) "
-                    "VALUES (:round_id, :status, CAST(:snapshot AS JSONB), CAST(:parameters AS JSONB), :seed, :version_id)"
-                ),
-                {
-                    "round_id": round_id,
-                    "status": job_status,
-                    "snapshot": _json(snapshot),
-                    "parameters": _json(payload.model_dump()),
-                    "seed": result.random_seed,
-                    "version_id": version_id,
-                },
-            )
-            db.execute(
-                text(
-                    "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
-                    "VALUES (:actor_id, 'SCHEDULER_RUN', 'schedule_version', :entity_id, CAST(:after_json AS JSONB))"
-                ),
-                {
-                    "actor_id": actor_id,
-                    "entity_id": str(version_id),
-                    "after_json": _json({"round_id": round_id, "status": result.status}),
-                },
-            )
+                )
+            first = summaries[0]
         return {
-            "version_id": version_id,
-            "status": "DRAFT",
-            "scheduled_count": len(result.sessions),
-            "unscheduled": [reason.__dict__ for reason in result.unscheduled],
-            "soft_scores": result.soft_scores,
+            "version_id": first["version_id"],
+            "status": first["status"],
+            "scheduled_count": first["scheduled_count"],
+            "unscheduled": first["unscheduled"],
+            "soft_scores": first["soft_scores"],
+            "objective_profile": first["objective_profile"],
+            "objective_label": first["objective_label"],
+            "metrics": first["metrics"],
+            "versions": summaries,
         }
     except (DomainError, IntegrityError) as exc:
         if isinstance(exc, DomainError):
