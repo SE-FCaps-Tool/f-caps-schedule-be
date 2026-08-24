@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = "postgresql+psycopg://scheduler:scheduler@localhost:5432/scheduler"
     session_cookie_name: str = "scheduler_session"
+    # The readable CSRF cookie must be visible to the separate frontend
+    # subdomain so the FE can echo it in X-CSRF-Token. Keep the session cookie
+    # host-only/HttpOnly; only set this in deployments that share a parent
+    # domain with the frontend (for example, .f-caps.net).
+    cookie_domain: str = ""
     session_idle_minutes: int = 60
     session_absolute_hours: int = 168
     frontend_url: str = "http://localhost:5173"

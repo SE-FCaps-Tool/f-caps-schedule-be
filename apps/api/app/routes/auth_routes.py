@@ -187,8 +187,9 @@ def logout(response: Response, request: Request, db: Db, settings: SettingsDep) 
         if row is not None:
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'LOGOUT', 'account', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": row["account_id"], "entity_id": str(row["account_id"]), "after_json": '{"session": "revoked"}'})
         db.commit()
-    response.delete_cookie(settings.session_cookie_name)
-    response.delete_cookie("scheduler_csrf")
+    cookie_domain = settings.cookie_domain or None
+    response.delete_cookie(settings.session_cookie_name, domain=cookie_domain)
+    response.delete_cookie("scheduler_csrf", domain=cookie_domain)
     return {"status": "signed_out"}
 
 
@@ -262,8 +263,24 @@ def _create_session(db: Session, account_id: int, role: str, response: Response,
     )
     db.commit()
     secure = settings.app_env not in {"development", "test"}
-    response.set_cookie(settings.session_cookie_name, token, httponly=True, secure=secure, samesite="lax", max_age=settings.session_absolute_hours * 3600)
-    response.set_cookie("scheduler_csrf", csrf_token, httponly=False, secure=secure, samesite="lax", max_age=settings.session_absolute_hours * 3600)
+    cookie_domain = settings.cookie_domain or None
+    response.set_cookie(
+        settings.session_cookie_name,
+        token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=settings.session_absolute_hours * 3600,
+    )
+    response.set_cookie(
+        "scheduler_csrf",
+        csrf_token,
+        httponly=False,
+        secure=secure,
+        samesite="lax",
+        domain=cookie_domain,
+        max_age=settings.session_absolute_hours * 3600,
+    )
     return expires
 
 
