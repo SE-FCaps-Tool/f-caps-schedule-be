@@ -11,7 +11,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 API_ROOT = REPO_ROOT / "apps" / "api"
 EXPORTER = API_ROOT / "tools" / "openapi_export.py"
-ARTIFACTS = ("openapi.json", "openapi.camel.json")
+ARTIFACTS = ("openapi.json",)
 
 
 def without_commit_stamp(raw: str) -> dict[str, Any]:

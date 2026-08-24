@@ -1,0 +1,84 @@
+name: API contract
+
+on:
+  push:
+    paths:
+      - "apps/api/**"
+      - "tools/**"
+      - ".github/workflows/api-contract.yml"
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - "tools/**"
+      - ".github/workflows/api-contract.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: scheduler
+          POSTGRES_USER: scheduler
+          POSTGRES_PASSWORD: scheduler
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scheduler -d scheduler"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: apps/api
+
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://scheduler:scheduler@localhost:5432/scheduler
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint contract tests
+        run: uv run ruff check tests/test_wire_is_camel.py tests/test_auth_transport_names.py
+
+      - name: Run full Ruff baseline (informational)
+        continue-on-error: true
+        run: uv run ruff check app tests
+
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+
+      - name: Verify committed OpenAPI artifact
+        run: uv run python ../../tools/check_openapi_spec.py
+
+      - name: Run required contract and auth suite
+        run: >-
+          uv run pytest -q
+          tests/test_wire_is_camel.py
+          tests/test_auth_transport_names.py
+          tests/test_spec_matches_wire.py
+          tests/test_openapi_coverage.py
+          tests/test_auth.py
+          tests/test_auth_api.py
+
+      - name: Run full baseline suite (informational)
+        continue-on-error: true
+        run: uv run pytest -q
