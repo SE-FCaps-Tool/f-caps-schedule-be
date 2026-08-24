@@ -1,0 +1,24 @@
+FROM python:3.11-slim
+
+WORKDIR /app/apps/api
+
+COPY apps/api/pyproject.toml ./pyproject.toml
+RUN pip install --no-cache-dir \
+    "fastapi>=0.115,<1.0" \
+    "uvicorn[standard]>=0.34,<1.0" \
+    "pydantic-settings>=2.8,<3.0" \
+    "alembic>=1.15,<2.0" \
+    "sqlalchemy>=2.0,<3.0" \
+    "psycopg[binary]>=3.2,<4.0" \
+    "argon2-cffi>=23.1,<26.0" \
+    "python-multipart>=0.0.20,<1.0" \
+    "ortools>=9.12,<10.0" \
+    "openpyxl>=3.1,<4.0"
+
+COPY apps/api ./
+COPY tools /app/tools
+
+ENV PYTHONPATH=/app/apps/api PYTHONUNBUFFERED=1
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
