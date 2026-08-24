@@ -188,8 +188,14 @@ def logout(response: Response, request: Request, db: Db, settings: SettingsDep) 
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'LOGOUT', 'account', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": row["account_id"], "entity_id": str(row["account_id"]), "after_json": '{"session": "revoked"}'})
         db.commit()
     cookie_domain = settings.cookie_domain or None
-    response.delete_cookie(settings.session_cookie_name, domain=cookie_domain)
-    response.delete_cookie("scheduler_csrf", domain=cookie_domain)
+    # scheduler_session remains host-only, so delete it without a Domain
+    # attribute even when the CSRF cookie is shared with the FE subdomain.
+    response.delete_cookie(settings.session_cookie_name)
+    # Remove both the old host-only cookie and the cross-subdomain cookie so
+    # an existing browser cannot send two scheduler_csrf values after rollout.
+    response.delete_cookie("scheduler_csrf")
+    if cookie_domain:
+        response.delete_cookie("scheduler_csrf", domain=cookie_domain)
     return {"status": "signed_out"}
 
 
