@@ -89,6 +89,12 @@ def test_generate_creates_draft_assignments_and_zero_operational_sessions(client
     round_id, _ = _prepare_round(client, headers, "2040-03-01")
     run = _run(client, headers, round_id)
     assert run["status"] == "DRAFT"
+    assert len(run["versions"]) == 3
+    assert {version["objective_profile"] for version in run["versions"]} == {
+        "LECTURER_COMPACT",
+        "LOAD_BALANCED",
+        "EARLY_FINISH",
+    }
 
     version_id = run["version_id"]
     detail = client.get(f"/api/v1/schedule/versions/{version_id}", headers=headers)

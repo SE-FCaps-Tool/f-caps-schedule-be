@@ -25,8 +25,18 @@ class TargetResponseModel(ResponseModel):
 
 
 class LoginResponse(ResponseModel):
+    role: str | None = None
+    expires_at: datetime | str | None = None
+    requires_role_selection: bool = False
+    available_roles: list[str] = Field(default_factory=list)
+
+
+class RoleSelectionResponse(ResponseModel):
+    available_roles: list[str] = Field(default_factory=list)
+
+
+class RoleSelectionPayload(BaseModel):
     role: str
-    expires_at: datetime | str
 
 
 class LogoutResponse(ResponseModel):
@@ -593,6 +603,9 @@ class VersionSummaryResponse(ResponseModel):
     semester_id: int | None = None
     semester_code: str | None = None
     generated_at: datetime | None = None
+    objective_profile: str | None = None
+    objective_label: str | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
 
 
 class VersionDetailResponse(VersionSummaryResponse):
@@ -1432,6 +1445,10 @@ class ScheduleRunResponse(ResponseModel):
     scheduled_count: int = 0
     unscheduled: list[dict[str, Any]] = Field(default_factory=list)
     soft_scores: dict[str, Any] = Field(default_factory=dict)
+    objective_profile: str | None = None
+    objective_label: str | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    versions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PublishResponse(ResponseModel):

@@ -1,6 +1,13 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
+
+SchedulerObjectiveProfile = Literal[
+    "LEGACY",
+    "LECTURER_COMPACT",
+    "LOAD_BALANCED",
+    "EARLY_FINISH",
+]
 
 
 @dataclass(frozen=True)
@@ -95,6 +102,8 @@ class SolverResult:
     soft_scores: dict[str, int]
     random_seed: int
     objective: int
+    objective_profile: SchedulerObjectiveProfile = "LEGACY"
+    metrics: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

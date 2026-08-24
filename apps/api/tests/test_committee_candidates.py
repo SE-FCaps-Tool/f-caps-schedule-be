@@ -1,6 +1,6 @@
 from dataclasses import replace
 
-from app.scheduler.candidates import generate_candidates
+from app.scheduler.candidates import FREE_POOL_REVIEWER_TUPLE_CAP, generate_candidates
 from app.scheduler.models import RoundInput
 from app.scheduler.snapshot import build_input_snapshot
 
@@ -47,6 +47,27 @@ def test_without_committees_the_free_pool_combinations_are_unchanged():
     assert {candidate.reviewer_ids for candidate in candidates} == {
         (2, 3), (2, 4), (2, 5), (3, 4), (3, 5), (4, 5)
     }
+
+
+def test_large_free_pool_is_bounded_and_rotates_reviewer_coverage():
+    reviewers = list(range(1, 10))
+    context = committee_input(
+        expected_reviewer_count=5,
+        lecturer_availability={(reviewer_id, 1) for reviewer_id in reviewers},
+    )
+
+    first = generate(
+        context,
+        reviewers=reviewers,
+    )
+    second = generate(
+        context,
+        reviewers=reviewers,
+    )
+
+    assert first == second
+    assert len(first) <= FREE_POOL_REVIEWER_TUPLE_CAP
+    assert {reviewer_id for candidate in first for reviewer_id in candidate.reviewer_ids} == set(reviewers)
 
 
 def test_assigned_committees_restrict_candidates_to_their_exact_member_sets():

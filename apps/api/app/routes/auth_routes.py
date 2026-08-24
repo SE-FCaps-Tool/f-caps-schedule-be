@@ -25,7 +25,13 @@ from starlette.responses import RedirectResponse
 from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
 from app.database import get_db
-from app.response_models import LoginResponse, LogoutResponse, MeResponse
+from app.response_models import (
+    LoginResponse,
+    LogoutResponse,
+    MeResponse,
+    RoleSelectionPayload,
+    RoleSelectionResponse,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 Db = Annotated[Session, Depends(get_db)]
@@ -36,6 +42,9 @@ GOOGLE_STATE_COOKIE = "scheduler_google_state"
 GOOGLE_PKCE_COOKIE = "scheduler_google_pkce"
 GOOGLE_NONCE_COOKIE = "scheduler_google_nonce"
 GOOGLE_COOKIE_PATH = "/api/v1/auth/google"
+LOGIN_CHALLENGE_COOKIE = "scheduler_login_challenge"
+LOGIN_CHALLENGE_COOKIE_PATH = "/api/v1/auth"
+LOGIN_CHALLENGE_MAX_AGE = 600
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 
@@ -46,16 +55,15 @@ class LoginPayload(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginPayload, response: Response, request: Request, db: Db, settings: SettingsDep) -> dict[str, str]:
+def login(payload: LoginPayload, response: Response, request: Request, db: Db, settings: SettingsDep) -> dict[str, object]:
     client_host = request.client.host if request.client else None
     throttle = _record_login_attempt(db, payload.email, client_host)
     if throttle["blocked"]:
         raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.", headers={"Retry-After": str(throttle["retry_after"])})
     row = db.execute(
         text(
-            "SELECT a.id, a.password_hash, a.status, ar.role FROM accounts a "
-            "JOIN account_roles ar ON ar.account_id = a.id WHERE lower(a.email) = lower(:email) "
-            "ORDER BY ar.role LIMIT 1"
+            "SELECT a.id, a.password_hash, a.status FROM accounts a "
+            "WHERE lower(a.email) = lower(:email)"
         ),
         {"email": payload.email.strip()},
     ).mappings().one_or_none()
@@ -68,8 +76,16 @@ def login(payload: LoginPayload, response: Response, request: Request, db: Db, s
         db.commit()
         raise HTTPException(status_code=401, detail="Invalid credentials") from exc
     db.execute(text("DELETE FROM auth_login_throttles WHERE identifier = :identifier"), {"identifier": _login_identifier(payload.email, client_host)})
-    expires = _create_session(db, row["id"], str(row["role"]), response, settings, provider="password")
-    return {"role": str(row["role"]), "expires_at": expires.isoformat()}
+    roles = _roles_for_account(db, int(row["id"]))
+    if not roles:
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if len(roles) > 1:
+        challenge = _create_login_challenge(db, int(row["id"]), provider="password")
+        _set_login_challenge_cookie(response, challenge, settings)
+        return {"role": None, "expires_at": None, "requires_role_selection": True, "available_roles": roles}
+    expires = _create_session(db, int(row["id"]), roles[0], response, settings, provider="password")
+    return {"role": roles[0], "expires_at": expires.isoformat(), "requires_role_selection": False, "available_roles": roles}
 
 
 @router.get("/google/start", include_in_schema=True)
@@ -151,11 +167,8 @@ def google_callback(
     if linked_identity is not None and str(linked_identity) != claims["subject"]:
         db.rollback()
         return _oauth_error_redirect(settings, "google_account_already_linked")
-    role = db.execute(
-        text("SELECT role FROM account_roles WHERE account_id = :account_id ORDER BY role LIMIT 1"),
-        {"account_id": account_id},
-    ).scalar_one_or_none()
-    if role is None:
+    roles = _roles_for_account(db, account_id)
+    if not roles:
         db.rollback()
         return _oauth_error_redirect(settings, "account_role_missing")
     try:
@@ -172,7 +185,11 @@ def google_callback(
                 text("UPDATE auth_identities SET email = :email, last_login_at = now() WHERE provider = 'google' AND subject = :subject"),
                 {"email": claims["email"], "subject": claims["subject"]},
             )
-        _create_session(db, account_id, str(role), response, settings, provider="google")
+        if len(roles) > 1:
+            challenge = _create_login_challenge(db, account_id, provider="google")
+            _set_login_challenge_cookie(response, challenge, settings)
+        else:
+            _create_session(db, account_id, roles[0], response, settings, provider="google")
     except IntegrityError:
         db.rollback()
         return _oauth_error_redirect(settings, "google_identity_conflict")
@@ -196,7 +213,56 @@ def logout(response: Response, request: Request, db: Db, settings: SettingsDep) 
     response.delete_cookie("scheduler_csrf")
     if cookie_domain:
         response.delete_cookie("scheduler_csrf", domain=cookie_domain)
+    response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
     return {"status": "signed_out"}
+
+
+@router.get("/pending", response_model=RoleSelectionResponse)
+def pending_role_selection(request: Request, response: Response, db: Db) -> dict[str, list[str]]:
+    challenge = _get_login_challenge(db, request.cookies.get(LOGIN_CHALLENGE_COOKIE))
+    if challenge is None:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "ROLE_SELECTION_EXPIRED", "message": "Role selection has expired. Please sign in again."},
+        )
+    roles = _roles_for_account(db, int(challenge["account_id"]))
+    if not roles:
+        response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "ACCOUNT_ROLE_MISSING", "message": "No active role is assigned to this account."},
+        )
+    return {"available_roles": roles}
+
+
+@router.post("/select-role", response_model=LoginResponse)
+def select_role(
+    payload: RoleSelectionPayload,
+    request: Request,
+    response: Response,
+    db: Db,
+    settings: SettingsDep,
+) -> dict[str, object]:
+    challenge = _get_login_challenge(db, request.cookies.get(LOGIN_CHALLENGE_COOKIE), for_update=True)
+    if challenge is None:
+        response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "ROLE_SELECTION_EXPIRED", "message": "Role selection has expired. Please sign in again."},
+        )
+    role = payload.role.strip().upper()
+    roles = _roles_for_account(db, int(challenge["account_id"]))
+    if role not in roles:
+        db.rollback()
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "ROLE_NOT_ASSIGNED", "message": "This role is not assigned to the account."},
+        )
+    db.execute(text("UPDATE auth_login_challenges SET used_at = now() WHERE id = :id"), {"id": challenge["id"]})
+    db.commit()
+    expires = _create_session(db, int(challenge["account_id"]), role, response, settings, provider=str(challenge["provider"]))
+    response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
+    return {"role": role, "expires_at": expires.isoformat(), "requires_role_selection": False, "available_roles": roles}
 
 
 @router.get("/me", response_model=MeResponse)
@@ -258,10 +324,16 @@ def _create_session(db: Session, account_id: int, role: str, response: Response,
     expires = datetime.now(UTC) + timedelta(hours=settings.session_absolute_hours)
     db.execute(
         text(
-            "INSERT INTO auth_sessions (account_id, token_hash, csrf_token_hash, expires_at) "
-            "VALUES (:account_id, :token_hash, :csrf_token_hash, :expires_at)"
+            "INSERT INTO auth_sessions (account_id, role, token_hash, csrf_token_hash, expires_at) "
+            "VALUES (:account_id, :role, :token_hash, :csrf_token_hash, :expires_at)"
         ),
-        {"account_id": account_id, "token_hash": _hash(token), "csrf_token_hash": _hash(csrf_token), "expires_at": expires},
+        {
+            "account_id": account_id,
+            "role": role,
+            "token_hash": _hash(token),
+            "csrf_token_hash": _hash(csrf_token),
+            "expires_at": expires,
+        },
     )
     db.execute(
         text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'LOGIN_SUCCESS', 'account', :entity_id, CAST(:after_json AS JSONB))"),
@@ -306,6 +378,65 @@ def _oauth_error_redirect(settings: Settings, code: str) -> RedirectResponse:
 def _clear_google_cookies(response: Response) -> None:
     for name in (GOOGLE_STATE_COOKIE, GOOGLE_PKCE_COOKIE, GOOGLE_NONCE_COOKIE):
         response.delete_cookie(name, path=GOOGLE_COOKIE_PATH)
+
+
+def _roles_for_account(db: Session, account_id: int) -> list[str]:
+    rows = db.execute(
+        text(
+            "SELECT role::text AS role FROM account_roles "
+            "WHERE account_id = :account_id "
+            "ORDER BY CASE role::text "
+            "WHEN 'ADMIN' THEN 1 WHEN 'MANAGER' THEN 2 WHEN 'LECTURER' THEN 3 WHEN 'STUDENT' THEN 4 ELSE 99 END"
+        ),
+        {"account_id": account_id},
+    ).mappings().all()
+    return [str(row["role"]) for row in rows]
+
+
+def _create_login_challenge(db: Session, account_id: int, *, provider: str) -> str:
+    token = secrets.token_urlsafe(48)
+    expires = datetime.now(UTC) + timedelta(seconds=LOGIN_CHALLENGE_MAX_AGE)
+    db.execute(
+        text("DELETE FROM auth_login_challenges WHERE account_id = :account_id OR expires_at <= now()"),
+        {"account_id": account_id},
+    )
+    db.execute(
+        text(
+            "INSERT INTO auth_login_challenges (account_id, token_hash, provider, expires_at) "
+            "VALUES (:account_id, :token_hash, :provider, :expires_at)"
+        ),
+        {"account_id": account_id, "token_hash": _hash(token), "provider": provider, "expires_at": expires},
+    )
+    db.commit()
+    return token
+
+
+def _set_login_challenge_cookie(response: Response, token: str, settings: Settings) -> None:
+    secure = settings.app_env not in {"development", "test"}
+    response.set_cookie(
+        LOGIN_CHALLENGE_COOKIE,
+        token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=LOGIN_CHALLENGE_MAX_AGE,
+        path=LOGIN_CHALLENGE_COOKIE_PATH,
+    )
+
+
+def _get_login_challenge(db: Session, token: str | None, *, for_update: bool = False):
+    if not token:
+        return None
+    lock = " FOR UPDATE" if for_update else ""
+    return db.execute(
+        text(
+            "SELECT c.id, c.account_id, c.provider, c.expires_at FROM auth_login_challenges c "
+            "JOIN accounts a ON a.id = c.account_id "
+            "WHERE c.token_hash = :token_hash AND c.used_at IS NULL AND c.expires_at > now() "
+            "AND a.status = 'ACTIVE'" + lock
+        ),
+        {"token_hash": _hash(token)},
+    ).mappings().one_or_none()
 
 
 def _hash(value: str) -> str:

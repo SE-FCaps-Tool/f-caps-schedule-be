@@ -40,11 +40,12 @@ def get_current_user(
         token_hash = hashlib.sha256(session_token.encode()).hexdigest()
         row = db.execute(
             text(
-                "SELECT s.account_id, a.status, ar.role FROM auth_sessions s "
-                "JOIN accounts a ON a.id = s.account_id JOIN account_roles ar ON ar.account_id = a.id "
+                "SELECT s.account_id, a.status, s.role FROM auth_sessions s "
+                "JOIN accounts a ON a.id = s.account_id "
+                "JOIN account_roles ar ON ar.account_id = s.account_id AND ar.role::text = s.role "
                 "WHERE s.token_hash = :token_hash AND s.revoked_at IS NULL AND s.expires_at > now() "
                 "AND s.last_seen_at > now() - (:idle_minutes * interval '1 minute') "
-                "ORDER BY ar.role LIMIT 1"
+                "LIMIT 1"
             ),
             {"token_hash": token_hash, "idle_minutes": settings.session_idle_minutes},
         ).mappings().one_or_none()

@@ -1,9 +1,17 @@
 from datetime import UTC, datetime, timedelta
 from itertools import combinations
+from math import comb
 
 from app.domain.round_types import DEFENSE_1_2_TYPES
 from app.scheduler.models import Candidate, RoundInput, UnscheduledReason
 from app.scheduler.validator import _eligible, valid_h11_waiver
+
+# A free Reviewer pool can contain many mathematically valid groups of reviewers.
+# Materialising every combination makes a large round (for example C(26, 5)
+# combinations for one group/slot) dominate the scheduler before CP-SAT starts.
+# Keep a deterministic, diverse sample when the full pool is too large. Assigned
+# Committees remain exact and are not subject to this cap.
+FREE_POOL_REVIEWER_TUPLE_CAP = 16
 
 
 def generate_candidates(
@@ -41,7 +49,11 @@ def generate_candidates(
                 continuity = set(context.prior_reviewer_ids.get(group_id, set()))
                 continuity.update(context.remediation_verifier_ids.get(group_id, set()))
                 available = [reviewer_id for reviewer_id in available if reviewer_id in continuity]
-            for reviewer_ids in _reviewer_tuples(context, available):
+            for reviewer_ids in _reviewer_tuples(
+                context,
+                available,
+                rotation_seed=group_id * 1_000_003 + timeslot_id,
+            ):
                 candidates.append(
                     Candidate(
                         group_id=group_id,
@@ -56,7 +68,12 @@ def generate_candidates(
     return candidates
 
 
-def _reviewer_tuples(context: RoundInput, available: list[int]) -> list[tuple[int, ...]]:
+def _reviewer_tuples(
+    context: RoundInput,
+    available: list[int],
+    *,
+    rotation_seed: int = 0,
+) -> list[tuple[int, ...]]:
     """Reviewer sets allowed for one (group, timeslot) after the hard filters.
 
     A Round bound to Committees may only be staffed by a whole Committee, so a
@@ -65,13 +82,61 @@ def _reviewer_tuples(context: RoundInput, available: list[int]) -> list[tuple[in
     """
 
     if not context.has_assigned_committees:
-        return list(combinations(available, context.expected_reviewer_count))
+        reviewer_count = context.expected_reviewer_count
+        total = comb(len(available), reviewer_count)
+        if total <= FREE_POOL_REVIEWER_TUPLE_CAP:
+            return list(combinations(available, reviewer_count))
+        return _bounded_free_pool_tuples(
+            available, reviewer_count, total, rotation_seed=rotation_seed
+        )
     eligible = set(available)
     return [
         tuple(member_ids)
         for member_ids in context.committee_reviewer_sets
         if len(member_ids) == context.expected_reviewer_count and eligible.issuperset(member_ids)
     ]
+
+
+def _bounded_free_pool_tuples(
+    available: list[int], reviewer_count: int, total: int, *, rotation_seed: int = 0
+) -> list[tuple[int, ...]]:
+    """Return a deterministic and evenly rotated subset of free-pool tuples.
+
+    Consecutive windows and stepped windows rotate every Reviewer through the
+    tuple positions before falling back to lexicographic combinations. This
+    preserves reviewer coverage while keeping the CP-SAT model bounded.
+    """
+
+    target = min(total, FREE_POOL_REVIEWER_TUPLE_CAP)
+    selected: list[tuple[int, ...]] = []
+    seen: set[tuple[int, ...]] = set()
+    reviewer_total = len(available)
+
+    for step in range(1, reviewer_total + 1):
+        for offset_index in range(reviewer_total):
+            offset = (rotation_seed + offset_index) % reviewer_total
+            reviewer_ids = tuple(
+                sorted(
+                    available[(offset + step * position) % reviewer_total]
+                    for position in range(reviewer_count)
+                )
+            )
+            if len(set(reviewer_ids)) != reviewer_count or reviewer_ids in seen:
+                continue
+            seen.add(reviewer_ids)
+            selected.append(reviewer_ids)
+            if len(selected) >= target:
+                return selected
+
+    # This is normally unnecessary, but keeps the helper correct for unusual
+    # pool sizes where the rotated patterns do not reach the target.
+    for reviewer_ids in combinations(available, reviewer_count):
+        if reviewer_ids in seen:
+            continue
+        selected.append(reviewer_ids)
+        if len(selected) >= target:
+            break
+    return selected
 
 
 def _normalize_timeslot(raw_timeslot: tuple[object, ...]):
