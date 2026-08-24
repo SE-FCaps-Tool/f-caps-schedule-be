@@ -171,6 +171,11 @@ def google_callback(
     if not roles:
         db.rollback()
         return _oauth_error_redirect(settings, "account_role_missing")
+    # Carry the server-resolved roles through the OAuth redirect. The FE can
+    # render the multi-role choice without calling /auth/pending; the actual
+    # selection remains protected by the short-lived challenge cookie below.
+    response = _frontend_redirect(settings, roles)
+    _clear_google_cookies(response)
     try:
         if identity is None:
             db.execute(
@@ -362,8 +367,11 @@ def _create_session(db: Session, account_id: int, role: str, response: Response,
     return expires
 
 
-def _frontend_redirect(settings: Settings) -> RedirectResponse:
-    return RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback", status_code=status.HTTP_303_SEE_OTHER)
+def _frontend_redirect(settings: Settings, roles: list[str] | None = None) -> RedirectResponse:
+    callback_url = f"{settings.frontend_url.rstrip('/')}/auth/callback"
+    if roles:
+        callback_url = f"{callback_url}?{urlencode({'roles': ','.join(roles)})}"
+    return RedirectResponse(callback_url, status_code=status.HTTP_303_SEE_OTHER)
 
 
 def _oauth_error_redirect(settings: Settings, code: str) -> RedirectResponse:
