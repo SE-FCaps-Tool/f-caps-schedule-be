@@ -16,6 +16,19 @@ services:
       timeout: 5s
       retries: 12
 
+  migrate:
+    image: ${BE_IMAGE}
+    command: ["python", "/app/tools/bootstrap_database.py"]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      SEED_FIXTURE: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     image: ${BE_IMAGE}
     environment:
@@ -26,6 +39,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
@@ -44,6 +59,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
