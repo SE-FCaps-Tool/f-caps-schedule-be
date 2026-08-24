@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kadntd3JeuYmFvv0ekl2VtwsUrV0L9ufwZD4WEWjfYbLrQF5H0yfgsKZAEeYGiK
+\restrict BohixT33MY8eHCcFf2ITClEONvhRaoshndiltWflHBnuZYnMdpfi50LdVTOI80T
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -18,378 +18,6 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-ALTER TABLE IF EXISTS ONLY public.timeslots DROP CONSTRAINT IF EXISTS timeslots_round_day_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.timeframes DROP CONSTRAINT IF EXISTS timeframes_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.timeframe_versions DROP CONSTRAINT IF EXISTS timeframe_versions_timeframe_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.timeframe_versions DROP CONSTRAINT IF EXISTS timeframe_versions_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.timeframe_break_windows DROP CONSTRAINT IF EXISTS timeframe_break_windows_timeframe_version_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.students DROP CONSTRAINT IF EXISTS students_account_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_timeslot_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_schedule_version_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_room_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_makeup_of_session_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_council_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.session_results DROP CONSTRAINT IF EXISTS session_results_verifier_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.session_results DROP CONSTRAINT IF EXISTS session_results_session_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.session_results DROP CONSTRAINT IF EXISTS session_results_entered_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.semesters DROP CONSTRAINT IF EXISTS semesters_updated_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.semesters DROP CONSTRAINT IF EXISTS semesters_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.semester_lecturer_quotas DROP CONSTRAINT IF EXISTS semester_lecturer_quotas_updated_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.semester_lecturer_quotas DROP CONSTRAINT IF EXISTS semester_lecturer_quotas_semester_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.semester_lecturer_quotas DROP CONSTRAINT IF EXISTS semester_lecturer_quotas_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.scheduler_jobs DROP CONSTRAINT IF EXISTS scheduler_jobs_schedule_version_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.scheduler_jobs DROP CONSTRAINT IF EXISTS scheduler_jobs_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_versions DROP CONSTRAINT IF EXISTS schedule_versions_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_versions DROP CONSTRAINT IF EXISTS schedule_versions_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_change_records DROP CONSTRAINT IF EXISTS schedule_change_records_session_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_change_records DROP CONSTRAINT IF EXISTS schedule_change_records_schedule_version_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_change_records DROP CONSTRAINT IF EXISTS schedule_change_records_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_change_records DROP CONSTRAINT IF EXISTS schedule_change_records_actor_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignments DROP CONSTRAINT IF EXISTS schedule_assignments_timeslot_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignments DROP CONSTRAINT IF EXISTS schedule_assignments_schedule_version_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignments DROP CONSTRAINT IF EXISTS schedule_assignments_project_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignments DROP CONSTRAINT IF EXISTS schedule_assignments_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignment_reviewers DROP CONSTRAINT IF EXISTS schedule_assignment_reviewers_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignment_reviewers DROP CONSTRAINT IF EXISTS schedule_assignment_reviewers_assignment_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.rounds DROP CONSTRAINT IF EXISTS rounds_timeframe_version_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.rounds DROP CONSTRAINT IF EXISTS rounds_timeframe_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.rounds DROP CONSTRAINT IF EXISTS rounds_semester_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.rounds DROP CONSTRAINT IF EXISTS rounds_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_room_types DROP CONSTRAINT IF EXISTS round_room_types_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_operation_records DROP CONSTRAINT IF EXISTS round_operation_records_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_operation_records DROP CONSTRAINT IF EXISTS round_operation_records_actor_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_invitations DROP CONSTRAINT IF EXISTS round_invitations_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_invitations DROP CONSTRAINT IF EXISTS round_invitations_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_groups DROP CONSTRAINT IF EXISTS round_groups_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_groups DROP CONSTRAINT IF EXISTS round_groups_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_days DROP CONSTRAINT IF EXISTS round_days_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_committees DROP CONSTRAINT IF EXISTS round_committees_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.reschedule_requests DROP CONSTRAINT IF EXISTS reschedule_requests_session_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.reschedule_requests DROP CONSTRAINT IF EXISTS reschedule_requests_reviewed_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.reschedule_requests DROP CONSTRAINT IF EXISTS reschedule_requests_requested_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.remediation_cases DROP CONSTRAINT IF EXISTS remediation_cases_verifier_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.remediation_cases DROP CONSTRAINT IF EXISTS remediation_cases_session_result_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.remediation_cases DROP CONSTRAINT IF EXISTS remediation_cases_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.projects DROP CONSTRAINT IF EXISTS projects_semester_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.projects DROP CONSTRAINT IF EXISTS projects_major_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.project_supervisors DROP CONSTRAINT IF EXISTS project_supervisors_project_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.project_supervisors DROP CONSTRAINT IF EXISTS project_supervisors_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.notifications DROP CONSTRAINT IF EXISTS notifications_recipient_account_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.lecturers DROP CONSTRAINT IF EXISTS lecturers_account_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.lecturer_availabilities DROP CONSTRAINT IF EXISTS lecturer_availabilities_updated_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.lecturer_availabilities DROP CONSTRAINT IF EXISTS lecturer_availabilities_timeslot_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.lecturer_availabilities DROP CONSTRAINT IF EXISTS lecturer_availabilities_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.lecturer_availabilities DROP CONSTRAINT IF EXISTS lecturer_availabilities_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.h11_waivers DROP CONSTRAINT IF EXISTS h11_waivers_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.h11_waivers DROP CONSTRAINT IF EXISTS h11_waivers_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.h11_waivers DROP CONSTRAINT IF EXISTS h11_waivers_granted_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.groups DROP CONSTRAINT IF EXISTS groups_project_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.group_slot_preferences DROP CONSTRAINT IF EXISTS group_slot_preferences_updated_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.group_slot_preferences DROP CONSTRAINT IF EXISTS group_slot_preferences_timeslot_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.group_slot_preferences DROP CONSTRAINT IF EXISTS group_slot_preferences_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.group_slot_preferences DROP CONSTRAINT IF EXISTS group_slot_preferences_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.group_memberships DROP CONSTRAINT IF EXISTS group_memberships_student_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.group_memberships DROP CONSTRAINT IF EXISTS group_memberships_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.group_memberships DROP CONSTRAINT IF EXISTS group_memberships_drop_requested_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.group_memberships DROP CONSTRAINT IF EXISTS group_memberships_drop_approved_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.round_committees DROP CONSTRAINT IF EXISTS fk_round_committees_round_id;
-ALTER TABLE IF EXISTS ONLY public.round_committees DROP CONSTRAINT IF EXISTS fk_round_committees_committee_id;
-ALTER TABLE IF EXISTS ONLY public.excel_summary_workloads DROP CONSTRAINT IF EXISTS excel_summary_workloads_batch_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_sheet_rows DROP CONSTRAINT IF EXISTS excel_sheet_rows_batch_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_review_schedule_rows DROP CONSTRAINT IF EXISTS excel_review_schedule_rows_canonical_session_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_review_schedule_rows DROP CONSTRAINT IF EXISTS excel_review_schedule_rows_canonical_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_review_schedule_rows DROP CONSTRAINT IF EXISTS excel_review_schedule_rows_batch_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_projects DROP CONSTRAINT IF EXISTS excel_projects_canonical_project_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_projects DROP CONSTRAINT IF EXISTS excel_projects_canonical_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_projects DROP CONSTRAINT IF EXISTS excel_projects_batch_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_defense_councils DROP CONSTRAINT IF EXISTS excel_defense_councils_canonical_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_defense_councils DROP CONSTRAINT IF EXISTS excel_defense_councils_batch_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_council_groups DROP CONSTRAINT IF EXISTS excel_council_groups_project_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_council_groups DROP CONSTRAINT IF EXISTS excel_council_groups_group_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.excel_council_groups DROP CONSTRAINT IF EXISTS excel_council_groups_council_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.councils DROP CONSTRAINT IF EXISTS councils_supersedes_council_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.councils DROP CONSTRAINT IF EXISTS councils_round_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.councils DROP CONSTRAINT IF EXISTS councils_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.council_members DROP CONSTRAINT IF EXISTS council_members_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.council_members DROP CONSTRAINT IF EXISTS council_members_council_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.conflict_declarations DROP CONSTRAINT IF EXISTS conflict_declarations_project_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.conflict_declarations DROP CONSTRAINT IF EXISTS conflict_declarations_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.conflict_declarations DROP CONSTRAINT IF EXISTS conflict_declarations_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.committees DROP CONSTRAINT IF EXISTS committees_created_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.committee_members DROP CONSTRAINT IF EXISTS committee_members_lecturer_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.committee_members DROP CONSTRAINT IF EXISTS committee_members_committee_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.auth_sessions DROP CONSTRAINT IF EXISTS auth_sessions_account_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.audit_events DROP CONSTRAINT IF EXISTS audit_events_actor_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.account_roles DROP CONSTRAINT IF EXISTS account_roles_account_id_fkey;
-DROP TRIGGER IF EXISTS sessions_council_valid ON public.sessions;
-DROP TRIGGER IF EXISTS councils_immutable ON public.councils;
-DROP TRIGGER IF EXISTS council_members_immutable ON public.council_members;
-DROP TRIGGER IF EXISTS audit_events_append_only ON public.audit_events;
-DROP INDEX IF EXISTS public.ux_sessions_makeup_of_session_id;
-DROP INDEX IF EXISTS public.uq_timeframes_active_name;
-DROP INDEX IF EXISTS public.uq_timeframe_versions_active;
-DROP INDEX IF EXISTS public.uq_schedule_versions_active_per_round;
-DROP INDEX IF EXISTS public.uq_active_semester;
-DROP INDEX IF EXISTS public.uq_active_group_student;
-DROP INDEX IF EXISTS public.uq_active_group_leader;
-DROP INDEX IF EXISTS public.session_results_entered_at_idx;
-DROP INDEX IF EXISTS public.scheduler_jobs_queue_idx;
-DROP INDEX IF EXISTS public.scheduler_jobs_idempotency_key_idx;
-DROP INDEX IF EXISTS public.schedule_change_records_session_idx;
-DROP INDEX IF EXISTS public.round_operation_records_round_idx;
-DROP INDEX IF EXISTS public.outbox_jobs_dedupe_key_idx;
-DROP INDEX IF EXISTS public.notifications_dedupe_key_idx;
-DROP INDEX IF EXISTS public.ix_timeframe_break_windows_version;
-DROP INDEX IF EXISTS public.ix_semesters_academic_year;
-DROP INDEX IF EXISTS public.ix_rounds_timeframe_id;
-DROP INDEX IF EXISTS public.ix_rounds_semester_id;
-DROP INDEX IF EXISTS public.ix_round_committees_committee_id;
-DROP INDEX IF EXISTS public.ix_excel_sheet_rows_batch_sheet;
-DROP INDEX IF EXISTS public.ix_excel_review_schedule_batch_type;
-DROP INDEX IF EXISTS public.ix_excel_projects_batch_codes;
-DROP INDEX IF EXISTS public.ix_excel_defense_councils_batch_type;
-DROP INDEX IF EXISTS public.auth_sessions_active_idx;
-ALTER TABLE IF EXISTS ONLY public.timeframe_versions DROP CONSTRAINT IF EXISTS uq_timeframe_versions_number;
-ALTER TABLE IF EXISTS ONLY public.timeframe_break_windows DROP CONSTRAINT IF EXISTS uq_timeframe_break_windows_sequence;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignments DROP CONSTRAINT IF EXISTS uq_schedule_assignments_version_group;
-ALTER TABLE IF EXISTS ONLY public.committee_members DROP CONSTRAINT IF EXISTS uq_committee_members_sequence;
-ALTER TABLE IF EXISTS ONLY public.timeslots DROP CONSTRAINT IF EXISTS timeslots_round_day_id_start_at_end_at_key;
-ALTER TABLE IF EXISTS ONLY public.timeslots DROP CONSTRAINT IF EXISTS timeslots_pkey;
-ALTER TABLE IF EXISTS ONLY public.timeframes DROP CONSTRAINT IF EXISTS timeframes_pkey;
-ALTER TABLE IF EXISTS ONLY public.timeframe_versions DROP CONSTRAINT IF EXISTS timeframe_versions_pkey;
-ALTER TABLE IF EXISTS ONLY public.timeframe_break_windows DROP CONSTRAINT IF EXISTS timeframe_break_windows_pkey;
-ALTER TABLE IF EXISTS ONLY public.students DROP CONSTRAINT IF EXISTS students_student_code_key;
-ALTER TABLE IF EXISTS ONLY public.students DROP CONSTRAINT IF EXISTS students_pkey;
-ALTER TABLE IF EXISTS ONLY public.students DROP CONSTRAINT IF EXISTS students_account_id_key;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_schedule_version_id_room_id_time_range_excl;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_schedule_version_id_group_id_key;
-ALTER TABLE IF EXISTS ONLY public.sessions DROP CONSTRAINT IF EXISTS sessions_pkey;
-ALTER TABLE IF EXISTS ONLY public.session_results DROP CONSTRAINT IF EXISTS session_results_session_id_key;
-ALTER TABLE IF EXISTS ONLY public.session_results DROP CONSTRAINT IF EXISTS session_results_pkey;
-ALTER TABLE IF EXISTS ONLY public.semesters DROP CONSTRAINT IF EXISTS semesters_pkey;
-ALTER TABLE IF EXISTS ONLY public.semesters DROP CONSTRAINT IF EXISTS semesters_code_key;
-ALTER TABLE IF EXISTS ONLY public.semester_lecturer_quotas DROP CONSTRAINT IF EXISTS semester_lecturer_quotas_pkey;
-ALTER TABLE IF EXISTS ONLY public.schema_meta DROP CONSTRAINT IF EXISTS schema_meta_pkey;
-ALTER TABLE IF EXISTS ONLY public.scheduler_jobs DROP CONSTRAINT IF EXISTS scheduler_jobs_schedule_version_id_key;
-ALTER TABLE IF EXISTS ONLY public.scheduler_jobs DROP CONSTRAINT IF EXISTS scheduler_jobs_pkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_versions DROP CONSTRAINT IF EXISTS schedule_versions_round_id_version_no_key;
-ALTER TABLE IF EXISTS ONLY public.schedule_versions DROP CONSTRAINT IF EXISTS schedule_versions_pkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_change_records DROP CONSTRAINT IF EXISTS schedule_change_records_pkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignments DROP CONSTRAINT IF EXISTS schedule_assignments_pkey;
-ALTER TABLE IF EXISTS ONLY public.rounds DROP CONSTRAINT IF EXISTS rounds_pkey;
-ALTER TABLE IF EXISTS ONLY public.round_room_types DROP CONSTRAINT IF EXISTS round_room_types_pkey;
-ALTER TABLE IF EXISTS ONLY public.round_operation_records DROP CONSTRAINT IF EXISTS round_operation_records_pkey;
-ALTER TABLE IF EXISTS ONLY public.round_invitations DROP CONSTRAINT IF EXISTS round_invitations_pkey;
-ALTER TABLE IF EXISTS ONLY public.round_groups DROP CONSTRAINT IF EXISTS round_groups_pkey;
-ALTER TABLE IF EXISTS ONLY public.round_days DROP CONSTRAINT IF EXISTS round_days_round_id_day_date_key;
-ALTER TABLE IF EXISTS ONLY public.round_days DROP CONSTRAINT IF EXISTS round_days_pkey;
-ALTER TABLE IF EXISTS ONLY public.round_committees DROP CONSTRAINT IF EXISTS round_committees_pkey;
-ALTER TABLE IF EXISTS ONLY public.rooms DROP CONSTRAINT IF EXISTS rooms_pkey;
-ALTER TABLE IF EXISTS ONLY public.rooms DROP CONSTRAINT IF EXISTS rooms_code_key;
-ALTER TABLE IF EXISTS ONLY public.reschedule_requests DROP CONSTRAINT IF EXISTS reschedule_requests_pkey;
-ALTER TABLE IF EXISTS ONLY public.remediation_cases DROP CONSTRAINT IF EXISTS remediation_cases_session_result_id_key;
-ALTER TABLE IF EXISTS ONLY public.remediation_cases DROP CONSTRAINT IF EXISTS remediation_cases_pkey;
-ALTER TABLE IF EXISTS ONLY public.projects DROP CONSTRAINT IF EXISTS projects_semester_id_code_key;
-ALTER TABLE IF EXISTS ONLY public.projects DROP CONSTRAINT IF EXISTS projects_pkey;
-ALTER TABLE IF EXISTS ONLY public.project_supervisors DROP CONSTRAINT IF EXISTS project_supervisors_pkey;
-ALTER TABLE IF EXISTS ONLY public.schedule_assignment_reviewers DROP CONSTRAINT IF EXISTS pk_schedule_assignment_reviewers;
-ALTER TABLE IF EXISTS ONLY public.outbox_jobs DROP CONSTRAINT IF EXISTS outbox_jobs_pkey;
-ALTER TABLE IF EXISTS ONLY public.notifications DROP CONSTRAINT IF EXISTS notifications_pkey;
-ALTER TABLE IF EXISTS ONLY public.majors DROP CONSTRAINT IF EXISTS majors_pkey;
-ALTER TABLE IF EXISTS ONLY public.majors DROP CONSTRAINT IF EXISTS majors_code_key;
-ALTER TABLE IF EXISTS ONLY public.lecturers DROP CONSTRAINT IF EXISTS lecturers_pkey;
-ALTER TABLE IF EXISTS ONLY public.lecturers DROP CONSTRAINT IF EXISTS lecturers_lecturer_code_key;
-ALTER TABLE IF EXISTS ONLY public.lecturers DROP CONSTRAINT IF EXISTS lecturers_account_id_key;
-ALTER TABLE IF EXISTS ONLY public.lecturer_availabilities DROP CONSTRAINT IF EXISTS lecturer_availabilities_pkey;
-ALTER TABLE IF EXISTS ONLY public.h11_waivers DROP CONSTRAINT IF EXISTS h11_waivers_round_id_group_id_key;
-ALTER TABLE IF EXISTS ONLY public.h11_waivers DROP CONSTRAINT IF EXISTS h11_waivers_pkey;
-ALTER TABLE IF EXISTS ONLY public.groups DROP CONSTRAINT IF EXISTS groups_project_id_key;
-ALTER TABLE IF EXISTS ONLY public.groups DROP CONSTRAINT IF EXISTS groups_project_id_code_key;
-ALTER TABLE IF EXISTS ONLY public.groups DROP CONSTRAINT IF EXISTS groups_pkey;
-ALTER TABLE IF EXISTS ONLY public.group_slot_preferences DROP CONSTRAINT IF EXISTS group_slot_preferences_pkey;
-ALTER TABLE IF EXISTS ONLY public.group_memberships DROP CONSTRAINT IF EXISTS group_memberships_pkey;
-ALTER TABLE IF EXISTS ONLY public.excel_summary_workloads DROP CONSTRAINT IF EXISTS excel_summary_workloads_pkey;
-ALTER TABLE IF EXISTS ONLY public.excel_summary_workloads DROP CONSTRAINT IF EXISTS excel_summary_workloads_batch_id_excel_row_key;
-ALTER TABLE IF EXISTS ONLY public.excel_sheet_rows DROP CONSTRAINT IF EXISTS excel_sheet_rows_pkey;
-ALTER TABLE IF EXISTS ONLY public.excel_sheet_rows DROP CONSTRAINT IF EXISTS excel_sheet_rows_batch_id_sheet_name_row_number_key;
-ALTER TABLE IF EXISTS ONLY public.excel_review_schedule_rows DROP CONSTRAINT IF EXISTS excel_review_schedule_rows_pkey;
-ALTER TABLE IF EXISTS ONLY public.excel_review_schedule_rows DROP CONSTRAINT IF EXISTS excel_review_schedule_rows_batch_id_review_type_excel_row_key;
-ALTER TABLE IF EXISTS ONLY public.excel_projects DROP CONSTRAINT IF EXISTS excel_projects_pkey;
-ALTER TABLE IF EXISTS ONLY public.excel_projects DROP CONSTRAINT IF EXISTS excel_projects_batch_id_excel_row_key;
-ALTER TABLE IF EXISTS ONLY public.excel_import_batches DROP CONSTRAINT IF EXISTS excel_import_batches_pkey;
-ALTER TABLE IF EXISTS ONLY public.excel_defense_councils DROP CONSTRAINT IF EXISTS excel_defense_councils_pkey;
-ALTER TABLE IF EXISTS ONLY public.excel_defense_councils DROP CONSTRAINT IF EXISTS excel_defense_councils_batch_id_defense_type_excel_row_key;
-ALTER TABLE IF EXISTS ONLY public.excel_council_groups DROP CONSTRAINT IF EXISTS excel_council_groups_pkey;
-ALTER TABLE IF EXISTS ONLY public.db_cleanup_backup_20260822_160826 DROP CONSTRAINT IF EXISTS db_cleanup_backup_20260822_160826_pkey;
-ALTER TABLE IF EXISTS ONLY public.councils DROP CONSTRAINT IF EXISTS councils_pkey;
-ALTER TABLE IF EXISTS ONLY public.council_members DROP CONSTRAINT IF EXISTS council_members_pkey;
-ALTER TABLE IF EXISTS ONLY public.conflict_declarations DROP CONSTRAINT IF EXISTS conflict_declarations_pkey;
-ALTER TABLE IF EXISTS ONLY public.conflict_declarations DROP CONSTRAINT IF EXISTS conflict_declarations_lecturer_id_project_id_key;
-ALTER TABLE IF EXISTS ONLY public.committees DROP CONSTRAINT IF EXISTS committees_pkey;
-ALTER TABLE IF EXISTS ONLY public.committees DROP CONSTRAINT IF EXISTS committees_code_key;
-ALTER TABLE IF EXISTS ONLY public.committee_members DROP CONSTRAINT IF EXISTS committee_members_pkey;
-ALTER TABLE IF EXISTS ONLY public.auth_sessions DROP CONSTRAINT IF EXISTS auth_sessions_token_hash_key;
-ALTER TABLE IF EXISTS ONLY public.auth_sessions DROP CONSTRAINT IF EXISTS auth_sessions_pkey;
-ALTER TABLE IF EXISTS ONLY public.auth_login_throttles DROP CONSTRAINT IF EXISTS auth_login_throttles_pkey;
-ALTER TABLE IF EXISTS ONLY public.audit_events DROP CONSTRAINT IF EXISTS audit_events_pkey;
-ALTER TABLE IF EXISTS ONLY public.alembic_version DROP CONSTRAINT IF EXISTS alembic_version_pkc;
-ALTER TABLE IF EXISTS ONLY public.accounts DROP CONSTRAINT IF EXISTS accounts_pkey;
-ALTER TABLE IF EXISTS ONLY public.accounts DROP CONSTRAINT IF EXISTS accounts_email_key;
-ALTER TABLE IF EXISTS ONLY public.account_roles DROP CONSTRAINT IF EXISTS account_roles_pkey;
-ALTER TABLE IF EXISTS public.timeslots ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.students ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.sessions ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.session_results ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.semesters ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.scheduler_jobs ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.schedule_versions ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.schedule_change_records ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.rounds ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.round_operation_records ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.round_days ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.rooms ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.reschedule_requests ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.remediation_cases ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.projects ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.outbox_jobs ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.notifications ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.majors ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.lecturers ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.h11_waivers ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.groups ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.group_memberships ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.excel_summary_workloads ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.excel_sheet_rows ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.excel_review_schedule_rows ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.excel_projects ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.excel_import_batches ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.excel_defense_councils ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.councils ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.conflict_declarations ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.auth_sessions ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.audit_events ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.accounts ALTER COLUMN id DROP DEFAULT;
-DROP SEQUENCE IF EXISTS public.timeslots_id_seq;
-DROP TABLE IF EXISTS public.timeslots;
-DROP TABLE IF EXISTS public.timeframes;
-DROP TABLE IF EXISTS public.timeframe_versions;
-DROP TABLE IF EXISTS public.timeframe_break_windows;
-DROP SEQUENCE IF EXISTS public.students_id_seq;
-DROP TABLE IF EXISTS public.students;
-DROP SEQUENCE IF EXISTS public.sessions_id_seq;
-DROP SEQUENCE IF EXISTS public.session_results_id_seq;
-DROP TABLE IF EXISTS public.session_results;
-DROP SEQUENCE IF EXISTS public.semesters_id_seq;
-DROP TABLE IF EXISTS public.semesters;
-DROP TABLE IF EXISTS public.semester_lecturer_quotas;
-DROP TABLE IF EXISTS public.schema_meta;
-DROP SEQUENCE IF EXISTS public.scheduler_jobs_id_seq;
-DROP TABLE IF EXISTS public.scheduler_jobs;
-DROP SEQUENCE IF EXISTS public.schedule_versions_id_seq;
-DROP TABLE IF EXISTS public.schedule_versions;
-DROP SEQUENCE IF EXISTS public.schedule_change_records_id_seq;
-DROP TABLE IF EXISTS public.schedule_change_records;
-DROP TABLE IF EXISTS public.schedule_assignments;
-DROP TABLE IF EXISTS public.schedule_assignment_reviewers;
-DROP SEQUENCE IF EXISTS public.rounds_id_seq;
-DROP TABLE IF EXISTS public.rounds;
-DROP TABLE IF EXISTS public.round_room_types;
-DROP SEQUENCE IF EXISTS public.round_operation_records_id_seq;
-DROP TABLE IF EXISTS public.round_operation_records;
-DROP TABLE IF EXISTS public.round_groups;
-DROP SEQUENCE IF EXISTS public.round_days_id_seq;
-DROP TABLE IF EXISTS public.round_days;
-DROP TABLE IF EXISTS public.round_committees;
-DROP SEQUENCE IF EXISTS public.rooms_id_seq;
-DROP TABLE IF EXISTS public.rooms;
-DROP SEQUENCE IF EXISTS public.reschedule_requests_id_seq;
-DROP TABLE IF EXISTS public.reschedule_requests;
-DROP SEQUENCE IF EXISTS public.remediation_cases_id_seq;
-DROP TABLE IF EXISTS public.remediation_cases;
-DROP SEQUENCE IF EXISTS public.projects_id_seq;
-DROP TABLE IF EXISTS public.project_supervisors;
-DROP SEQUENCE IF EXISTS public.outbox_jobs_id_seq;
-DROP TABLE IF EXISTS public.outbox_jobs;
-DROP SEQUENCE IF EXISTS public.notifications_id_seq;
-DROP TABLE IF EXISTS public.notifications;
-DROP SEQUENCE IF EXISTS public.majors_id_seq;
-DROP TABLE IF EXISTS public.majors;
-DROP SEQUENCE IF EXISTS public.lecturers_id_seq;
-DROP TABLE IF EXISTS public.lecturers;
-DROP TABLE IF EXISTS public.lecturer_availabilities;
-DROP SEQUENCE IF EXISTS public.h11_waivers_id_seq;
-DROP TABLE IF EXISTS public.h11_waivers;
-DROP SEQUENCE IF EXISTS public.groups_id_seq;
-DROP TABLE IF EXISTS public.group_slot_preferences;
-DROP SEQUENCE IF EXISTS public.group_memberships_id_seq;
-DROP TABLE IF EXISTS public.group_memberships;
-DROP SEQUENCE IF EXISTS public.excel_summary_workloads_id_seq;
-DROP TABLE IF EXISTS public.excel_summary_workloads;
-DROP SEQUENCE IF EXISTS public.excel_sheet_rows_id_seq;
-DROP TABLE IF EXISTS public.excel_sheet_rows;
-DROP SEQUENCE IF EXISTS public.excel_review_schedule_rows_id_seq;
-DROP TABLE IF EXISTS public.excel_review_schedule_rows;
-DROP SEQUENCE IF EXISTS public.excel_projects_id_seq;
-DROP TABLE IF EXISTS public.excel_projects;
-DROP SEQUENCE IF EXISTS public.excel_import_batches_id_seq;
-DROP TABLE IF EXISTS public.excel_import_batches;
-DROP SEQUENCE IF EXISTS public.excel_defense_councils_id_seq;
-DROP TABLE IF EXISTS public.excel_defense_councils;
-DROP TABLE IF EXISTS public.excel_council_groups;
-DROP TABLE IF EXISTS public.db_cleanup_backup_20260822_160826;
-DROP SEQUENCE IF EXISTS public.councils_id_seq;
-DROP TABLE IF EXISTS public.councils;
-DROP TABLE IF EXISTS public.council_members;
-DROP SEQUENCE IF EXISTS public.conflict_declarations_id_seq;
-DROP TABLE IF EXISTS public.conflict_declarations;
-DROP TABLE IF EXISTS public.committees;
-DROP TABLE IF EXISTS public.committee_members;
-DROP SEQUENCE IF EXISTS public.auth_sessions_id_seq;
-DROP TABLE IF EXISTS public.auth_sessions;
-DROP TABLE IF EXISTS public.auth_login_throttles;
-DROP SEQUENCE IF EXISTS public.audit_events_id_seq;
-DROP TABLE IF EXISTS public.audit_events;
-DROP VIEW IF EXISTS public.api_session_statuses;
-DROP TABLE IF EXISTS public.sessions;
-DROP VIEW IF EXISTS public.api_project_statuses;
-DROP TABLE IF EXISTS public.projects;
-DROP VIEW IF EXISTS public.api_invitation_statuses;
-DROP TABLE IF EXISTS public.round_invitations;
-DROP VIEW IF EXISTS public.api_group_statuses;
-DROP TABLE IF EXISTS public.groups;
-DROP TABLE IF EXISTS public.alembic_version;
-DROP SEQUENCE IF EXISTS public.accounts_id_seq;
-DROP TABLE IF EXISTS public.accounts;
-DROP TABLE IF EXISTS public.account_roles;
-DROP FUNCTION IF EXISTS public.validate_session_council();
-DROP FUNCTION IF EXISTS public.reject_audit_mutation();
-DROP FUNCTION IF EXISTS public.prevent_council_mutation();
-DROP FUNCTION IF EXISTS public.prevent_council_member_mutation();
-DROP TYPE IF EXISTS public.verify_status;
-DROP TYPE IF EXISTS public.system_role;
-DROP TYPE IF EXISTS public.supervisor_type;
-DROP TYPE IF EXISTS public.session_status;
-DROP TYPE IF EXISTS public.semester_status;
-DROP TYPE IF EXISTS public.schedule_version_status;
-DROP TYPE IF EXISTS public.round_type;
-DROP TYPE IF EXISTS public.round_status;
-DROP TYPE IF EXISTS public.room_type;
-DROP TYPE IF EXISTS public.result_outcome;
-DROP TYPE IF EXISTS public.reschedule_status;
-DROP TYPE IF EXISTS public.remediation_status;
-DROP TYPE IF EXISTS public.project_status;
-DROP TYPE IF EXISTS public.outbox_status;
-DROP TYPE IF EXISTS public.notification_status;
-DROP TYPE IF EXISTS public.membership_status;
-DROP TYPE IF EXISTS public.membership_role;
-DROP TYPE IF EXISTS public.invitation_status;
-DROP TYPE IF EXISTS public.group_status;
-DROP TYPE IF EXISTS public.committee_role;
-DROP TYPE IF EXISTS public.availability_state;
-DROP TYPE IF EXISTS public.assignment_role;
-DROP TYPE IF EXISTS public.account_status;
-DROP EXTENSION IF EXISTS btree_gist;
 --
 -- Name: btree_gist; Type: EXTENSION; Schema: -; Owner: -
 --
@@ -398,14 +26,14 @@ CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION btree_gist; Type: COMMENT; Schema: -; Owner: -
+-- Name: EXTENSION btree_gist; Type: COMMENT; Schema: -; Owner:
 --
 
 COMMENT ON EXTENSION btree_gist IS 'support for indexing common datatypes in GiST';
 
 
 --
--- Name: account_status; Type: TYPE; Schema: public; Owner: -
+-- Name: account_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.account_status AS ENUM (
@@ -414,8 +42,10 @@ CREATE TYPE public.account_status AS ENUM (
 );
 
 
+ALTER TYPE public.account_status OWNER TO scheduler;
+
 --
--- Name: assignment_role; Type: TYPE; Schema: public; Owner: -
+-- Name: assignment_role; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.assignment_role AS ENUM (
@@ -427,8 +57,10 @@ CREATE TYPE public.assignment_role AS ENUM (
 );
 
 
+ALTER TYPE public.assignment_role OWNER TO scheduler;
+
 --
--- Name: availability_state; Type: TYPE; Schema: public; Owner: -
+-- Name: availability_state; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.availability_state AS ENUM (
@@ -437,8 +69,10 @@ CREATE TYPE public.availability_state AS ENUM (
 );
 
 
+ALTER TYPE public.availability_state OWNER TO scheduler;
+
 --
--- Name: committee_role; Type: TYPE; Schema: public; Owner: -
+-- Name: committee_role; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.committee_role AS ENUM (
@@ -449,8 +83,10 @@ CREATE TYPE public.committee_role AS ENUM (
 );
 
 
+ALTER TYPE public.committee_role OWNER TO scheduler;
+
 --
--- Name: group_status; Type: TYPE; Schema: public; Owner: -
+-- Name: group_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.group_status AS ENUM (
@@ -464,8 +100,10 @@ CREATE TYPE public.group_status AS ENUM (
 );
 
 
+ALTER TYPE public.group_status OWNER TO scheduler;
+
 --
--- Name: invitation_status; Type: TYPE; Schema: public; Owner: -
+-- Name: invitation_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.invitation_status AS ENUM (
@@ -475,8 +113,10 @@ CREATE TYPE public.invitation_status AS ENUM (
 );
 
 
+ALTER TYPE public.invitation_status OWNER TO scheduler;
+
 --
--- Name: membership_role; Type: TYPE; Schema: public; Owner: -
+-- Name: membership_role; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.membership_role AS ENUM (
@@ -485,8 +125,10 @@ CREATE TYPE public.membership_role AS ENUM (
 );
 
 
+ALTER TYPE public.membership_role OWNER TO scheduler;
+
 --
--- Name: membership_status; Type: TYPE; Schema: public; Owner: -
+-- Name: membership_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.membership_status AS ENUM (
@@ -495,8 +137,10 @@ CREATE TYPE public.membership_status AS ENUM (
 );
 
 
+ALTER TYPE public.membership_status OWNER TO scheduler;
+
 --
--- Name: notification_status; Type: TYPE; Schema: public; Owner: -
+-- Name: notification_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.notification_status AS ENUM (
@@ -506,8 +150,10 @@ CREATE TYPE public.notification_status AS ENUM (
 );
 
 
+ALTER TYPE public.notification_status OWNER TO scheduler;
+
 --
--- Name: outbox_status; Type: TYPE; Schema: public; Owner: -
+-- Name: outbox_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.outbox_status AS ENUM (
@@ -518,8 +164,10 @@ CREATE TYPE public.outbox_status AS ENUM (
 );
 
 
+ALTER TYPE public.outbox_status OWNER TO scheduler;
+
 --
--- Name: project_status; Type: TYPE; Schema: public; Owner: -
+-- Name: project_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.project_status AS ENUM (
@@ -528,8 +176,10 @@ CREATE TYPE public.project_status AS ENUM (
 );
 
 
+ALTER TYPE public.project_status OWNER TO scheduler;
+
 --
--- Name: remediation_status; Type: TYPE; Schema: public; Owner: -
+-- Name: remediation_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.remediation_status AS ENUM (
@@ -540,8 +190,10 @@ CREATE TYPE public.remediation_status AS ENUM (
 );
 
 
+ALTER TYPE public.remediation_status OWNER TO scheduler;
+
 --
--- Name: reschedule_status; Type: TYPE; Schema: public; Owner: -
+-- Name: reschedule_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.reschedule_status AS ENUM (
@@ -552,8 +204,10 @@ CREATE TYPE public.reschedule_status AS ENUM (
 );
 
 
+ALTER TYPE public.reschedule_status OWNER TO scheduler;
+
 --
--- Name: result_outcome; Type: TYPE; Schema: public; Owner: -
+-- Name: result_outcome; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.result_outcome AS ENUM (
@@ -569,8 +223,10 @@ CREATE TYPE public.result_outcome AS ENUM (
 );
 
 
+ALTER TYPE public.result_outcome OWNER TO scheduler;
+
 --
--- Name: room_type; Type: TYPE; Schema: public; Owner: -
+-- Name: room_type; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.room_type AS ENUM (
@@ -580,8 +236,10 @@ CREATE TYPE public.room_type AS ENUM (
 );
 
 
+ALTER TYPE public.room_type OWNER TO scheduler;
+
 --
--- Name: round_status; Type: TYPE; Schema: public; Owner: -
+-- Name: round_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.round_status AS ENUM (
@@ -599,8 +257,10 @@ CREATE TYPE public.round_status AS ENUM (
 );
 
 
+ALTER TYPE public.round_status OWNER TO scheduler;
+
 --
--- Name: round_type; Type: TYPE; Schema: public; Owner: -
+-- Name: round_type; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.round_type AS ENUM (
@@ -616,8 +276,10 @@ CREATE TYPE public.round_type AS ENUM (
 );
 
 
+ALTER TYPE public.round_type OWNER TO scheduler;
+
 --
--- Name: schedule_version_status; Type: TYPE; Schema: public; Owner: -
+-- Name: schedule_version_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.schedule_version_status AS ENUM (
@@ -628,8 +290,10 @@ CREATE TYPE public.schedule_version_status AS ENUM (
 );
 
 
+ALTER TYPE public.schedule_version_status OWNER TO scheduler;
+
 --
--- Name: semester_status; Type: TYPE; Schema: public; Owner: -
+-- Name: semester_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.semester_status AS ENUM (
@@ -640,8 +304,10 @@ CREATE TYPE public.semester_status AS ENUM (
 );
 
 
+ALTER TYPE public.semester_status OWNER TO scheduler;
+
 --
--- Name: session_status; Type: TYPE; Schema: public; Owner: -
+-- Name: session_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.session_status AS ENUM (
@@ -654,8 +320,10 @@ CREATE TYPE public.session_status AS ENUM (
 );
 
 
+ALTER TYPE public.session_status OWNER TO scheduler;
+
 --
--- Name: supervisor_type; Type: TYPE; Schema: public; Owner: -
+-- Name: supervisor_type; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.supervisor_type AS ENUM (
@@ -664,8 +332,10 @@ CREATE TYPE public.supervisor_type AS ENUM (
 );
 
 
+ALTER TYPE public.supervisor_type OWNER TO scheduler;
+
 --
--- Name: system_role; Type: TYPE; Schema: public; Owner: -
+-- Name: system_role; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.system_role AS ENUM (
@@ -676,8 +346,10 @@ CREATE TYPE public.system_role AS ENUM (
 );
 
 
+ALTER TYPE public.system_role OWNER TO scheduler;
+
 --
--- Name: verify_status; Type: TYPE; Schema: public; Owner: -
+-- Name: verify_status; Type: TYPE; Schema: public; Owner: scheduler
 --
 
 CREATE TYPE public.verify_status AS ENUM (
@@ -687,8 +359,10 @@ CREATE TYPE public.verify_status AS ENUM (
 );
 
 
+ALTER TYPE public.verify_status OWNER TO scheduler;
+
 --
--- Name: prevent_council_member_mutation(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: prevent_council_member_mutation(); Type: FUNCTION; Schema: public; Owner: scheduler
 --
 
 CREATE FUNCTION public.prevent_council_member_mutation() RETURNS trigger
@@ -706,8 +380,10 @@ CREATE FUNCTION public.prevent_council_member_mutation() RETURNS trigger
         $$;
 
 
+ALTER FUNCTION public.prevent_council_member_mutation() OWNER TO scheduler;
+
 --
--- Name: prevent_council_mutation(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: prevent_council_mutation(); Type: FUNCTION; Schema: public; Owner: scheduler
 --
 
 CREATE FUNCTION public.prevent_council_mutation() RETURNS trigger
@@ -733,8 +409,10 @@ CREATE FUNCTION public.prevent_council_mutation() RETURNS trigger
         $$;
 
 
+ALTER FUNCTION public.prevent_council_mutation() OWNER TO scheduler;
+
 --
--- Name: reject_audit_mutation(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: reject_audit_mutation(); Type: FUNCTION; Schema: public; Owner: scheduler
 --
 
 CREATE FUNCTION public.reject_audit_mutation() RETURNS trigger
@@ -746,8 +424,10 @@ CREATE FUNCTION public.reject_audit_mutation() RETURNS trigger
         $$;
 
 
+ALTER FUNCTION public.reject_audit_mutation() OWNER TO scheduler;
+
 --
--- Name: validate_session_council(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: validate_session_council(); Type: FUNCTION; Schema: public; Owner: scheduler
 --
 
 CREATE FUNCTION public.validate_session_council() RETURNS trigger
@@ -776,12 +456,14 @@ CREATE FUNCTION public.validate_session_council() RETURNS trigger
         $$;
 
 
+ALTER FUNCTION public.validate_session_council() OWNER TO scheduler;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: account_roles; Type: TABLE; Schema: public; Owner: -
+-- Name: account_roles; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.account_roles (
@@ -790,8 +472,10 @@ CREATE TABLE public.account_roles (
 );
 
 
+ALTER TABLE public.account_roles OWNER TO scheduler;
+
 --
--- Name: accounts; Type: TABLE; Schema: public; Owner: -
+-- Name: accounts; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.accounts (
@@ -804,8 +488,10 @@ CREATE TABLE public.accounts (
 );
 
 
+ALTER TABLE public.accounts OWNER TO scheduler;
+
 --
--- Name: accounts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: accounts_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.accounts_id_seq
@@ -816,15 +502,17 @@ CREATE SEQUENCE public.accounts_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.accounts_id_seq OWNER TO scheduler;
+
 --
--- Name: accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.accounts_id_seq OWNED BY public.accounts.id;
 
 
 --
--- Name: alembic_version; Type: TABLE; Schema: public; Owner: -
+-- Name: alembic_version; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.alembic_version (
@@ -832,8 +520,10 @@ CREATE TABLE public.alembic_version (
 );
 
 
+ALTER TABLE public.alembic_version OWNER TO scheduler;
+
 --
--- Name: groups; Type: TABLE; Schema: public; Owner: -
+-- Name: groups; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.groups (
@@ -844,8 +534,10 @@ CREATE TABLE public.groups (
 );
 
 
+ALTER TABLE public.groups OWNER TO scheduler;
+
 --
--- Name: api_group_statuses; Type: VIEW; Schema: public; Owner: -
+-- Name: api_group_statuses; Type: VIEW; Schema: public; Owner: scheduler
 --
 
 CREATE VIEW public.api_group_statuses AS
@@ -860,8 +552,10 @@ CREATE VIEW public.api_group_statuses AS
    FROM public.groups g;
 
 
+ALTER VIEW public.api_group_statuses OWNER TO scheduler;
+
 --
--- Name: round_invitations; Type: TABLE; Schema: public; Owner: -
+-- Name: round_invitations; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.round_invitations (
@@ -873,8 +567,10 @@ CREATE TABLE public.round_invitations (
 );
 
 
+ALTER TABLE public.round_invitations OWNER TO scheduler;
+
 --
--- Name: api_invitation_statuses; Type: VIEW; Schema: public; Owner: -
+-- Name: api_invitation_statuses; Type: VIEW; Schema: public; Owner: scheduler
 --
 
 CREATE VIEW public.api_invitation_statuses AS
@@ -885,8 +581,10 @@ CREATE VIEW public.api_invitation_statuses AS
    FROM public.round_invitations i;
 
 
+ALTER VIEW public.api_invitation_statuses OWNER TO scheduler;
+
 --
--- Name: projects; Type: TABLE; Schema: public; Owner: -
+-- Name: projects; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.projects (
@@ -901,8 +599,10 @@ CREATE TABLE public.projects (
 );
 
 
+ALTER TABLE public.projects OWNER TO scheduler;
+
 --
--- Name: api_project_statuses; Type: VIEW; Schema: public; Owner: -
+-- Name: api_project_statuses; Type: VIEW; Schema: public; Owner: scheduler
 --
 
 CREATE VIEW public.api_project_statuses AS
@@ -915,8 +615,10 @@ CREATE VIEW public.api_project_statuses AS
    FROM public.projects p;
 
 
+ALTER VIEW public.api_project_statuses OWNER TO scheduler;
+
 --
--- Name: sessions; Type: TABLE; Schema: public; Owner: -
+-- Name: sessions; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.sessions (
@@ -935,8 +637,10 @@ CREATE TABLE public.sessions (
 );
 
 
+ALTER TABLE public.sessions OWNER TO scheduler;
+
 --
--- Name: api_session_statuses; Type: VIEW; Schema: public; Owner: -
+-- Name: api_session_statuses; Type: VIEW; Schema: public; Owner: scheduler
 --
 
 CREATE VIEW public.api_session_statuses AS
@@ -946,8 +650,10 @@ CREATE VIEW public.api_session_statuses AS
    FROM public.sessions s;
 
 
+ALTER VIEW public.api_session_statuses OWNER TO scheduler;
+
 --
--- Name: audit_events; Type: TABLE; Schema: public; Owner: -
+-- Name: audit_events; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.audit_events (
@@ -963,8 +669,10 @@ CREATE TABLE public.audit_events (
 );
 
 
+ALTER TABLE public.audit_events OWNER TO scheduler;
+
 --
--- Name: audit_events_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: audit_events_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.audit_events_id_seq
@@ -975,15 +683,17 @@ CREATE SEQUENCE public.audit_events_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.audit_events_id_seq OWNER TO scheduler;
+
 --
--- Name: audit_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: audit_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.audit_events_id_seq OWNED BY public.audit_events.id;
 
 
 --
--- Name: auth_login_throttles; Type: TABLE; Schema: public; Owner: -
+-- Name: auth_login_throttles; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.auth_login_throttles (
@@ -995,8 +705,10 @@ CREATE TABLE public.auth_login_throttles (
 );
 
 
+ALTER TABLE public.auth_login_throttles OWNER TO scheduler;
+
 --
--- Name: auth_sessions; Type: TABLE; Schema: public; Owner: -
+-- Name: auth_sessions; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.auth_sessions (
@@ -1011,8 +723,10 @@ CREATE TABLE public.auth_sessions (
 );
 
 
+ALTER TABLE public.auth_sessions OWNER TO scheduler;
+
 --
--- Name: auth_sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: auth_sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.auth_sessions_id_seq
@@ -1023,15 +737,17 @@ CREATE SEQUENCE public.auth_sessions_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.auth_sessions_id_seq OWNER TO scheduler;
+
 --
--- Name: auth_sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: auth_sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.auth_sessions_id_seq OWNED BY public.auth_sessions.id;
 
 
 --
--- Name: committee_members; Type: TABLE; Schema: public; Owner: -
+-- Name: committee_members; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.committee_members (
@@ -1043,8 +759,10 @@ CREATE TABLE public.committee_members (
 );
 
 
+ALTER TABLE public.committee_members OWNER TO scheduler;
+
 --
--- Name: committees; Type: TABLE; Schema: public; Owner: -
+-- Name: committees; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.committees (
@@ -1057,8 +775,10 @@ CREATE TABLE public.committees (
 );
 
 
+ALTER TABLE public.committees OWNER TO scheduler;
+
 --
--- Name: committees_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: committees_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE public.committees ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -1072,7 +792,7 @@ ALTER TABLE public.committees ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTI
 
 
 --
--- Name: conflict_declarations; Type: TABLE; Schema: public; Owner: -
+-- Name: conflict_declarations; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.conflict_declarations (
@@ -1085,8 +805,10 @@ CREATE TABLE public.conflict_declarations (
 );
 
 
+ALTER TABLE public.conflict_declarations OWNER TO scheduler;
+
 --
--- Name: conflict_declarations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: conflict_declarations_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.conflict_declarations_id_seq
@@ -1097,15 +819,17 @@ CREATE SEQUENCE public.conflict_declarations_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.conflict_declarations_id_seq OWNER TO scheduler;
+
 --
--- Name: conflict_declarations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: conflict_declarations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.conflict_declarations_id_seq OWNED BY public.conflict_declarations.id;
 
 
 --
--- Name: council_members; Type: TABLE; Schema: public; Owner: -
+-- Name: council_members; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.council_members (
@@ -1117,8 +841,10 @@ CREATE TABLE public.council_members (
 );
 
 
+ALTER TABLE public.council_members OWNER TO scheduler;
+
 --
--- Name: councils; Type: TABLE; Schema: public; Owner: -
+-- Name: councils; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.councils (
@@ -1132,8 +858,10 @@ CREATE TABLE public.councils (
 );
 
 
+ALTER TABLE public.councils OWNER TO scheduler;
+
 --
--- Name: councils_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: councils_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.councils_id_seq
@@ -1144,15 +872,17 @@ CREATE SEQUENCE public.councils_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.councils_id_seq OWNER TO scheduler;
+
 --
--- Name: councils_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: councils_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.councils_id_seq OWNED BY public.councils.id;
 
 
 --
--- Name: db_cleanup_backup_20260822_160826; Type: TABLE; Schema: public; Owner: -
+-- Name: db_cleanup_backup_20260822_160826; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.db_cleanup_backup_20260822_160826 (
@@ -1163,15 +893,17 @@ CREATE TABLE public.db_cleanup_backup_20260822_160826 (
 );
 
 
+ALTER TABLE public.db_cleanup_backup_20260822_160826 OWNER TO scheduler;
+
 --
--- Name: TABLE db_cleanup_backup_20260822_160826; Type: COMMENT; Schema: public; Owner: -
+-- Name: TABLE db_cleanup_backup_20260822_160826; Type: COMMENT; Schema: public; Owner: scheduler
 --
 
 COMMENT ON TABLE public.db_cleanup_backup_20260822_160826 IS 'Full public-table snapshot before cleanup/import';
 
 
 --
--- Name: db_cleanup_backup_20260822_160826_backup_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: db_cleanup_backup_20260822_160826_backup_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE public.db_cleanup_backup_20260822_160826 ALTER COLUMN backup_id ADD GENERATED ALWAYS AS IDENTITY (
@@ -1185,7 +917,7 @@ ALTER TABLE public.db_cleanup_backup_20260822_160826 ALTER COLUMN backup_id ADD 
 
 
 --
--- Name: excel_council_groups; Type: TABLE; Schema: public; Owner: -
+-- Name: excel_council_groups; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.excel_council_groups (
@@ -1197,8 +929,10 @@ CREATE TABLE public.excel_council_groups (
 );
 
 
+ALTER TABLE public.excel_council_groups OWNER TO scheduler;
+
 --
--- Name: excel_defense_councils; Type: TABLE; Schema: public; Owner: -
+-- Name: excel_defense_councils; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.excel_defense_councils (
@@ -1224,8 +958,10 @@ CREATE TABLE public.excel_defense_councils (
 );
 
 
+ALTER TABLE public.excel_defense_councils OWNER TO scheduler;
+
 --
--- Name: excel_defense_councils_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: excel_defense_councils_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.excel_defense_councils_id_seq
@@ -1236,15 +972,17 @@ CREATE SEQUENCE public.excel_defense_councils_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.excel_defense_councils_id_seq OWNER TO scheduler;
+
 --
--- Name: excel_defense_councils_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: excel_defense_councils_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.excel_defense_councils_id_seq OWNED BY public.excel_defense_councils.id;
 
 
 --
--- Name: excel_import_batches; Type: TABLE; Schema: public; Owner: -
+-- Name: excel_import_batches; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.excel_import_batches (
@@ -1256,8 +994,10 @@ CREATE TABLE public.excel_import_batches (
 );
 
 
+ALTER TABLE public.excel_import_batches OWNER TO scheduler;
+
 --
--- Name: excel_import_batches_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: excel_import_batches_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.excel_import_batches_id_seq
@@ -1268,15 +1008,17 @@ CREATE SEQUENCE public.excel_import_batches_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.excel_import_batches_id_seq OWNER TO scheduler;
+
 --
--- Name: excel_import_batches_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: excel_import_batches_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.excel_import_batches_id_seq OWNED BY public.excel_import_batches.id;
 
 
 --
--- Name: excel_projects; Type: TABLE; Schema: public; Owner: -
+-- Name: excel_projects; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.excel_projects (
@@ -1297,8 +1039,10 @@ CREATE TABLE public.excel_projects (
 );
 
 
+ALTER TABLE public.excel_projects OWNER TO scheduler;
+
 --
--- Name: excel_projects_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: excel_projects_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.excel_projects_id_seq
@@ -1309,15 +1053,17 @@ CREATE SEQUENCE public.excel_projects_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.excel_projects_id_seq OWNER TO scheduler;
+
 --
--- Name: excel_projects_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: excel_projects_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.excel_projects_id_seq OWNED BY public.excel_projects.id;
 
 
 --
--- Name: excel_review_schedule_rows; Type: TABLE; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.excel_review_schedule_rows (
@@ -1344,8 +1090,10 @@ CREATE TABLE public.excel_review_schedule_rows (
 );
 
 
+ALTER TABLE public.excel_review_schedule_rows OWNER TO scheduler;
+
 --
--- Name: excel_review_schedule_rows_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.excel_review_schedule_rows_id_seq
@@ -1356,15 +1104,17 @@ CREATE SEQUENCE public.excel_review_schedule_rows_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.excel_review_schedule_rows_id_seq OWNER TO scheduler;
+
 --
--- Name: excel_review_schedule_rows_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.excel_review_schedule_rows_id_seq OWNED BY public.excel_review_schedule_rows.id;
 
 
 --
--- Name: excel_sheet_rows; Type: TABLE; Schema: public; Owner: -
+-- Name: excel_sheet_rows; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.excel_sheet_rows (
@@ -1379,8 +1129,10 @@ CREATE TABLE public.excel_sheet_rows (
 );
 
 
+ALTER TABLE public.excel_sheet_rows OWNER TO scheduler;
+
 --
--- Name: excel_sheet_rows_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: excel_sheet_rows_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.excel_sheet_rows_id_seq
@@ -1391,15 +1143,17 @@ CREATE SEQUENCE public.excel_sheet_rows_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.excel_sheet_rows_id_seq OWNER TO scheduler;
+
 --
--- Name: excel_sheet_rows_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: excel_sheet_rows_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.excel_sheet_rows_id_seq OWNED BY public.excel_sheet_rows.id;
 
 
 --
--- Name: excel_summary_workloads; Type: TABLE; Schema: public; Owner: -
+-- Name: excel_summary_workloads; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.excel_summary_workloads (
@@ -1418,8 +1172,10 @@ CREATE TABLE public.excel_summary_workloads (
 );
 
 
+ALTER TABLE public.excel_summary_workloads OWNER TO scheduler;
+
 --
--- Name: excel_summary_workloads_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: excel_summary_workloads_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.excel_summary_workloads_id_seq
@@ -1430,15 +1186,17 @@ CREATE SEQUENCE public.excel_summary_workloads_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.excel_summary_workloads_id_seq OWNER TO scheduler;
+
 --
--- Name: excel_summary_workloads_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: excel_summary_workloads_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.excel_summary_workloads_id_seq OWNED BY public.excel_summary_workloads.id;
 
 
 --
--- Name: group_memberships; Type: TABLE; Schema: public; Owner: -
+-- Name: group_memberships; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.group_memberships (
@@ -1457,8 +1215,10 @@ CREATE TABLE public.group_memberships (
 );
 
 
+ALTER TABLE public.group_memberships OWNER TO scheduler;
+
 --
--- Name: group_memberships_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: group_memberships_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.group_memberships_id_seq
@@ -1469,15 +1229,17 @@ CREATE SEQUENCE public.group_memberships_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.group_memberships_id_seq OWNER TO scheduler;
+
 --
--- Name: group_memberships_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: group_memberships_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.group_memberships_id_seq OWNED BY public.group_memberships.id;
 
 
 --
--- Name: group_slot_preferences; Type: TABLE; Schema: public; Owner: -
+-- Name: group_slot_preferences; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.group_slot_preferences (
@@ -1490,8 +1252,10 @@ CREATE TABLE public.group_slot_preferences (
 );
 
 
+ALTER TABLE public.group_slot_preferences OWNER TO scheduler;
+
 --
--- Name: groups_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: groups_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.groups_id_seq
@@ -1502,15 +1266,17 @@ CREATE SEQUENCE public.groups_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.groups_id_seq OWNER TO scheduler;
+
 --
--- Name: groups_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: groups_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.groups_id_seq OWNED BY public.groups.id;
 
 
 --
--- Name: h11_waivers; Type: TABLE; Schema: public; Owner: -
+-- Name: h11_waivers; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.h11_waivers (
@@ -1524,8 +1290,10 @@ CREATE TABLE public.h11_waivers (
 );
 
 
+ALTER TABLE public.h11_waivers OWNER TO scheduler;
+
 --
--- Name: h11_waivers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: h11_waivers_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.h11_waivers_id_seq
@@ -1536,15 +1304,17 @@ CREATE SEQUENCE public.h11_waivers_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.h11_waivers_id_seq OWNER TO scheduler;
+
 --
--- Name: h11_waivers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: h11_waivers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.h11_waivers_id_seq OWNED BY public.h11_waivers.id;
 
 
 --
--- Name: lecturer_availabilities; Type: TABLE; Schema: public; Owner: -
+-- Name: lecturer_availabilities; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.lecturer_availabilities (
@@ -1555,12 +1325,14 @@ CREATE TABLE public.lecturer_availabilities (
     load_preference character varying(16) DEFAULT 'MEDIUM'::character varying NOT NULL,
     source character varying(32) DEFAULT 'FORM'::character varying NOT NULL,
     updated_by bigint,
-    CONSTRAINT lecturer_availabilities_load_preference_check CHECK (((load_preference)::text = ANY ((ARRAY['LOW'::character varying, 'MEDIUM'::character varying, 'HIGH'::character varying])::text[])))
+    CONSTRAINT lecturer_availabilities_load_preference_check CHECK (((load_preference)::text = ANY (ARRAY[('LOW'::character varying)::text, ('MEDIUM'::character varying)::text, ('HIGH'::character varying)::text])))
 );
 
 
+ALTER TABLE public.lecturer_availabilities OWNER TO scheduler;
+
 --
--- Name: lecturers; Type: TABLE; Schema: public; Owner: -
+-- Name: lecturers; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.lecturers (
@@ -1570,8 +1342,10 @@ CREATE TABLE public.lecturers (
 );
 
 
+ALTER TABLE public.lecturers OWNER TO scheduler;
+
 --
--- Name: lecturers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: lecturers_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.lecturers_id_seq
@@ -1582,15 +1356,17 @@ CREATE SEQUENCE public.lecturers_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.lecturers_id_seq OWNER TO scheduler;
+
 --
--- Name: lecturers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: lecturers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.lecturers_id_seq OWNED BY public.lecturers.id;
 
 
 --
--- Name: majors; Type: TABLE; Schema: public; Owner: -
+-- Name: majors; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.majors (
@@ -1600,8 +1376,10 @@ CREATE TABLE public.majors (
 );
 
 
+ALTER TABLE public.majors OWNER TO scheduler;
+
 --
--- Name: majors_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: majors_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.majors_id_seq
@@ -1612,15 +1390,100 @@ CREATE SEQUENCE public.majors_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.majors_id_seq OWNER TO scheduler;
+
 --
--- Name: majors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: majors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.majors_id_seq OWNED BY public.majors.id;
 
 
 --
--- Name: notifications; Type: TABLE; Schema: public; Owner: -
+-- Name: manual_schedule_drafts; Type: TABLE; Schema: public; Owner: scheduler
+--
+
+CREATE TABLE public.manual_schedule_drafts (
+    round_id bigint NOT NULL,
+    revision integer DEFAULT 0 NOT NULL,
+    created_by bigint,
+    updated_by bigint,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    published_schedule_version_id bigint,
+    CONSTRAINT ck_manual_schedule_revision_nonnegative CHECK ((revision >= 0))
+);
+
+
+ALTER TABLE public.manual_schedule_drafts OWNER TO scheduler;
+
+--
+-- Name: manual_schedule_session_groups; Type: TABLE; Schema: public; Owner: scheduler
+--
+
+CREATE TABLE public.manual_schedule_session_groups (
+    session_id bigint NOT NULL,
+    group_id bigint NOT NULL,
+    "position" integer DEFAULT 1 NOT NULL,
+    CONSTRAINT ck_manual_schedule_group_position CHECK (("position" > 0))
+);
+
+
+ALTER TABLE public.manual_schedule_session_groups OWNER TO scheduler;
+
+--
+-- Name: manual_schedule_session_reviewers; Type: TABLE; Schema: public; Owner: scheduler
+--
+
+CREATE TABLE public.manual_schedule_session_reviewers (
+    session_id bigint NOT NULL,
+    lecturer_id bigint NOT NULL,
+    role_key character varying(32) NOT NULL,
+    role_order integer NOT NULL,
+    snapshot_name character varying(160) NOT NULL,
+    CONSTRAINT ck_manual_schedule_reviewer_order CHECK ((role_order > 0))
+);
+
+
+ALTER TABLE public.manual_schedule_session_reviewers OWNER TO scheduler;
+
+--
+-- Name: manual_schedule_sessions; Type: TABLE; Schema: public; Owner: scheduler
+--
+
+CREATE TABLE public.manual_schedule_sessions (
+    id bigint NOT NULL,
+    round_id bigint NOT NULL,
+    timeslot_id bigint NOT NULL,
+    room_id bigint,
+    status character varying(16) DEFAULT 'DRAFT'::character varying NOT NULL,
+    published_session_id bigint,
+    created_by bigint,
+    updated_by bigint,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_manual_schedule_session_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'READY'::character varying, 'PUBLISHED'::character varying])::text[])))
+);
+
+
+ALTER TABLE public.manual_schedule_sessions OWNER TO scheduler;
+
+--
+-- Name: manual_schedule_sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE public.manual_schedule_sessions ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.manual_schedule_sessions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: notifications; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.notifications (
@@ -1635,8 +1498,10 @@ CREATE TABLE public.notifications (
 );
 
 
+ALTER TABLE public.notifications OWNER TO scheduler;
+
 --
--- Name: notifications_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: notifications_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.notifications_id_seq
@@ -1647,15 +1512,17 @@ CREATE SEQUENCE public.notifications_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.notifications_id_seq OWNER TO scheduler;
+
 --
--- Name: notifications_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: notifications_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.notifications_id_seq OWNED BY public.notifications.id;
 
 
 --
--- Name: outbox_jobs; Type: TABLE; Schema: public; Owner: -
+-- Name: outbox_jobs; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.outbox_jobs (
@@ -1672,8 +1539,10 @@ CREATE TABLE public.outbox_jobs (
 );
 
 
+ALTER TABLE public.outbox_jobs OWNER TO scheduler;
+
 --
--- Name: outbox_jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: outbox_jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.outbox_jobs_id_seq
@@ -1684,15 +1553,17 @@ CREATE SEQUENCE public.outbox_jobs_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.outbox_jobs_id_seq OWNER TO scheduler;
+
 --
--- Name: outbox_jobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: outbox_jobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.outbox_jobs_id_seq OWNED BY public.outbox_jobs.id;
 
 
 --
--- Name: project_supervisors; Type: TABLE; Schema: public; Owner: -
+-- Name: project_supervisors; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.project_supervisors (
@@ -1702,8 +1573,10 @@ CREATE TABLE public.project_supervisors (
 );
 
 
+ALTER TABLE public.project_supervisors OWNER TO scheduler;
+
 --
--- Name: projects_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: projects_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.projects_id_seq
@@ -1714,15 +1587,17 @@ CREATE SEQUENCE public.projects_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.projects_id_seq OWNER TO scheduler;
+
 --
--- Name: projects_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: projects_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.projects_id_seq OWNED BY public.projects.id;
 
 
 --
--- Name: remediation_cases; Type: TABLE; Schema: public; Owner: -
+-- Name: remediation_cases; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.remediation_cases (
@@ -1737,8 +1612,10 @@ CREATE TABLE public.remediation_cases (
 );
 
 
+ALTER TABLE public.remediation_cases OWNER TO scheduler;
+
 --
--- Name: remediation_cases_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: remediation_cases_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.remediation_cases_id_seq
@@ -1749,15 +1626,17 @@ CREATE SEQUENCE public.remediation_cases_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.remediation_cases_id_seq OWNER TO scheduler;
+
 --
--- Name: remediation_cases_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: remediation_cases_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.remediation_cases_id_seq OWNED BY public.remediation_cases.id;
 
 
 --
--- Name: reschedule_requests; Type: TABLE; Schema: public; Owner: -
+-- Name: reschedule_requests; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.reschedule_requests (
@@ -1773,8 +1652,10 @@ CREATE TABLE public.reschedule_requests (
 );
 
 
+ALTER TABLE public.reschedule_requests OWNER TO scheduler;
+
 --
--- Name: reschedule_requests_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: reschedule_requests_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.reschedule_requests_id_seq
@@ -1785,15 +1666,17 @@ CREATE SEQUENCE public.reschedule_requests_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.reschedule_requests_id_seq OWNER TO scheduler;
+
 --
--- Name: reschedule_requests_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: reschedule_requests_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.reschedule_requests_id_seq OWNED BY public.reschedule_requests.id;
 
 
 --
--- Name: rooms; Type: TABLE; Schema: public; Owner: -
+-- Name: rooms; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.rooms (
@@ -1807,8 +1690,10 @@ CREATE TABLE public.rooms (
 );
 
 
+ALTER TABLE public.rooms OWNER TO scheduler;
+
 --
--- Name: rooms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: rooms_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.rooms_id_seq
@@ -1819,15 +1704,17 @@ CREATE SEQUENCE public.rooms_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.rooms_id_seq OWNER TO scheduler;
+
 --
--- Name: rooms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: rooms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.rooms_id_seq OWNED BY public.rooms.id;
 
 
 --
--- Name: round_committees; Type: TABLE; Schema: public; Owner: -
+-- Name: round_committees; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.round_committees (
@@ -1838,8 +1725,10 @@ CREATE TABLE public.round_committees (
 );
 
 
+ALTER TABLE public.round_committees OWNER TO scheduler;
+
 --
--- Name: round_days; Type: TABLE; Schema: public; Owner: -
+-- Name: round_days; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.round_days (
@@ -1849,8 +1738,10 @@ CREATE TABLE public.round_days (
 );
 
 
+ALTER TABLE public.round_days OWNER TO scheduler;
+
 --
--- Name: round_days_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: round_days_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.round_days_id_seq
@@ -1861,15 +1752,17 @@ CREATE SEQUENCE public.round_days_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.round_days_id_seq OWNER TO scheduler;
+
 --
--- Name: round_days_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: round_days_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.round_days_id_seq OWNED BY public.round_days.id;
 
 
 --
--- Name: round_groups; Type: TABLE; Schema: public; Owner: -
+-- Name: round_groups; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.round_groups (
@@ -1878,8 +1771,10 @@ CREATE TABLE public.round_groups (
 );
 
 
+ALTER TABLE public.round_groups OWNER TO scheduler;
+
 --
--- Name: round_operation_records; Type: TABLE; Schema: public; Owner: -
+-- Name: round_operation_records; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.round_operation_records (
@@ -1894,8 +1789,10 @@ CREATE TABLE public.round_operation_records (
 );
 
 
+ALTER TABLE public.round_operation_records OWNER TO scheduler;
+
 --
--- Name: round_operation_records_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: round_operation_records_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.round_operation_records_id_seq
@@ -1906,15 +1803,17 @@ CREATE SEQUENCE public.round_operation_records_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.round_operation_records_id_seq OWNER TO scheduler;
+
 --
--- Name: round_operation_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: round_operation_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.round_operation_records_id_seq OWNED BY public.round_operation_records.id;
 
 
 --
--- Name: round_room_types; Type: TABLE; Schema: public; Owner: -
+-- Name: round_room_types; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.round_room_types (
@@ -1923,8 +1822,10 @@ CREATE TABLE public.round_room_types (
 );
 
 
+ALTER TABLE public.round_room_types OWNER TO scheduler;
+
 --
--- Name: rounds; Type: TABLE; Schema: public; Owner: -
+-- Name: rounds; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.rounds (
@@ -1966,8 +1867,10 @@ CREATE TABLE public.rounds (
 );
 
 
+ALTER TABLE public.rounds OWNER TO scheduler;
+
 --
--- Name: rounds_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: rounds_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.rounds_id_seq
@@ -1978,15 +1881,17 @@ CREATE SEQUENCE public.rounds_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.rounds_id_seq OWNER TO scheduler;
+
 --
--- Name: rounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: rounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.rounds_id_seq OWNED BY public.rounds.id;
 
 
 --
--- Name: schedule_assignment_reviewers; Type: TABLE; Schema: public; Owner: -
+-- Name: schedule_assignment_reviewers; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.schedule_assignment_reviewers (
@@ -1997,8 +1902,10 @@ CREATE TABLE public.schedule_assignment_reviewers (
 );
 
 
+ALTER TABLE public.schedule_assignment_reviewers OWNER TO scheduler;
+
 --
--- Name: schedule_assignments; Type: TABLE; Schema: public; Owner: -
+-- Name: schedule_assignments; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.schedule_assignments (
@@ -2014,8 +1921,10 @@ CREATE TABLE public.schedule_assignments (
 );
 
 
+ALTER TABLE public.schedule_assignments OWNER TO scheduler;
+
 --
--- Name: schedule_assignments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: schedule_assignments_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE public.schedule_assignments ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -2029,7 +1938,7 @@ ALTER TABLE public.schedule_assignments ALTER COLUMN id ADD GENERATED BY DEFAULT
 
 
 --
--- Name: schedule_change_records; Type: TABLE; Schema: public; Owner: -
+-- Name: schedule_change_records; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.schedule_change_records (
@@ -2045,8 +1954,10 @@ CREATE TABLE public.schedule_change_records (
 );
 
 
+ALTER TABLE public.schedule_change_records OWNER TO scheduler;
+
 --
--- Name: schedule_change_records_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: schedule_change_records_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.schedule_change_records_id_seq
@@ -2057,15 +1968,17 @@ CREATE SEQUENCE public.schedule_change_records_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.schedule_change_records_id_seq OWNER TO scheduler;
+
 --
--- Name: schedule_change_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: schedule_change_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.schedule_change_records_id_seq OWNED BY public.schedule_change_records.id;
 
 
 --
--- Name: schedule_versions; Type: TABLE; Schema: public; Owner: -
+-- Name: schedule_versions; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.schedule_versions (
@@ -2086,8 +1999,10 @@ CREATE TABLE public.schedule_versions (
 );
 
 
+ALTER TABLE public.schedule_versions OWNER TO scheduler;
+
 --
--- Name: schedule_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: schedule_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.schedule_versions_id_seq
@@ -2098,15 +2013,17 @@ CREATE SEQUENCE public.schedule_versions_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.schedule_versions_id_seq OWNER TO scheduler;
+
 --
--- Name: schedule_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: schedule_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.schedule_versions_id_seq OWNED BY public.schedule_versions.id;
 
 
 --
--- Name: scheduler_jobs; Type: TABLE; Schema: public; Owner: -
+-- Name: scheduler_jobs; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.scheduler_jobs (
@@ -2124,12 +2041,14 @@ CREATE TABLE public.scheduler_jobs (
     started_at timestamp with time zone,
     finished_at timestamp with time zone,
     CONSTRAINT scheduler_jobs_attempt_check CHECK ((attempt > 0)),
-    CONSTRAINT scheduler_jobs_status_check CHECK (((status)::text = ANY ((ARRAY['QUEUED'::character varying, 'RUNNING'::character varying, 'COMPLETED'::character varying, 'PARTIAL'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying])::text[])))
+    CONSTRAINT scheduler_jobs_status_check CHECK (((status)::text = ANY (ARRAY[('QUEUED'::character varying)::text, ('RUNNING'::character varying)::text, ('COMPLETED'::character varying)::text, ('PARTIAL'::character varying)::text, ('FAILED'::character varying)::text, ('CANCELLED'::character varying)::text])))
 );
 
 
+ALTER TABLE public.scheduler_jobs OWNER TO scheduler;
+
 --
--- Name: scheduler_jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: scheduler_jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.scheduler_jobs_id_seq
@@ -2140,15 +2059,17 @@ CREATE SEQUENCE public.scheduler_jobs_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.scheduler_jobs_id_seq OWNER TO scheduler;
+
 --
--- Name: scheduler_jobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: scheduler_jobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.scheduler_jobs_id_seq OWNED BY public.scheduler_jobs.id;
 
 
 --
--- Name: schema_meta; Type: TABLE; Schema: public; Owner: -
+-- Name: schema_meta; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.schema_meta (
@@ -2157,8 +2078,10 @@ CREATE TABLE public.schema_meta (
 );
 
 
+ALTER TABLE public.schema_meta OWNER TO scheduler;
+
 --
--- Name: semester_lecturer_quotas; Type: TABLE; Schema: public; Owner: -
+-- Name: semester_lecturer_quotas; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.semester_lecturer_quotas (
@@ -2171,8 +2094,10 @@ CREATE TABLE public.semester_lecturer_quotas (
 );
 
 
+ALTER TABLE public.semester_lecturer_quotas OWNER TO scheduler;
+
 --
--- Name: semesters; Type: TABLE; Schema: public; Owner: -
+-- Name: semesters; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.semesters (
@@ -2192,8 +2117,10 @@ CREATE TABLE public.semesters (
 );
 
 
+ALTER TABLE public.semesters OWNER TO scheduler;
+
 --
--- Name: semesters_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: semesters_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.semesters_id_seq
@@ -2204,15 +2131,31 @@ CREATE SEQUENCE public.semesters_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.semesters_id_seq OWNER TO scheduler;
+
 --
--- Name: semesters_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: semesters_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.semesters_id_seq OWNED BY public.semesters.id;
 
 
 --
--- Name: session_results; Type: TABLE; Schema: public; Owner: -
+-- Name: session_groups; Type: TABLE; Schema: public; Owner: scheduler
+--
+
+CREATE TABLE public.session_groups (
+    session_id bigint NOT NULL,
+    group_id bigint NOT NULL,
+    "position" integer DEFAULT 1 NOT NULL,
+    CONSTRAINT ck_session_groups_position CHECK (("position" > 0))
+);
+
+
+ALTER TABLE public.session_groups OWNER TO scheduler;
+
+--
+-- Name: session_results; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.session_results (
@@ -2233,8 +2176,10 @@ CREATE TABLE public.session_results (
 );
 
 
+ALTER TABLE public.session_results OWNER TO scheduler;
+
 --
--- Name: session_results_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: session_results_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.session_results_id_seq
@@ -2245,15 +2190,17 @@ CREATE SEQUENCE public.session_results_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.session_results_id_seq OWNER TO scheduler;
+
 --
--- Name: session_results_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: session_results_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.session_results_id_seq OWNED BY public.session_results.id;
 
 
 --
--- Name: sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.sessions_id_seq
@@ -2264,15 +2211,17 @@ CREATE SEQUENCE public.sessions_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.sessions_id_seq OWNER TO scheduler;
+
 --
--- Name: sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.sessions_id_seq OWNED BY public.sessions.id;
 
 
 --
--- Name: students; Type: TABLE; Schema: public; Owner: -
+-- Name: students; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.students (
@@ -2282,8 +2231,10 @@ CREATE TABLE public.students (
 );
 
 
+ALTER TABLE public.students OWNER TO scheduler;
+
 --
--- Name: students_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: students_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.students_id_seq
@@ -2294,15 +2245,17 @@ CREATE SEQUENCE public.students_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.students_id_seq OWNER TO scheduler;
+
 --
--- Name: students_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: students_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.students_id_seq OWNED BY public.students.id;
 
 
 --
--- Name: timeframe_break_windows; Type: TABLE; Schema: public; Owner: -
+-- Name: timeframe_break_windows; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.timeframe_break_windows (
@@ -2317,8 +2270,10 @@ CREATE TABLE public.timeframe_break_windows (
 );
 
 
+ALTER TABLE public.timeframe_break_windows OWNER TO scheduler;
+
 --
--- Name: timeframe_break_windows_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: timeframe_break_windows_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE public.timeframe_break_windows ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -2332,7 +2287,7 @@ ALTER TABLE public.timeframe_break_windows ALTER COLUMN id ADD GENERATED BY DEFA
 
 
 --
--- Name: timeframe_versions; Type: TABLE; Schema: public; Owner: -
+-- Name: timeframe_versions; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.timeframe_versions (
@@ -2352,13 +2307,15 @@ CREATE TABLE public.timeframe_versions (
     CONSTRAINT ck_timeframe_versions_block_break CHECK ((break_between_blocks_minutes >= 0)),
     CONSTRAINT ck_timeframe_versions_block_duration CHECK ((block_duration_minutes > 0)),
     CONSTRAINT ck_timeframe_versions_group_duration CHECK ((group_duration_minutes > 0)),
-    CONSTRAINT ck_timeframe_versions_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'SUPERSEDED'::character varying])::text[]))),
+    CONSTRAINT ck_timeframe_versions_status CHECK (((status)::text = ANY (ARRAY[('ACTIVE'::character varying)::text, ('SUPERSEDED'::character varying)::text]))),
     CONSTRAINT ck_timeframe_versions_time_range CHECK ((end_time > start_time))
 );
 
 
+ALTER TABLE public.timeframe_versions OWNER TO scheduler;
+
 --
--- Name: timeframe_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: timeframe_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE public.timeframe_versions ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -2372,7 +2329,7 @@ ALTER TABLE public.timeframe_versions ALTER COLUMN id ADD GENERATED BY DEFAULT A
 
 
 --
--- Name: timeframes; Type: TABLE; Schema: public; Owner: -
+-- Name: timeframes; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.timeframes (
@@ -2386,8 +2343,10 @@ CREATE TABLE public.timeframes (
 );
 
 
+ALTER TABLE public.timeframes OWNER TO scheduler;
+
 --
--- Name: timeframes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: timeframes_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE public.timeframes ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -2401,7 +2360,7 @@ ALTER TABLE public.timeframes ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTI
 
 
 --
--- Name: timeslots; Type: TABLE; Schema: public; Owner: -
+-- Name: timeslots; Type: TABLE; Schema: public; Owner: scheduler
 --
 
 CREATE TABLE public.timeslots (
@@ -2412,12 +2371,14 @@ CREATE TABLE public.timeslots (
     active boolean DEFAULT true NOT NULL,
     part character varying(8) DEFAULT 'AM'::character varying NOT NULL,
     CONSTRAINT timeslots_check CHECK ((end_at > start_at)),
-    CONSTRAINT timeslots_part_check CHECK (((part)::text = ANY ((ARRAY['AM'::character varying, 'PM'::character varying])::text[])))
+    CONSTRAINT timeslots_part_check CHECK (((part)::text = ANY (ARRAY[('AM'::character varying)::text, ('PM'::character varying)::text])))
 );
 
 
+ALTER TABLE public.timeslots OWNER TO scheduler;
+
 --
--- Name: timeslots_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: timeslots_id_seq; Type: SEQUENCE; Schema: public; Owner: scheduler
 --
 
 CREATE SEQUENCE public.timeslots_id_seq
@@ -2428,246 +2389,248 @@ CREATE SEQUENCE public.timeslots_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.timeslots_id_seq OWNER TO scheduler;
+
 --
--- Name: timeslots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: timeslots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: scheduler
 --
 
 ALTER SEQUENCE public.timeslots_id_seq OWNED BY public.timeslots.id;
 
 
 --
--- Name: accounts id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: accounts id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.accounts ALTER COLUMN id SET DEFAULT nextval('public.accounts_id_seq'::regclass);
 
 
 --
--- Name: audit_events id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: audit_events id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.audit_events ALTER COLUMN id SET DEFAULT nextval('public.audit_events_id_seq'::regclass);
 
 
 --
--- Name: auth_sessions id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: auth_sessions id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.auth_sessions ALTER COLUMN id SET DEFAULT nextval('public.auth_sessions_id_seq'::regclass);
 
 
 --
--- Name: conflict_declarations id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: conflict_declarations id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.conflict_declarations ALTER COLUMN id SET DEFAULT nextval('public.conflict_declarations_id_seq'::regclass);
 
 
 --
--- Name: councils id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: councils id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.councils ALTER COLUMN id SET DEFAULT nextval('public.councils_id_seq'::regclass);
 
 
 --
--- Name: excel_defense_councils id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: excel_defense_councils id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_defense_councils ALTER COLUMN id SET DEFAULT nextval('public.excel_defense_councils_id_seq'::regclass);
 
 
 --
--- Name: excel_import_batches id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: excel_import_batches id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_import_batches ALTER COLUMN id SET DEFAULT nextval('public.excel_import_batches_id_seq'::regclass);
 
 
 --
--- Name: excel_projects id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: excel_projects id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_projects ALTER COLUMN id SET DEFAULT nextval('public.excel_projects_id_seq'::regclass);
 
 
 --
--- Name: excel_review_schedule_rows id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_review_schedule_rows ALTER COLUMN id SET DEFAULT nextval('public.excel_review_schedule_rows_id_seq'::regclass);
 
 
 --
--- Name: excel_sheet_rows id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: excel_sheet_rows id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_sheet_rows ALTER COLUMN id SET DEFAULT nextval('public.excel_sheet_rows_id_seq'::regclass);
 
 
 --
--- Name: excel_summary_workloads id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: excel_summary_workloads id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_summary_workloads ALTER COLUMN id SET DEFAULT nextval('public.excel_summary_workloads_id_seq'::regclass);
 
 
 --
--- Name: group_memberships id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: group_memberships id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_memberships ALTER COLUMN id SET DEFAULT nextval('public.group_memberships_id_seq'::regclass);
 
 
 --
--- Name: groups id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: groups id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.groups ALTER COLUMN id SET DEFAULT nextval('public.groups_id_seq'::regclass);
 
 
 --
--- Name: h11_waivers id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: h11_waivers id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.h11_waivers ALTER COLUMN id SET DEFAULT nextval('public.h11_waivers_id_seq'::regclass);
 
 
 --
--- Name: lecturers id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: lecturers id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturers ALTER COLUMN id SET DEFAULT nextval('public.lecturers_id_seq'::regclass);
 
 
 --
--- Name: majors id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: majors id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.majors ALTER COLUMN id SET DEFAULT nextval('public.majors_id_seq'::regclass);
 
 
 --
--- Name: notifications id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: notifications id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.notifications ALTER COLUMN id SET DEFAULT nextval('public.notifications_id_seq'::regclass);
 
 
 --
--- Name: outbox_jobs id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: outbox_jobs id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.outbox_jobs ALTER COLUMN id SET DEFAULT nextval('public.outbox_jobs_id_seq'::regclass);
 
 
 --
--- Name: projects id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: projects id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.projects ALTER COLUMN id SET DEFAULT nextval('public.projects_id_seq'::regclass);
 
 
 --
--- Name: remediation_cases id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: remediation_cases id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.remediation_cases ALTER COLUMN id SET DEFAULT nextval('public.remediation_cases_id_seq'::regclass);
 
 
 --
--- Name: reschedule_requests id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: reschedule_requests id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.reschedule_requests ALTER COLUMN id SET DEFAULT nextval('public.reschedule_requests_id_seq'::regclass);
 
 
 --
--- Name: rooms id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: rooms id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rooms ALTER COLUMN id SET DEFAULT nextval('public.rooms_id_seq'::regclass);
 
 
 --
--- Name: round_days id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: round_days id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_days ALTER COLUMN id SET DEFAULT nextval('public.round_days_id_seq'::regclass);
 
 
 --
--- Name: round_operation_records id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: round_operation_records id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_operation_records ALTER COLUMN id SET DEFAULT nextval('public.round_operation_records_id_seq'::regclass);
 
 
 --
--- Name: rounds id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: rounds id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rounds ALTER COLUMN id SET DEFAULT nextval('public.rounds_id_seq'::regclass);
 
 
 --
--- Name: schedule_change_records id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: schedule_change_records id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_change_records ALTER COLUMN id SET DEFAULT nextval('public.schedule_change_records_id_seq'::regclass);
 
 
 --
--- Name: schedule_versions id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: schedule_versions id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_versions ALTER COLUMN id SET DEFAULT nextval('public.schedule_versions_id_seq'::regclass);
 
 
 --
--- Name: scheduler_jobs id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: scheduler_jobs id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.scheduler_jobs ALTER COLUMN id SET DEFAULT nextval('public.scheduler_jobs_id_seq'::regclass);
 
 
 --
--- Name: semesters id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: semesters id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semesters ALTER COLUMN id SET DEFAULT nextval('public.semesters_id_seq'::regclass);
 
 
 --
--- Name: session_results id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: session_results id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.session_results ALTER COLUMN id SET DEFAULT nextval('public.session_results_id_seq'::regclass);
 
 
 --
--- Name: sessions id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: sessions id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions ALTER COLUMN id SET DEFAULT nextval('public.sessions_id_seq'::regclass);
 
 
 --
--- Name: students id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: students id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.students ALTER COLUMN id SET DEFAULT nextval('public.students_id_seq'::regclass);
 
 
 --
--- Name: timeslots id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: timeslots id; Type: DEFAULT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeslots ALTER COLUMN id SET DEFAULT nextval('public.timeslots_id_seq'::regclass);
 
 
 --
--- Data for Name: account_roles; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: account_roles; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.account_roles (account_id, role) FROM stdin;
@@ -2822,7 +2785,7 @@ COPY public.account_roles (account_id, role) FROM stdin;
 
 
 --
--- Data for Name: accounts; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: accounts; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.accounts (id, email, display_name, password_hash, status, created_at) FROM stdin;
@@ -2977,16 +2940,16 @@ COPY public.accounts (id, email, display_name, password_hash, status, created_at
 
 
 --
--- Data for Name: alembic_version; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: alembic_version; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.alembic_version (version_num) FROM stdin;
-0038_project_bilingual_titles
+0039_manual_scheduling
 \.
 
 
 --
--- Data for Name: audit_events; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: audit_events; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, before_json, after_json, occurred_at) FROM stdin;
@@ -3794,6 +3757,8 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 799	2	TIMEFRAME_CREATED	timeframe	40	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-22 16:58:27.972661+00
 800	2	ROUND_CREATED	round	190	\N	\N	{"name": "Round From Quick Timeframe", "type": "REVIEW_1", "end_date": "2026-09-01", "room_types": ["NORMAL"], "start_date": "2026-09-01", "description": null, "semester_id": 1, "soft_weights": {}, "timeframe_id": 40, "reviewer_count": 2, "result_owner_mode": false, "h12_semester_quota": null, "timeframeVersionId": 70, "max_minutes_per_day": null, "group_selection_mode": false, "h12_sessions_per_day": 8, "max_minutes_per_part": null, "h12_sessions_per_part": 4, "registration_deadline": null, "max_groups_per_timeslot": 1, "session_duration_minutes": 45, "group_preference_deadline": null}	2026-08-22 16:58:28.037454+00
 801	2	TIMEFRAME_UPDATED	timeframe	40	Test reusable system configuration	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "12:30:00", "start_time": "10:15:00", "group_slots": [{"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 1}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 2}, {"end_time": "12:30:00", "start_time": "11:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:45:00", "start_time": "12:30:00", "group_slots": [{"end_time": "13:15:00", "start_time": "12:30:00", "sequence_number": 1}, {"end_time": "14:00:00", "start_time": "13:15:00", "sequence_number": 2}, {"end_time": "14:45:00", "start_time": "14:00:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "17:00:00", "start_time": "14:45:00", "group_slots": [{"end_time": "15:30:00", "start_time": "14:45:00", "sequence_number": 1}, {"end_time": "16:15:00", "start_time": "15:30:00", "sequence_number": 2}, {"end_time": "17:00:00", "start_time": "16:15:00", "sequence_number": 3}], "sequence_number": 4, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:00:00", "start_time": "08:00:00", "break_windows": [], "blocks_per_day": 4, "unused_minutes": 0, "capacity_per_day": 12, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 0, "break_window_minutes": 0, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": 0}	2026-08-22 16:58:28.1672+00
+2306	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:21:30.35571+00
+2307	2098	AVAILABILITY_ENTERED	group_availability	510:42	\N	\N	{"source": "FORM", "selected_count": 0}	2026-08-23 18:21:30.594781+00
 802	2	TIMEFRAME_MANUAL_CREATED	timeframe	41	Save timelines edited from quick preview	\N	{"blocks": [{"end_time": "09:00:00", "start_time": "07:30:00", "group_slots": [{"end_time": "08:15:00", "start_time": "07:30:00", "sequence_number": 1}, {"end_time": "09:00:00", "start_time": "08:15:00", "sequence_number": 2}], "sequence_number": 1, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}, {"end_time": "11:30:00", "start_time": "09:15:00", "group_slots": [{"end_time": "10:00:00", "start_time": "09:15:00", "sequence_number": 1}, {"end_time": "10:45:00", "start_time": "10:00:00", "sequence_number": 2}, {"end_time": "11:30:00", "start_time": "10:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 3, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "07:30:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "09:15:00", "start_time": "09:00:00"}, {"name": "Khoảng nghỉ 2", "end_time": "13:00:00", "start_time": "11:30:00"}], "blocks_per_day": 3, "unused_minutes": 0, "capacity_per_day": 7, "groups_per_block": null, "manual_timelines": [{"end_time": "09:00:00", "start_time": "07:30:00", "groups_per_slot": 2}, {"end_time": "11:30:00", "start_time": "09:15:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 105, "break_window_minutes": 105, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-22 16:58:28.703561+00
 830	2	H11_WAIVER_GRANTED	h11_waiver	164:62	Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.	\N	{"scope": "H11", "active": true, "bootstrap": true}	2026-08-22 17:49:29.30662+00
 803	2	ROUND_CREATED	round	191	\N	\N	{"name": "Round From Manual Timeframe", "type": "REVIEW_1", "end_date": "2026-09-02", "room_types": ["NORMAL"], "start_date": "2026-09-02", "description": null, "semester_id": 1, "soft_weights": {}, "timeframe_id": 41, "reviewer_count": 2, "result_owner_mode": false, "h12_semester_quota": null, "timeframeVersionId": 72, "max_minutes_per_day": null, "group_selection_mode": false, "h12_sessions_per_day": 8, "max_minutes_per_part": null, "h12_sessions_per_part": 4, "registration_deadline": null, "max_groups_per_timeslot": 1, "session_duration_minutes": 45, "group_preference_deadline": null}	2026-08-22 16:58:28.740635+00
@@ -3802,12 +3767,6 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 806	\N	ROUND_RECONFIGURED	round	164	Reopen Defense 1.2 after accidental registration close; reset grading window and deadline without creating a new Round.	{"status": "REGISTRATION_CLOSED", "end_date": "2026-08-23", "start_date": "2026-05-11", "timeframe_id": 33, "timeframe_version_id": 65, "registration_deadline": "2026-05-11 16:59:00+00:00"}	{"status": "OPEN_REGISTRATION", "end_date": "2026-09-06", "start_date": "2026-09-04", "timeframe_id": 33, "timeframe_version_id": 65, "registration_deadline": "2026-08-30T23:59:00+07:00", "generated_blocks_per_day": 5, "generated_groups_per_day": 15, "session_duration_minutes": 45}	2026-08-22 17:35:22.662671+00
 807	2	ROUND_AVAILABILITY_SEEDED	round	164	Seed randomized lecturer availability and leader slot preferences from the pinned Normal Timeframe.	\N	{"groups": 16, "lecturers": 27, "random_seed": 1640904, "lecturer_rows": 1215, "lecturer_tiers": {"LOW": 9, "HIGH": 9, "MEDIUM": 9}, "group_preference_rows": 99, "lecturer_available_rows": 691, "min_available_reviewers_per_slot": 11}	2026-08-22 17:39:40.684304+00
 808	2	ROUND_TRANSITION	round	164	\N	{"status": "OPEN_REGISTRATION"}	{"status": "REGISTRATION_CLOSED"}	2026-08-22 17:40:57.99009+00
-809	2	SCHEDULER_RUN	schedule_version	10	\N	\N	{"status": "PARTIAL", "round_id": 164}	2026-08-22 17:40:59.749171+00
-810	2	SCHEDULER_RUN	schedule_version	11	\N	\N	{"status": "PARTIAL", "round_id": 164}	2026-08-22 17:42:21.667143+00
-811	2	SCHEDULER_RUN	schedule_version	12	\N	\N	{"status": "PARTIAL", "round_id": 164}	2026-08-22 17:44:54.346494+00
-812	2	SCHEDULE_VERSION_ACTIVATED	schedule_version	12	\N	\N	{"status": "ACTIVE", "round_id": 164}	2026-08-22 17:45:06.470254+00
-813	2	SCHEDULE_VERSION_ROLLED_BACK	schedule_version	12	Rollback empty active Defense 1.2 version before H11 remediation and regeneration.	{"status": "ACTIVE", "sessions": 0, "assignments": 0}	{"status": "DISCARDED", "sessions": 0, "assignments": 0}	2026-08-22 17:49:29.30662+00
-814	2	ROUND_SCHEDULING_REOPENED	round	164	Reopen scheduling after rolling back an empty active version.	{"status": "SCHEDULED"}	{"status": "SCHEDULING"}	2026-08-22 17:49:29.30662+00
 815	2	H11_WAIVER_GRANTED	h11_waiver	164:65	Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.	\N	{"scope": "H11", "active": true, "bootstrap": true}	2026-08-22 17:49:29.30662+00
 816	2	H11_WAIVER_GRANTED	h11_waiver	164:68	Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.	\N	{"scope": "H11", "active": true, "bootstrap": true}	2026-08-22 17:49:29.30662+00
 817	2	H11_WAIVER_GRANTED	h11_waiver	164:69	Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.	\N	{"scope": "H11", "active": true, "bootstrap": true}	2026-08-22 17:49:29.30662+00
@@ -3823,30 +3782,6 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 827	2	H11_WAIVER_GRANTED	h11_waiver	164:58	Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.	\N	{"scope": "H11", "active": true, "bootstrap": true}	2026-08-22 17:49:29.30662+00
 828	2	H11_WAIVER_GRANTED	h11_waiver	164:59	Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.	\N	{"scope": "H11", "active": true, "bootstrap": true}	2026-08-22 17:49:29.30662+00
 829	2	H11_WAIVER_GRANTED	h11_waiver	164:61	Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.	\N	{"scope": "H11", "active": true, "bootstrap": true}	2026-08-22 17:49:29.30662+00
-833	2	ROUND_REVIEWER_POOL_BOOTSTRAPPED	round	164	Use six accepted Reviewers to bound Defense 1.2 candidate generation while retaining availability for all lecturers.	\N	{"accepted_lecturers": [1, 2, 3, 4, 5, 6], "total_availability_lecturers": 27}	2026-08-22 18:02:03.78271+00
-834	2	SCHEDULER_RUN	schedule_version	13	\N	\N	{"status": "PARTIAL", "round_id": 164}	2026-08-22 18:02:13.457866+00
-835	2	ROUND_REVIEWER_POOL_EXPANDED	round	164	Expand accepted Reviewer pool to twelve to cover all selected group slots while retaining bounded candidate generation.	\N	{"accepted_lecturers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "total_availability_lecturers": 27}	2026-08-22 18:02:31.882106+00
-836	2	SCHEDULER_RUN	schedule_version	14	\N	\N	{"status": "OPTIMAL", "round_id": 164}	2026-08-22 18:02:39.049961+00
-837	2	ROUND_REVIEWER_POOL_EXPANDED	round	164	Expand accepted Reviewer pool to eighteen to satisfy H12 quota across UTC validation buckets.	\N	{"accepted_lecturers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "total_availability_lecturers": 27}	2026-08-22 18:03:43.925546+00
-839	2	SCHEDULE_REVIEWERS_REBALANCED	schedule_version	14	Rebalance draft reviewer sets to satisfy H1/H12 before activation.	\N	{"groups": 16, "max_per_utc_bucket": 4, "reviewers_per_group": 5}	2026-08-22 18:06:04.927753+00
-840	2	SCHEDULE_VERSION_ACTIVATED	schedule_version	14	\N	\N	{"status": "ACTIVE", "round_id": 164}	2026-08-22 18:06:42.159027+00
-841	2	ROOM_ASSIGNED	session	20	\N	\N	{"batch": true, "room_id": 19}	2026-08-22 18:06:51.086696+00
-842	2	ROOM_ASSIGNED	session	24	\N	\N	{"batch": true, "room_id": 13}	2026-08-22 18:06:51.086696+00
-843	2	ROOM_ASSIGNED	session	15	\N	\N	{"batch": true, "room_id": 14}	2026-08-22 18:06:51.086696+00
-844	2	ROOM_ASSIGNED	session	22	\N	\N	{"batch": true, "room_id": 9}	2026-08-22 18:06:51.086696+00
-845	2	ROOM_ASSIGNED	session	21	\N	\N	{"batch": true, "room_id": 10}	2026-08-22 18:06:51.086696+00
-846	2	ROOM_ASSIGNED	session	25	\N	\N	{"batch": true, "room_id": 11}	2026-08-22 18:06:51.086696+00
-847	2	ROOM_ASSIGNED	session	13	\N	\N	{"batch": true, "room_id": 12}	2026-08-22 18:06:51.086696+00
-848	2	ROOM_ASSIGNED	session	16	\N	\N	{"batch": true, "room_id": 15}	2026-08-22 18:06:51.086696+00
-849	2	ROOM_ASSIGNED	session	11	\N	\N	{"batch": true, "room_id": 16}	2026-08-22 18:06:51.086696+00
-850	2	ROOM_ASSIGNED	session	14	\N	\N	{"batch": true, "room_id": 17}	2026-08-22 18:06:51.086696+00
-851	2	ROOM_ASSIGNED	session	17	\N	\N	{"batch": true, "room_id": 18}	2026-08-22 18:06:51.086696+00
-852	2	ROOM_ASSIGNED	session	23	\N	\N	{"batch": true, "room_id": 19}	2026-08-22 18:06:51.086696+00
-853	2	ROOM_ASSIGNED	session	12	\N	\N	{"batch": true, "room_id": 13}	2026-08-22 18:06:51.086696+00
-854	2	ROOM_ASSIGNED	session	19	\N	\N	{"batch": true, "room_id": 14}	2026-08-22 18:06:51.086696+00
-855	2	ROOM_ASSIGNED	session	10	\N	\N	{"batch": true, "room_id": 9}	2026-08-22 18:06:51.086696+00
-856	2	ROOM_ASSIGNED	session	18	\N	\N	{"batch": true, "room_id": 10}	2026-08-22 18:06:51.086696+00
-857	2	SCHEDULE_VERSION_DISCARDED	schedule_version	13	Discard partial draft superseded by the complete H12-compliant version 14.	\N	{"status": "DISCARDED", "superseded_by": 14}	2026-08-22 18:06:57.137434+00
 858	2	LOGOUT	account	2	\N	\N	{"session": "revoked"}	2026-08-22 18:33:22.95909+00
 859	2103	LOGIN_SUCCESS	account	2103	\N	\N	{"session": "created"}	2026-08-22 18:33:25.243557+00
 860	2103	LOGOUT	account	2103	\N	\N	{"session": "revoked"}	2026-08-22 18:33:34.772498+00
@@ -3963,6 +3898,9 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 968	2	TIMEFRAME_CREATED	timeframe	43	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 12:33:40.676727+00
 969	2	TIMEFRAME_UPDATED	timeframe	43	Move the shared template to 08:00	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "12:30:00", "start_time": "10:15:00", "group_slots": [{"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 1}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 2}, {"end_time": "12:30:00", "start_time": "11:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:30:00", "start_time": "13:15:00", "group_slots": [{"end_time": "14:00:00", "start_time": "13:15:00", "sequence_number": 1}, {"end_time": "14:45:00", "start_time": "14:00:00", "sequence_number": 2}, {"end_time": "15:30:00", "start_time": "14:45:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:00:00", "start_time": "08:00:00", "break_windows": [{"name": "Nghi trua moi", "end_time": "13:15:00", "start_time": "12:30:00"}], "blocks_per_day": 3, "unused_minutes": 90, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 45, "break_window_minutes": 45, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": 0}	2026-08-23 12:33:40.725922+00
 970	2	TIMEFRAME_ARCHIVED	timeframe	43	Archive test template	\N	{"archived": true}	2026-08-23 12:33:40.755939+00
+2308	2103	AVAILABILITY_ENTERED	lecturer_availability	510:1090	\N	\N	{"source": "FORM", "selected_count": 0}	2026-08-23 18:21:30.626354+00
+2309	2098	AVAILABILITY_ENTERED	group_availability	510:42	\N	\N	{"source": "FORM", "selected_count": 0}	2026-08-23 18:21:30.660227+00
+2310	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:21:55.414182+00
 971	2	TIMEFRAME_CREATED	timeframe	44	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 12:33:41.021142+00
 972	2	ROUND_CREATED	round	219	\N	\N	{"name": "Round From Quick Timeframe", "type": "REVIEW_1", "end_date": "2026-09-01", "room_types": ["NORMAL"], "start_date": "2026-09-01", "description": null, "semester_id": 1, "soft_weights": {}, "timeframe_id": 44, "reviewer_count": 2, "result_owner_mode": false, "h12_semester_quota": null, "timeframeVersionId": 77, "max_minutes_per_day": null, "group_selection_mode": false, "h12_sessions_per_day": 8, "max_minutes_per_part": null, "h12_sessions_per_part": 4, "registration_deadline": null, "max_groups_per_timeslot": 1, "session_duration_minutes": 45, "group_preference_deadline": null}	2026-08-23 12:33:41.050275+00
 973	2	TIMEFRAME_UPDATED	timeframe	44	Test reusable system configuration	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "12:30:00", "start_time": "10:15:00", "group_slots": [{"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 1}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 2}, {"end_time": "12:30:00", "start_time": "11:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:45:00", "start_time": "12:30:00", "group_slots": [{"end_time": "13:15:00", "start_time": "12:30:00", "sequence_number": 1}, {"end_time": "14:00:00", "start_time": "13:15:00", "sequence_number": 2}, {"end_time": "14:45:00", "start_time": "14:00:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "17:00:00", "start_time": "14:45:00", "group_slots": [{"end_time": "15:30:00", "start_time": "14:45:00", "sequence_number": 1}, {"end_time": "16:15:00", "start_time": "15:30:00", "sequence_number": 2}, {"end_time": "17:00:00", "start_time": "16:15:00", "sequence_number": 3}], "sequence_number": 4, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:00:00", "start_time": "08:00:00", "break_windows": [], "blocks_per_day": 4, "unused_minutes": 0, "capacity_per_day": 12, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 0, "break_window_minutes": 0, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": 0}	2026-08-23 12:33:41.111337+00
@@ -3996,6 +3934,7 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 1003	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:34:21.982952+00
 1004	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:34:22.318055+00
 1005	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:34:22.55549+00
+2528	2	LOGIN_SUCCESS	account	2	\N	\N	{"session": "created"}	2026-08-24 06:31:55.270755+00
 1006	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:34:22.87593+00
 1007	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:34:23.433058+00
 1008	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:34:23.680437+00
@@ -4046,6 +3985,8 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 1053	2	SEMESTER_UPDATED	semester	429	\N	{"code": "FAST-3ECB9118", "name": "Fast Track Semester", "note": "Created by API test", "status": "ACTIVE", "end_date": "2036-04-15", "start_date": "2036-01-01", "academic_year": "2036-2037"}	{"code": "FAST-3ECB9118", "name": "Fast Track Semester", "note": "Updated note", "status": "ACTIVE", "end_date": "2036-04-15", "start_date": "2036-01-01", "academic_year": "2036-2037"}	2026-08-23 12:34:51.46485+00
 1054	2	SEMESTER_SET_CURRENT	semester	429	\N	{"status": "ACTIVE"}	{"status": "CLOSED"}	2026-08-23 12:34:51.49416+00
 1055	2	SEMESTER_SET_CURRENT	semester	1	\N	{"status": "CLOSED"}	{"status": "ACTIVE"}	2026-08-23 12:34:51.49416+00
+2311	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:21:57.160004+00
+2312	2	ROUND_COMMITTEES_REPLACED	round	511	\N	\N	{"committee_ids": [845, 846]}	2026-08-23 18:21:57.210459+00
 1056	2	TIMEFRAME_MANUAL_CREATED	timeframe	46	Save timelines edited from quick preview	\N	{"blocks": [{"end_time": "09:00:00", "start_time": "07:30:00", "group_slots": [{"end_time": "08:15:00", "start_time": "07:30:00", "sequence_number": 1}, {"end_time": "09:00:00", "start_time": "08:15:00", "sequence_number": 2}], "sequence_number": 1, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}, {"end_time": "11:30:00", "start_time": "09:15:00", "group_slots": [{"end_time": "10:00:00", "start_time": "09:15:00", "sequence_number": 1}, {"end_time": "10:45:00", "start_time": "10:00:00", "sequence_number": 2}, {"end_time": "11:30:00", "start_time": "10:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 3, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "07:30:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "09:15:00", "start_time": "09:00:00"}, {"name": "Khoảng nghỉ 2", "end_time": "13:00:00", "start_time": "11:30:00"}], "blocks_per_day": 3, "unused_minutes": 0, "capacity_per_day": 7, "groups_per_block": null, "manual_timelines": [{"end_time": "09:00:00", "start_time": "07:30:00", "groups_per_slot": 2}, {"end_time": "11:30:00", "start_time": "09:15:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 105, "break_window_minutes": 105, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 12:34:57.122779+00
 1057	2	TIMEFRAME_MANUAL_UPDATED	timeframe	46	Replace all edited timelines	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 2, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "08:00:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "13:00:00", "start_time": "10:15:00"}], "blocks_per_day": 2, "unused_minutes": 0, "capacity_per_day": 5, "groups_per_block": null, "manual_timelines": [{"end_time": "10:15:00", "start_time": "08:00:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 165, "break_window_minutes": 165, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 12:34:57.159113+00
 1058	2	TIMEFRAME_CREATED	timeframe	47	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 12:34:57.423452+00
@@ -4143,6 +4084,8 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 1146	2	TIMEFRAME_MANUAL_CREATED	timeframe	50	Save timelines edited from quick preview	\N	{"blocks": [{"end_time": "09:00:00", "start_time": "07:30:00", "group_slots": [{"end_time": "08:15:00", "start_time": "07:30:00", "sequence_number": 1}, {"end_time": "09:00:00", "start_time": "08:15:00", "sequence_number": 2}], "sequence_number": 1, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}, {"end_time": "11:30:00", "start_time": "09:15:00", "group_slots": [{"end_time": "10:00:00", "start_time": "09:15:00", "sequence_number": 1}, {"end_time": "10:45:00", "start_time": "10:00:00", "sequence_number": 2}, {"end_time": "11:30:00", "start_time": "10:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 3, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "07:30:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "09:15:00", "start_time": "09:00:00"}, {"name": "Khoảng nghỉ 2", "end_time": "13:00:00", "start_time": "11:30:00"}], "blocks_per_day": 3, "unused_minutes": 0, "capacity_per_day": 7, "groups_per_block": null, "manual_timelines": [{"end_time": "09:00:00", "start_time": "07:30:00", "groups_per_slot": 2}, {"end_time": "11:30:00", "start_time": "09:15:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 105, "break_window_minutes": 105, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 12:36:19.78424+00
 1147	2	TIMEFRAME_MANUAL_UPDATED	timeframe	50	Replace all edited timelines	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 2, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "08:00:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "13:00:00", "start_time": "10:15:00"}], "blocks_per_day": 2, "unused_minutes": 0, "capacity_per_day": 5, "groups_per_block": null, "manual_timelines": [{"end_time": "10:15:00", "start_time": "08:00:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 165, "break_window_minutes": 165, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 12:36:19.818336+00
 1148	2	TIMEFRAME_CREATED	timeframe	51	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 12:36:20.052709+00
+2313	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:21:57.970732+00
+2314	2	ROUND_COMMITTEES_REPLACED	round	512	\N	\N	{"committee_ids": [848]}	2026-08-23 18:21:58.005449+00
 1149	2	TIMEFRAME_UPDATED	timeframe	51	Move the shared template to 08:00	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "12:30:00", "start_time": "10:15:00", "group_slots": [{"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 1}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 2}, {"end_time": "12:30:00", "start_time": "11:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:30:00", "start_time": "13:15:00", "group_slots": [{"end_time": "14:00:00", "start_time": "13:15:00", "sequence_number": 1}, {"end_time": "14:45:00", "start_time": "14:00:00", "sequence_number": 2}, {"end_time": "15:30:00", "start_time": "14:45:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:00:00", "start_time": "08:00:00", "break_windows": [{"name": "Nghi trua moi", "end_time": "13:15:00", "start_time": "12:30:00"}], "blocks_per_day": 3, "unused_minutes": 90, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 45, "break_window_minutes": 45, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": 0}	2026-08-23 12:36:20.10556+00
 1150	2	TIMEFRAME_ARCHIVED	timeframe	51	Archive test template	\N	{"archived": true}	2026-08-23 12:36:20.14042+00
 1151	2	TIMEFRAME_CREATED	timeframe	52	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 12:36:20.44904+00
@@ -4172,6 +4115,7 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 1178	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:37:01.541966+00
 1179	2	SEMESTER_STATUS_CHANGED	semester	1	Prepare isolated API test	{"status": "ACTIVE"}	{"status": "CLOSED"}	2026-08-23 12:37:01.766066+00
 1180	2	SEMESTER_CREATED	semester	485	\N	\N	{"code": "DURATION-60E08E33", "name": "Duration Test Semester", "note": null, "status": "ACTIVE", "end_date": "2030-04-15", "start_date": "2030-01-01", "academic_year": "2030-2031"}	2026-08-23 12:37:01.782515+00
+2315	2	ROUND_COMMITTEES_REPLACED	round	512	\N	\N	{"committee_ids": []}	2026-08-23 18:21:58.032562+00
 1181	2	SEMESTER_STATUS_CHANGED	semester	485	Semester completed	{"status": "ACTIVE"}	{"status": "CLOSED"}	2026-08-23 12:37:01.803334+00
 1182	2	SEMESTER_SET_CURRENT	semester	1	\N	{"status": "CLOSED"}	{"status": "ACTIVE"}	2026-08-23 12:37:01.827618+00
 1183	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:37:02.479895+00
@@ -4224,6 +4168,9 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 1230	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 12:37:34.805522+00
 1231	2	SEMESTER_STATUS_CHANGED	semester	1	Prepare API test	{"status": "ACTIVE"}	{"status": "CLOSED"}	2026-08-23 12:37:35.196618+00
 1232	2	SEMESTER_CREATED	semester	513	\N	\N	{"code": "FAST-CF2C72E2", "name": "Fast Track Semester", "note": "Created by API test", "status": "ACTIVE", "end_date": "2036-04-15", "start_date": "2036-01-01", "academic_year": "2036-2037"}	2026-08-23 12:37:35.217071+00
+2316	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:21:58.5419+00
+2317	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:21:59.160973+00
+2529	3	LOGIN_SUCCESS	account	3	\N	\N	{"session": "created"}	2026-08-24 06:58:59.480313+00
 1233	2	SEMESTER_UPDATED	semester	513	\N	{"code": "FAST-CF2C72E2", "name": "Fast Track Semester", "note": "Created by API test", "status": "ACTIVE", "end_date": "2036-04-15", "start_date": "2036-01-01", "academic_year": "2036-2037"}	{"code": "FAST-CF2C72E2", "name": "Fast Track Semester", "note": "Updated note", "status": "ACTIVE", "end_date": "2036-04-15", "start_date": "2036-01-01", "academic_year": "2036-2037"}	2026-08-23 12:37:35.421689+00
 1234	2	SEMESTER_SET_CURRENT	semester	513	\N	{"status": "ACTIVE"}	{"status": "CLOSED"}	2026-08-23 12:37:35.463389+00
 1235	2	SEMESTER_SET_CURRENT	semester	1	\N	{"status": "CLOSED"}	{"status": "ACTIVE"}	2026-08-23 12:37:35.463389+00
@@ -4238,6 +4185,10 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 1241	2	TIMEFRAME_CREATED	timeframe	56	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 12:37:41.490252+00
 1242	2	ROUND_CREATED	round	276	\N	\N	{"name": "Round From Quick Timeframe", "type": "REVIEW_1", "end_date": "2026-09-01", "room_types": ["NORMAL"], "start_date": "2026-09-01", "description": null, "semester_id": 1, "soft_weights": {}, "timeframe_id": 56, "reviewer_count": 2, "result_owner_mode": false, "h12_semester_quota": null, "timeframeVersionId": 98, "max_minutes_per_day": null, "group_selection_mode": false, "h12_sessions_per_day": 8, "max_minutes_per_part": null, "h12_sessions_per_part": 4, "registration_deadline": null, "max_groups_per_timeslot": 1, "session_duration_minutes": 45, "group_preference_deadline": null}	2026-08-23 12:37:41.538633+00
 1243	2	TIMEFRAME_UPDATED	timeframe	56	Test reusable system configuration	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "12:30:00", "start_time": "10:15:00", "group_slots": [{"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 1}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 2}, {"end_time": "12:30:00", "start_time": "11:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:45:00", "start_time": "12:30:00", "group_slots": [{"end_time": "13:15:00", "start_time": "12:30:00", "sequence_number": 1}, {"end_time": "14:00:00", "start_time": "13:15:00", "sequence_number": 2}, {"end_time": "14:45:00", "start_time": "14:00:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "17:00:00", "start_time": "14:45:00", "group_slots": [{"end_time": "15:30:00", "start_time": "14:45:00", "sequence_number": 1}, {"end_time": "16:15:00", "start_time": "15:30:00", "sequence_number": 2}, {"end_time": "17:00:00", "start_time": "16:15:00", "sequence_number": 3}], "sequence_number": 4, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:00:00", "start_time": "08:00:00", "break_windows": [], "blocks_per_day": 4, "unused_minutes": 0, "capacity_per_day": 12, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 0, "break_window_minutes": 0, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": 0}	2026-08-23 12:37:41.626145+00
+2318	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:00.356834+00
+2319	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:00.843185+00
+2320	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:01.226051+00
+2321	2	ROUND_COMMITTEES_REPLACED	round	518	\N	\N	{"committee_ids": [863]}	2026-08-23 18:22:01.266006+00
 1244	2	TIMEFRAME_MANUAL_CREATED	timeframe	57	Save timelines edited from quick preview	\N	{"blocks": [{"end_time": "09:00:00", "start_time": "07:30:00", "group_slots": [{"end_time": "08:15:00", "start_time": "07:30:00", "sequence_number": 1}, {"end_time": "09:00:00", "start_time": "08:15:00", "sequence_number": 2}], "sequence_number": 1, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}, {"end_time": "11:30:00", "start_time": "09:15:00", "group_slots": [{"end_time": "10:00:00", "start_time": "09:15:00", "sequence_number": 1}, {"end_time": "10:45:00", "start_time": "10:00:00", "sequence_number": 2}, {"end_time": "11:30:00", "start_time": "10:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 3, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "07:30:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "09:15:00", "start_time": "09:00:00"}, {"name": "Khoảng nghỉ 2", "end_time": "13:00:00", "start_time": "11:30:00"}], "blocks_per_day": 3, "unused_minutes": 0, "capacity_per_day": 7, "groups_per_block": null, "manual_timelines": [{"end_time": "09:00:00", "start_time": "07:30:00", "groups_per_slot": 2}, {"end_time": "11:30:00", "start_time": "09:15:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 105, "break_window_minutes": 105, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 12:37:41.923201+00
 1245	2	ROUND_CREATED	round	277	\N	\N	{"name": "Round From Manual Timeframe", "type": "REVIEW_1", "end_date": "2026-09-02", "room_types": ["NORMAL"], "start_date": "2026-09-02", "description": null, "semester_id": 1, "soft_weights": {}, "timeframe_id": 57, "reviewer_count": 2, "result_owner_mode": false, "h12_semester_quota": null, "timeframeVersionId": 100, "max_minutes_per_day": null, "group_selection_mode": false, "h12_sessions_per_day": 8, "max_minutes_per_part": null, "h12_sessions_per_part": 4, "registration_deadline": null, "max_groups_per_timeslot": 1, "session_duration_minutes": 45, "group_preference_deadline": null}	2026-08-23 12:37:41.956662+00
 1246	2	LOGIN_SUCCESS	account	2	\N	\N	{"session": "created"}	2026-08-23 12:50:17.983936+00
@@ -4323,6 +4274,14 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 1341	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 1, "skipped": 1}	2026-08-23 12:59:22.540764+00
 2063	2	LOGIN_SUCCESS	account	2	\N	\N	{"session": "created"}	2026-08-23 17:31:45.185999+00
 1327	2	TIMEFRAME_MANUAL_CREATED	timeframe	58	Save timelines edited from quick preview	\N	{"blocks": [{"end_time": "09:00:00", "start_time": "07:30:00", "group_slots": [{"end_time": "08:15:00", "start_time": "07:30:00", "sequence_number": 1}, {"end_time": "09:00:00", "start_time": "08:15:00", "sequence_number": 2}], "sequence_number": 1, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}, {"end_time": "11:30:00", "start_time": "09:15:00", "group_slots": [{"end_time": "10:00:00", "start_time": "09:15:00", "sequence_number": 1}, {"end_time": "10:45:00", "start_time": "10:00:00", "sequence_number": 2}, {"end_time": "11:30:00", "start_time": "10:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 3, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "07:30:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "09:15:00", "start_time": "09:00:00"}, {"name": "Khoảng nghỉ 2", "end_time": "13:00:00", "start_time": "11:30:00"}], "blocks_per_day": 3, "unused_minutes": 0, "capacity_per_day": 7, "groups_per_block": null, "manual_timelines": [{"end_time": "09:00:00", "start_time": "07:30:00", "groups_per_slot": 2}, {"end_time": "11:30:00", "start_time": "09:15:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 105, "break_window_minutes": 105, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 12:56:11.050895+00
+2322	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:01.779907+00
+2323	2	ROUND_COMMITTEES_REPLACED	round	519	\N	\N	{"committee_ids": [866]}	2026-08-23 18:22:01.847913+00
+2324	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:02.393112+00
+2325	2	ROUND_COMMITTEES_REPLACED	round	520	\N	\N	{"committee_ids": [869]}	2026-08-23 18:22:02.445174+00
+2326	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:22:04.129373+00
+2327	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:22:05.022411+00
+2328	2	SEMESTER_STATUS_CHANGED	semester	948	Prepare API test	{"status": "ACTIVE"}	{"status": "CLOSED"}	2026-08-23 18:22:05.505359+00
+2329	2	SEMESTER_CREATED	semester	1033	\N	\N	{"code": "FAST-516B67B0", "name": "Fast Track Semester", "note": "Created by API test", "status": "ACTIVE", "end_date": "2036-04-15", "start_date": "2036-01-01", "academic_year": "2036-2037"}	2026-08-23 18:22:05.527899+00
 1328	2	TIMEFRAME_MANUAL_UPDATED	timeframe	58	Replace all edited timelines	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 2, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "08:00:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "13:00:00", "start_time": "10:15:00"}], "blocks_per_day": 2, "unused_minutes": 0, "capacity_per_day": 5, "groups_per_block": null, "manual_timelines": [{"end_time": "10:15:00", "start_time": "08:00:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 165, "break_window_minutes": 165, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 12:56:11.086694+00
 1329	2	TIMEFRAME_CREATED	timeframe	59	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 12:56:11.356501+00
 1330	2	TIMEFRAME_UPDATED	timeframe	59	Move the shared template to 08:00	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "12:30:00", "start_time": "10:15:00", "group_slots": [{"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 1}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 2}, {"end_time": "12:30:00", "start_time": "11:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:30:00", "start_time": "13:15:00", "group_slots": [{"end_time": "14:00:00", "start_time": "13:15:00", "sequence_number": 1}, {"end_time": "14:45:00", "start_time": "14:00:00", "sequence_number": 2}, {"end_time": "15:30:00", "start_time": "14:45:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:00:00", "start_time": "08:00:00", "break_windows": [{"name": "Nghi trua moi", "end_time": "13:15:00", "start_time": "12:30:00"}], "blocks_per_day": 3, "unused_minutes": 90, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 45, "break_window_minutes": 45, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": 0}	2026-08-23 12:56:11.407317+00
@@ -4418,6 +4377,7 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 1457	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 13:53:50.390111+00
 1458	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 13:53:50.81799+00
 1422	2	TIMEFRAME_CREATED	timeframe	64	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 13:00:19.178414+00
+2330	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:22:10.679328+00
 1423	2	ROUND_CREATED	round	314	\N	\N	{"name": "Round From Quick Timeframe", "type": "REVIEW_1", "end_date": "2026-09-01", "room_types": ["NORMAL"], "start_date": "2026-09-01", "description": null, "semester_id": 1, "soft_weights": {}, "timeframe_id": 64, "reviewer_count": 2, "result_owner_mode": false, "h12_semester_quota": null, "timeframeVersionId": 112, "max_minutes_per_day": null, "group_selection_mode": false, "h12_sessions_per_day": 8, "max_minutes_per_part": null, "h12_sessions_per_part": 4, "registration_deadline": null, "max_groups_per_timeslot": 1, "session_duration_minutes": 45, "group_preference_deadline": null}	2026-08-23 13:00:19.202358+00
 1424	2	TIMEFRAME_UPDATED	timeframe	64	Test reusable system configuration	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "12:30:00", "start_time": "10:15:00", "group_slots": [{"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 1}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 2}, {"end_time": "12:30:00", "start_time": "11:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:45:00", "start_time": "12:30:00", "group_slots": [{"end_time": "13:15:00", "start_time": "12:30:00", "sequence_number": 1}, {"end_time": "14:00:00", "start_time": "13:15:00", "sequence_number": 2}, {"end_time": "14:45:00", "start_time": "14:00:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "17:00:00", "start_time": "14:45:00", "group_slots": [{"end_time": "15:30:00", "start_time": "14:45:00", "sequence_number": 1}, {"end_time": "16:15:00", "start_time": "15:30:00", "sequence_number": 2}, {"end_time": "17:00:00", "start_time": "16:15:00", "sequence_number": 3}], "sequence_number": 4, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:00:00", "start_time": "08:00:00", "break_windows": [], "blocks_per_day": 4, "unused_minutes": 0, "capacity_per_day": 12, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 0, "break_window_minutes": 0, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": 0}	2026-08-23 13:00:19.269071+00
 1425	2	TIMEFRAME_MANUAL_CREATED	timeframe	65	Save timelines edited from quick preview	\N	{"blocks": [{"end_time": "09:00:00", "start_time": "07:30:00", "group_slots": [{"end_time": "08:15:00", "start_time": "07:30:00", "sequence_number": 1}, {"end_time": "09:00:00", "start_time": "08:15:00", "sequence_number": 2}], "sequence_number": 1, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}, {"end_time": "11:30:00", "start_time": "09:15:00", "group_slots": [{"end_time": "10:00:00", "start_time": "09:15:00", "sequence_number": 1}, {"end_time": "10:45:00", "start_time": "10:00:00", "sequence_number": 2}, {"end_time": "11:30:00", "start_time": "10:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 3, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "07:30:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "09:15:00", "start_time": "09:00:00"}, {"name": "Khoảng nghỉ 2", "end_time": "13:00:00", "start_time": "11:30:00"}], "blocks_per_day": 3, "unused_minutes": 0, "capacity_per_day": 7, "groups_per_block": null, "manual_timelines": [{"end_time": "09:00:00", "start_time": "07:30:00", "groups_per_slot": 2}, {"end_time": "11:30:00", "start_time": "09:15:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 105, "break_window_minutes": 105, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 13:00:19.536448+00
@@ -5294,31 +5254,6 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 2303	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:21:29.271787+00
 2304	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:21:29.624648+00
 2305	2	ROUND_TRANSITION	round	509	\N	{"status": "OPEN_REGISTRATION"}	{"status": "REGISTRATION_CLOSED"}	2026-08-23 18:21:30.119189+00
-2306	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:21:30.35571+00
-2307	2098	AVAILABILITY_ENTERED	group_availability	510:42	\N	\N	{"source": "FORM", "selected_count": 0}	2026-08-23 18:21:30.594781+00
-2308	2103	AVAILABILITY_ENTERED	lecturer_availability	510:1090	\N	\N	{"source": "FORM", "selected_count": 0}	2026-08-23 18:21:30.626354+00
-2309	2098	AVAILABILITY_ENTERED	group_availability	510:42	\N	\N	{"source": "FORM", "selected_count": 0}	2026-08-23 18:21:30.660227+00
-2310	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:21:55.414182+00
-2311	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:21:57.160004+00
-2312	2	ROUND_COMMITTEES_REPLACED	round	511	\N	\N	{"committee_ids": [845, 846]}	2026-08-23 18:21:57.210459+00
-2313	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:21:57.970732+00
-2314	2	ROUND_COMMITTEES_REPLACED	round	512	\N	\N	{"committee_ids": [848]}	2026-08-23 18:21:58.005449+00
-2315	2	ROUND_COMMITTEES_REPLACED	round	512	\N	\N	{"committee_ids": []}	2026-08-23 18:21:58.032562+00
-2316	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:21:58.5419+00
-2317	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:21:59.160973+00
-2318	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:00.356834+00
-2319	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:00.843185+00
-2320	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:01.226051+00
-2321	2	ROUND_COMMITTEES_REPLACED	round	518	\N	\N	{"committee_ids": [863]}	2026-08-23 18:22:01.266006+00
-2322	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:01.779907+00
-2323	2	ROUND_COMMITTEES_REPLACED	round	519	\N	\N	{"committee_ids": [866]}	2026-08-23 18:22:01.847913+00
-2324	2	COMMITTEES_CREATED	committee	bulk	\N	\N	{"created": 3, "skipped": 0}	2026-08-23 18:22:02.393112+00
-2325	2	ROUND_COMMITTEES_REPLACED	round	520	\N	\N	{"committee_ids": [869]}	2026-08-23 18:22:02.445174+00
-2326	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:22:04.129373+00
-2327	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:22:05.022411+00
-2328	2	SEMESTER_STATUS_CHANGED	semester	948	Prepare API test	{"status": "ACTIVE"}	{"status": "CLOSED"}	2026-08-23 18:22:05.505359+00
-2329	2	SEMESTER_CREATED	semester	1033	\N	\N	{"code": "FAST-516B67B0", "name": "Fast Track Semester", "note": "Created by API test", "status": "ACTIVE", "end_date": "2036-04-15", "start_date": "2036-01-01", "academic_year": "2036-2037"}	2026-08-23 18:22:05.527899+00
-2330	1	SEED_FIXTURE_LOADED	seed_fixture	seed-v5	\N	\N	{"source": "VERSIONED_SEED"}	2026-08-23 18:22:10.679328+00
 2331	2	TIMEFRAME_MANUAL_CREATED	timeframe	106	Save timelines edited from quick preview	\N	{"blocks": [{"end_time": "09:00:00", "start_time": "07:30:00", "group_slots": [{"end_time": "08:15:00", "start_time": "07:30:00", "sequence_number": 1}, {"end_time": "09:00:00", "start_time": "08:15:00", "sequence_number": 2}], "sequence_number": 1, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}, {"end_time": "11:30:00", "start_time": "09:15:00", "group_slots": [{"end_time": "10:00:00", "start_time": "09:15:00", "sequence_number": 1}, {"end_time": "10:45:00", "start_time": "10:00:00", "sequence_number": 2}, {"end_time": "11:30:00", "start_time": "10:45:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 3, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "07:30:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "09:15:00", "start_time": "09:00:00"}, {"name": "Khoảng nghỉ 2", "end_time": "13:00:00", "start_time": "11:30:00"}], "blocks_per_day": 3, "unused_minutes": 0, "capacity_per_day": 7, "groups_per_block": null, "manual_timelines": [{"end_time": "09:00:00", "start_time": "07:30:00", "groups_per_slot": 2}, {"end_time": "11:30:00", "start_time": "09:15:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 105, "break_window_minutes": 105, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 18:22:17.766927+00
 2332	2	TIMEFRAME_MANUAL_UPDATED	timeframe	106	Replace all edited timelines	\N	{"blocks": [{"end_time": "10:15:00", "start_time": "08:00:00", "group_slots": [{"end_time": "08:45:00", "start_time": "08:00:00", "sequence_number": 1}, {"end_time": "09:30:00", "start_time": "08:45:00", "sequence_number": 2}, {"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "14:30:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}], "sequence_number": 2, "duration_minutes": 90, "groups_per_block": 2, "group_duration_minutes": 45}], "end_time": "14:30:00", "start_time": "08:00:00", "break_windows": [{"name": "Khoảng nghỉ 1", "end_time": "13:00:00", "start_time": "10:15:00"}], "blocks_per_day": 2, "unused_minutes": 0, "capacity_per_day": 5, "groups_per_block": null, "manual_timelines": [{"end_time": "10:15:00", "start_time": "08:00:00", "groups_per_slot": 3}, {"end_time": "14:30:00", "start_time": "13:00:00", "groups_per_slot": 2}], "total_break_minutes": 165, "break_window_minutes": 165, "block_duration_minutes": null, "group_duration_minutes": 45, "applied_block_break_minutes": 0, "break_between_blocks_minutes": null}	2026-08-23 18:22:17.815191+00
 2333	2	TIMEFRAME_CREATED	timeframe	107	Test reusable system configuration	\N	{"blocks": [{"end_time": "09:15:00", "start_time": "07:00:00", "group_slots": [{"end_time": "07:45:00", "start_time": "07:00:00", "sequence_number": 1}, {"end_time": "08:30:00", "start_time": "07:45:00", "sequence_number": 2}, {"end_time": "09:15:00", "start_time": "08:30:00", "sequence_number": 3}], "sequence_number": 1, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "11:45:00", "start_time": "09:30:00", "group_slots": [{"end_time": "10:15:00", "start_time": "09:30:00", "sequence_number": 1}, {"end_time": "11:00:00", "start_time": "10:15:00", "sequence_number": 2}, {"end_time": "11:45:00", "start_time": "11:00:00", "sequence_number": 3}], "sequence_number": 2, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}, {"end_time": "15:15:00", "start_time": "13:00:00", "group_slots": [{"end_time": "13:45:00", "start_time": "13:00:00", "sequence_number": 1}, {"end_time": "14:30:00", "start_time": "13:45:00", "sequence_number": 2}, {"end_time": "15:15:00", "start_time": "14:30:00", "sequence_number": 3}], "sequence_number": 3, "duration_minutes": 135, "groups_per_block": 3, "group_duration_minutes": 45}], "end_time": "17:30:00", "start_time": "07:00:00", "break_windows": [{"name": "Nghi trua", "end_time": "13:00:00", "start_time": "12:00:00"}], "blocks_per_day": 3, "unused_minutes": 150, "capacity_per_day": 9, "groups_per_block": 3, "manual_timelines": null, "total_break_minutes": 75, "break_window_minutes": 60, "block_duration_minutes": 135, "group_duration_minutes": 45, "applied_block_break_minutes": 15, "break_between_blocks_minutes": 15}	2026-08-23 18:22:18.221174+00
@@ -5516,11 +5451,12 @@ COPY public.audit_events (id, actor_id, action, entity_type, entity_id, reason, 
 2525	1	LOGOUT	account	1	\N	\N	{"session": "revoked"}	2026-08-23 19:53:02.595572+00
 2526	2	LOGIN_SUCCESS	account	2	\N	\N	{"session": "created"}	2026-08-23 19:53:25.500216+00
 2527	2	LOGIN_SUCCESS	account	2	\N	\N	{"session": "created"}	2026-08-24 02:31:05.893604+00
+2536	2	LOGIN_SUCCESS	account	2	\N	\N	{"session": "created"}	2026-08-24 11:10:05.94179+00
 \.
 
 
 --
--- Data for Name: auth_login_throttles; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: auth_login_throttles; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.auth_login_throttles (identifier, window_started_at, attempts, updated_at) FROM stdin;
@@ -5558,7 +5494,7 @@ f4b336d305a7aa62f291917e5cb45a0c15831fd5bb731caa0a6dc34b91c2f93f	2026-08-23 18:3
 
 
 --
--- Data for Name: auth_sessions; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: auth_sessions; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.auth_sessions (id, account_id, token_hash, csrf_token_hash, created_at, last_seen_at, expires_at, revoked_at) FROM stdin;
@@ -5625,11 +5561,14 @@ COPY public.auth_sessions (id, account_id, token_hash, csrf_token_hash, created_
 57	2	be9c467c8826939f58c8c9b958771c59a11a5c6644c91e7ae5b2d14306b61270	5571f5f13fbef21b843adc030b583d9d8b31788b9bc981039fc9664d6412fd1d	2026-08-23 18:20:36.852837+00	2026-08-23 18:20:37.10017+00	2026-08-30 18:20:37.017727+00	2026-08-23 18:20:37.133169+00
 60	2	5b32e22a9ee08e83eea3726a779061088666ac0a24db8a489c7ee7493ae9a3fc	ebedadadd87f67e177155fc43ad2318099535f7f8567fa8514386d05ba0437b6	2026-08-23 18:50:06.063123+00	2026-08-23 18:50:06.226349+00	2026-08-30 18:50:06.168631+00	2026-08-23 18:50:06.248742+00
 48	2	e71aa4e2abafadef265026b8dae69f3ce6c9ab9a8f02eeaebc6340bbd6ed0f01	16f6fe7c176de4942fe9f949cdb4cbe0a1b5e26d00d35a7e5533b6a5c96b06dc	2026-08-23 17:31:45.185999+00	2026-08-23 20:11:52.580491+00	2026-08-30 17:31:45.362879+00	\N
+65	3	ab0a6827b7fc276e7a2a21c810c9c5b8540463d3dd446ed15d4f55fb569886bc	13d3c26672b3e4bb68ddcaa9eaf391deca0cceb2dd3efae2d39d1d8201a99f75	2026-08-24 06:58:59.480313+00	2026-08-24 07:54:11.235637+00	2026-08-31 06:58:59.524249+00	\N
+64	2	cde076daf0e7a76c4666c7786a88ebfe3a2a32db608ad2f0aa0a431165838c5a	9e32aa747bd336ae395148c5a696a99ceae3783cea3483d480c1e9619f952822	2026-08-24 06:31:55.270755+00	2026-08-24 09:08:22.385215+00	2026-08-31 06:31:55.327268+00	\N
+66	2	5f1841b87da6384e95cbaa47308622eadf4b386478eefd35620dd417a1cce549	4d05906271b8b2a15a994883d74df0b6764ed913504c90f355e15a0abe63e5ee	2026-08-24 11:10:05.94179+00	2026-08-24 12:06:53.524379+00	2026-08-31 11:10:05.993494+00	\N
 \.
 
 
 --
--- Data for Name: committee_members; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: committee_members; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.committee_members (committee_id, lecturer_id, role, sequence_number) FROM stdin;
@@ -5637,7 +5576,7 @@ COPY public.committee_members (committee_id, lecturer_id, role, sequence_number)
 
 
 --
--- Data for Name: committees; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: committees; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.committees (id, code, member_count, created_by, created_at) FROM stdin;
@@ -5645,7 +5584,7 @@ COPY public.committees (id, code, member_count, created_by, created_at) FROM std
 
 
 --
--- Data for Name: conflict_declarations; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: conflict_declarations; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.conflict_declarations (id, lecturer_id, project_id, reason, created_by, created_at) FROM stdin;
@@ -5653,119 +5592,23 @@ COPY public.conflict_declarations (id, lecturer_id, project_id, reason, created_
 
 
 --
--- Data for Name: council_members; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: council_members; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.council_members (council_id, lecturer_id, assignment, is_result_owner, snapshot_name) FROM stdin;
-1	3	REVIEWER	f	Thân Thị Ngọc Vân
-1	4	REVIEWER	f	Phan Minh Tâm
-1	10	REVIEWER	f	Nguyễn Trọng Tài
-1	13	REVIEWER	f	Ngô Đăng Hà An
-1	14	REVIEWER	f	Vũ Thị Thùy Dương
-2	1	REVIEWER	f	Lâm Hữu Khánh Phương
-2	9	REVIEWER	f	Trương Long
-2	13	REVIEWER	f	Ngô Đăng Hà An
-2	14	REVIEWER	f	Vũ Thị Thùy Dương
-2	15	REVIEWER	f	Lại Đức Hùng
-3	1	REVIEWER	f	Lâm Hữu Khánh Phương
-3	2	REVIEWER	f	Đặng Ngọc Minh Đức
-3	9	REVIEWER	f	Trương Long
-3	15	REVIEWER	f	Lại Đức Hùng
-3	17	REVIEWER	f	Kiều Trọng Khánh
-4	1	REVIEWER	f	Lâm Hữu Khánh Phương
-4	4	REVIEWER	f	Phan Minh Tâm
-4	8	REVIEWER	f	Nguyễn Thế Hoàng
-4	9	REVIEWER	f	Trương Long
-4	11	REVIEWER	f	Nguyễn Ngọc Lâm
-5	8	REVIEWER	f	Nguyễn Thế Hoàng
-5	11	REVIEWER	f	Nguyễn Ngọc Lâm
-5	12	REVIEWER	f	Nguyễn Trí Thông
-5	16	REVIEWER	f	Trần Thanh Nguyên
-5	17	REVIEWER	f	Kiều Trọng Khánh
-6	1	REVIEWER	f	Lâm Hữu Khánh Phương
-6	2	REVIEWER	f	Đặng Ngọc Minh Đức
-6	10	REVIEWER	f	Nguyễn Trọng Tài
-6	17	REVIEWER	f	Kiều Trọng Khánh
-6	18	REVIEWER	f	Nguyễn Thị Cẩm Hương
-7	2	REVIEWER	f	Đặng Ngọc Minh Đức
-7	6	REVIEWER	f	Nguyễn Tấn Phúc
-7	10	REVIEWER	f	Nguyễn Trọng Tài
-7	12	REVIEWER	f	Nguyễn Trí Thông
-7	17	REVIEWER	f	Kiều Trọng Khánh
-8	2	REVIEWER	f	Đặng Ngọc Minh Đức
-8	3	REVIEWER	f	Thân Thị Ngọc Vân
-8	6	REVIEWER	f	Nguyễn Tấn Phúc
-8	7	REVIEWER	f	Nguyễn Minh Sang
-8	13	REVIEWER	f	Ngô Đăng Hà An
-9	1	REVIEWER	f	Lâm Hữu Khánh Phương
-9	2	REVIEWER	f	Đặng Ngọc Minh Đức
-9	5	REVIEWER	f	Đỗ Tấn Nhàn
-9	15	REVIEWER	f	Lại Đức Hùng
-9	17	REVIEWER	f	Kiều Trọng Khánh
-10	3	REVIEWER	f	Thân Thị Ngọc Vân
-10	6	REVIEWER	f	Nguyễn Tấn Phúc
-10	11	REVIEWER	f	Nguyễn Ngọc Lâm
-10	12	REVIEWER	f	Nguyễn Trí Thông
-10	18	REVIEWER	f	Nguyễn Thị Cẩm Hương
-11	2	REVIEWER	f	Đặng Ngọc Minh Đức
-11	3	REVIEWER	f	Thân Thị Ngọc Vân
-11	5	REVIEWER	f	Đỗ Tấn Nhàn
-11	6	REVIEWER	f	Nguyễn Tấn Phúc
-11	8	REVIEWER	f	Nguyễn Thế Hoàng
-12	4	REVIEWER	f	Phan Minh Tâm
-12	9	REVIEWER	f	Trương Long
-12	10	REVIEWER	f	Nguyễn Trọng Tài
-12	13	REVIEWER	f	Ngô Đăng Hà An
-12	16	REVIEWER	f	Trần Thanh Nguyên
-13	3	REVIEWER	f	Thân Thị Ngọc Vân
-13	5	REVIEWER	f	Đỗ Tấn Nhàn
-13	6	REVIEWER	f	Nguyễn Tấn Phúc
-13	8	REVIEWER	f	Nguyễn Thế Hoàng
-13	15	REVIEWER	f	Lại Đức Hùng
-14	10	REVIEWER	f	Nguyễn Trọng Tài
-14	12	REVIEWER	f	Nguyễn Trí Thông
-14	13	REVIEWER	f	Ngô Đăng Hà An
-14	14	REVIEWER	f	Vũ Thị Thùy Dương
-14	16	REVIEWER	f	Trần Thanh Nguyên
-15	1	REVIEWER	f	Lâm Hữu Khánh Phương
-15	7	REVIEWER	f	Nguyễn Minh Sang
-15	9	REVIEWER	f	Trương Long
-15	11	REVIEWER	f	Nguyễn Ngọc Lâm
-15	14	REVIEWER	f	Vũ Thị Thùy Dương
-16	4	REVIEWER	f	Phan Minh Tâm
-16	7	REVIEWER	f	Nguyễn Minh Sang
-16	11	REVIEWER	f	Nguyễn Ngọc Lâm
-16	14	REVIEWER	f	Vũ Thị Thùy Dương
-16	15	REVIEWER	f	Lại Đức Hùng
 \.
 
 
 --
--- Data for Name: councils; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: councils; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.councils (id, round_id, supersedes_council_id, created_by, reason, created_at, sealed_at) FROM stdin;
-1	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-2	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-3	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-4	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-5	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-6	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-7	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-8	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-9	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-10	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-11	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-12	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-13	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-14	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-15	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
-16	164	\N	2	Schedule activation	2026-08-22 18:06:42.159027+00	2026-08-22 18:06:42.159027+00
 \.
 
 
 --
--- Data for Name: db_cleanup_backup_20260822_160826; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: db_cleanup_backup_20260822_160826; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.db_cleanup_backup_20260822_160826 (backup_id, table_name, row_data, backed_up_at) FROM stdin;
@@ -6845,7 +6688,7 @@ COPY public.db_cleanup_backup_20260822_160826 (backup_id, table_name, row_data, 
 
 
 --
--- Data for Name: excel_council_groups; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: excel_council_groups; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.excel_council_groups (council_id, project_code, group_code, project_id, group_id) FROM stdin;
@@ -6853,7 +6696,7 @@ COPY public.excel_council_groups (council_id, project_code, group_code, project_
 
 
 --
--- Data for Name: excel_defense_councils; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: excel_defense_councils; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.excel_defense_councils (id, batch_id, defense_type, excel_row, council_code, council_date, day_code, chair_code, secretary_code, member_1_code, member_2_code, member_3_code, member_count, group_count, member_list, canonical_round_id, raw_values) FROM stdin;
@@ -6861,7 +6704,7 @@ COPY public.excel_defense_councils (id, batch_id, defense_type, excel_row, counc
 
 
 --
--- Data for Name: excel_import_batches; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: excel_import_batches; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.excel_import_batches (id, source_file_name, source_path, imported_at, notes) FROM stdin;
@@ -6869,7 +6712,7 @@ COPY public.excel_import_batches (id, source_file_name, source_path, imported_at
 
 
 --
--- Data for Name: excel_projects; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: excel_projects; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.excel_projects (id, batch_id, excel_row, project_code, group_code, title_en, title_vi, supervisor_display_name, supervisor_1_code, supervisor_2_code, canonical_project_id, canonical_group_id, raw_values) FROM stdin;
@@ -6877,7 +6720,7 @@ COPY public.excel_projects (id, batch_id, excel_row, project_code, group_code, t
 
 
 --
--- Data for Name: excel_review_schedule_rows; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: excel_review_schedule_rows; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.excel_review_schedule_rows (id, batch_id, review_type, excel_row, schedule_code, week_code, day_code, slot_number, wds_code, group_number, schedule_date, date_of_week, room_name, reviewer_1_code, reviewer_2_code, count_value, canonical_round_id, canonical_session_id, raw_values) FROM stdin;
@@ -6885,7 +6728,7 @@ COPY public.excel_review_schedule_rows (id, batch_id, review_type, excel_row, sc
 
 
 --
--- Data for Name: excel_sheet_rows; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: excel_sheet_rows; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.excel_sheet_rows (id, batch_id, sheet_name, row_number, values_jsonb, formulas_jsonb, non_empty) FROM stdin;
@@ -6893,7 +6736,7 @@ COPY public.excel_sheet_rows (id, batch_id, sheet_name, row_number, values_jsonb
 
 
 --
--- Data for Name: excel_summary_workloads; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: excel_summary_workloads; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.excel_summary_workloads (id, batch_id, excel_row, lecturer_code, department, review_1_count, review_2_count, review_3_count, defense_1_count, defense_2_count, raw_values) FROM stdin;
@@ -6901,7 +6744,7 @@ COPY public.excel_summary_workloads (id, batch_id, excel_row, lecturer_code, dep
 
 
 --
--- Data for Name: group_memberships; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: group_memberships; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.group_memberships (id, group_id, student_id, membership_role, status, joined_at, left_at, reason, drop_requested_by, drop_approved_by) FROM stdin;
@@ -7013,7 +6856,7 @@ COPY public.group_memberships (id, group_id, student_id, membership_role, status
 
 
 --
--- Data for Name: group_slot_preferences; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: group_slot_preferences; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.group_slot_preferences (round_id, group_id, timeslot_id, selected, source, updated_by) FROM stdin;
@@ -7120,7 +6963,7 @@ COPY public.group_slot_preferences (round_id, group_id, timeslot_id, selected, s
 
 
 --
--- Data for Name: groups; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: groups; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.groups (id, project_id, code, status) FROM stdin;
@@ -7157,7 +7000,7 @@ COPY public.groups (id, project_id, code, status) FROM stdin;
 
 
 --
--- Data for Name: h11_waivers; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: h11_waivers; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.h11_waivers (id, round_id, group_id, granted_by, reason, active, created_at) FROM stdin;
@@ -7181,7 +7024,7 @@ COPY public.h11_waivers (id, round_id, group_id, granted_by, reason, active, cre
 
 
 --
--- Data for Name: lecturer_availabilities; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: lecturer_availabilities; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.lecturer_availabilities (round_id, lecturer_id, timeslot_id, state, load_preference, source, updated_by) FROM stdin;
@@ -8404,7 +8247,7 @@ COPY public.lecturer_availabilities (round_id, lecturer_id, timeslot_id, state, 
 
 
 --
--- Data for Name: lecturers; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: lecturers; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.lecturers (id, account_id, lecturer_code) FROM stdin;
@@ -8449,7 +8292,7 @@ COPY public.lecturers (id, account_id, lecturer_code) FROM stdin;
 
 
 --
--- Data for Name: majors; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: majors; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.majors (id, code, name) FROM stdin;
@@ -8458,7 +8301,39 @@ COPY public.majors (id, code, name) FROM stdin;
 
 
 --
--- Data for Name: notifications; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: manual_schedule_drafts; Type: TABLE DATA; Schema: public; Owner: scheduler
+--
+
+COPY public.manual_schedule_drafts (round_id, revision, created_by, updated_by, created_at, updated_at, published_schedule_version_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: manual_schedule_session_groups; Type: TABLE DATA; Schema: public; Owner: scheduler
+--
+
+COPY public.manual_schedule_session_groups (session_id, group_id, "position") FROM stdin;
+\.
+
+
+--
+-- Data for Name: manual_schedule_session_reviewers; Type: TABLE DATA; Schema: public; Owner: scheduler
+--
+
+COPY public.manual_schedule_session_reviewers (session_id, lecturer_id, role_key, role_order, snapshot_name) FROM stdin;
+\.
+
+
+--
+-- Data for Name: manual_schedule_sessions; Type: TABLE DATA; Schema: public; Owner: scheduler
+--
+
+COPY public.manual_schedule_sessions (id, round_id, timeslot_id, room_id, status, published_session_id, created_by, updated_by, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: notifications; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.notifications (id, recipient_account_id, event_type, payload, status, sent_at, created_at, dedupe_key) FROM stdin;
@@ -8501,7 +8376,7 @@ COPY public.notifications (id, recipient_account_id, event_type, payload, status
 
 
 --
--- Data for Name: outbox_jobs; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: outbox_jobs; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.outbox_jobs (id, topic, payload, status, attempts, available_at, processed_at, created_at, dedupe_key) FROM stdin;
@@ -8549,7 +8424,7 @@ COPY public.outbox_jobs (id, topic, payload, status, attempts, available_at, pro
 
 
 --
--- Data for Name: project_supervisors; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: project_supervisors; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.project_supervisors (project_id, lecturer_id, supervisor_type) FROM stdin;
@@ -8637,7 +8512,7 @@ COPY public.project_supervisors (project_id, lecturer_id, supervisor_type) FROM 
 
 
 --
--- Data for Name: projects; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: projects; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.projects (id, semester_id, major_id, code, title, status, title_vi, title_en) FROM stdin;
@@ -8719,7 +8594,7 @@ COPY public.projects (id, semester_id, major_id, code, title, status, title_vi, 
 
 
 --
--- Data for Name: remediation_cases; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: remediation_cases; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.remediation_cases (id, session_result_id, group_id, due_at, status, verifier_lecturer_id, verified_at, note) FROM stdin;
@@ -8727,7 +8602,7 @@ COPY public.remediation_cases (id, session_result_id, group_id, due_at, status, 
 
 
 --
--- Data for Name: reschedule_requests; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: reschedule_requests; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.reschedule_requests (id, session_id, requested_by, reason, status, reviewed_by, created_at, reviewed_at, decision_note) FROM stdin;
@@ -8735,7 +8610,7 @@ COPY public.reschedule_requests (id, session_id, requested_by, reason, status, r
 
 
 --
--- Data for Name: rooms; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: rooms; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.rooms (id, code, name, capacity, active, room_type) FROM stdin;
@@ -8754,7 +8629,7 @@ COPY public.rooms (id, code, name, capacity, active, room_type) FROM stdin;
 
 
 --
--- Data for Name: round_committees; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: round_committees; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.round_committees (round_id, committee_id, created_by, created_at) FROM stdin;
@@ -8762,7 +8637,7 @@ COPY public.round_committees (round_id, committee_id, created_by, created_at) FR
 
 
 --
--- Data for Name: round_days; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: round_days; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.round_days (id, round_id, day_date) FROM stdin;
@@ -8773,7 +8648,7 @@ COPY public.round_days (id, round_id, day_date) FROM stdin;
 
 
 --
--- Data for Name: round_groups; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: round_groups; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.round_groups (round_id, group_id) FROM stdin;
@@ -8797,42 +8672,42 @@ COPY public.round_groups (round_id, group_id) FROM stdin;
 
 
 --
--- Data for Name: round_invitations; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: round_invitations; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.round_invitations (round_id, lecturer_id, status, response_reason, responded_at) FROM stdin;
-164	1090	ACCEPTED	\N	2026-08-23 17:59:43.061972+00
-164	1	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	2	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	3	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	4	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	5	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	6	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	7	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	8	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	9	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	10	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	11	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	12	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	13	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	14	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	15	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	16	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	17	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	18	ACCEPTED	Bootstrap reviewer pool for Defense 1.2 scheduling	2026-08-22 18:03:43.925546+00
-164	19	PENDING	\N	\N
-164	20	PENDING	\N	\N
-164	21	PENDING	\N	\N
-164	22	PENDING	\N	\N
-164	23	PENDING	\N	\N
-164	24	PENDING	\N	\N
-164	25	PENDING	\N	\N
-164	26	PENDING	\N	\N
+164	1090	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	1	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	2	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	3	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	4	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	5	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	6	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	7	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	8	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	9	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	10	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	11	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	12	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	13	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	14	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	15	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	16	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	17	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	18	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	19	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	20	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	21	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	22	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	23	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	24	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	25	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
+164	26	ACCEPTED	Seeded accepted invitation before scheduling	2026-08-23 18:00:00+00
 \.
 
 
 --
--- Data for Name: round_operation_records; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: round_operation_records; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.round_operation_records (id, round_id, actor_id, action, reason, before_status, after_status, created_at) FROM stdin;
@@ -8840,7 +8715,7 @@ COPY public.round_operation_records (id, round_id, actor_id, action, reason, bef
 
 
 --
--- Data for Name: round_room_types; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: round_room_types; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.round_room_types (round_id, room_type) FROM stdin;
@@ -8850,146 +8725,32 @@ COPY public.round_room_types (round_id, room_type) FROM stdin;
 
 
 --
--- Data for Name: rounds; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: rounds; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.rounds (id, semester_id, type, status, session_duration_minutes, reviewer_count, registration_deadline, result_owner_mode, h12_sessions_per_part, h12_sessions_per_day, h12_semester_quota, soft_weights, created_by, created_at, group_selection_mode, start_date, end_date, max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, name, description, group_preference_deadline, lecturer_registration_closed_at, timeframe_id, timeframe_version_id) FROM stdin;
-164	1	DEFENSE_1_2	SCHEDULED	45	5	2026-08-30 16:59:00+00	f	4	8	\N	{}	1	2026-08-22 10:21:16.638371+00	t	2026-09-04	2026-09-06	\N	\N	\N	Bảo vệ kỳ 2 (Defense 1.2)	Imported from su26_defense_1.2_SE.xlsx; sheet Kỹ thuật phần mềm; Review 1.1 result = Bảo vệ kỳ 2.	\N	\N	33	65
+164	1	DEFENSE_1_2	REGISTRATION_CLOSED	45	3	2026-08-30 16:59:00+00	f	4	8	\N	{}	1	2026-08-22 10:21:16.638371+00	t	2026-09-04	2026-09-06	\N	\N	\N	Bảo vệ kỳ 2 (Defense 1.2)	Imported from su26_defense_1.2_SE.xlsx; sheet Kỹ thuật phần mềm; Review 1.1 result = Bảo vệ kỳ 2.	\N	2026-08-23 18:00:00+00	33	65
 \.
 
 
 --
--- Data for Name: schedule_assignment_reviewers; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: schedule_assignment_reviewers; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.schedule_assignment_reviewers (assignment_id, lecturer_id, is_result_owner, snapshot_name) FROM stdin;
-1	1	f	Lâm Hữu Khánh Phương
-1	2	f	Đặng Ngọc Minh Đức
-1	3	f	Thân Thị Ngọc Vân
-1	4	f	Phan Minh Tâm
-1	6	f	Nguyễn Tấn Phúc
-2	1	f	Lâm Hữu Khánh Phương
-2	3	f	Thân Thị Ngọc Vân
-2	4	f	Phan Minh Tâm
-2	5	f	Đỗ Tấn Nhàn
-2	6	f	Nguyễn Tấn Phúc
-3	1	f	Lâm Hữu Khánh Phương
-3	2	f	Đặng Ngọc Minh Đức
-3	3	f	Thân Thị Ngọc Vân
-3	4	f	Phan Minh Tâm
-3	5	f	Đỗ Tấn Nhàn
-14	2	f	Đặng Ngọc Minh Đức
-14	3	f	Thân Thị Ngọc Vân
-14	5	f	Đỗ Tấn Nhàn
-14	6	f	Nguyễn Tấn Phúc
-14	8	f	Nguyễn Thế Hoàng
-18	1	f	Lâm Hữu Khánh Phương
-18	7	f	Nguyễn Minh Sang
-18	9	f	Trương Long
-18	11	f	Nguyễn Ngọc Lâm
-18	14	f	Vũ Thị Thùy Dương
-9	10	f	Nguyễn Trọng Tài
-9	17	f	Kiều Trọng Khánh
-9	18	f	Nguyễn Thị Cẩm Hương
-9	1	f	Lâm Hữu Khánh Phương
-9	2	f	Đặng Ngọc Minh Đức
-16	15	f	Lại Đức Hùng
-16	3	f	Thân Thị Ngọc Vân
-16	5	f	Đỗ Tấn Nhàn
-16	6	f	Nguyễn Tấn Phúc
-16	8	f	Nguyễn Thế Hoàng
-15	4	f	Phan Minh Tâm
-15	13	f	Ngô Đăng Hà An
-15	16	f	Trần Thanh Nguyên
-15	9	f	Trương Long
-15	10	f	Nguyễn Trọng Tài
-19	4	f	Phan Minh Tâm
-19	7	f	Nguyễn Minh Sang
-19	11	f	Nguyễn Ngọc Lâm
-19	14	f	Vũ Thị Thùy Dương
-19	15	f	Lại Đức Hùng
-7	1	f	Lâm Hữu Khánh Phương
-7	4	f	Phan Minh Tâm
-7	8	f	Nguyễn Thế Hoàng
-7	9	f	Trương Long
-7	11	f	Nguyễn Ngọc Lâm
-10	12	f	Nguyễn Trí Thông
-10	17	f	Kiều Trọng Khánh
-10	2	f	Đặng Ngọc Minh Đức
-10	6	f	Nguyễn Tấn Phúc
-10	10	f	Nguyễn Trọng Tài
-5	13	f	Ngô Đăng Hà An
-5	14	f	Vũ Thị Thùy Dương
-5	15	f	Lại Đức Hùng
-5	1	f	Lâm Hữu Khánh Phương
-5	9	f	Trương Long
-8	16	f	Trần Thanh Nguyên
-8	8	f	Nguyễn Thế Hoàng
-8	11	f	Nguyễn Ngọc Lâm
-8	12	f	Nguyễn Trí Thông
-8	17	f	Kiều Trọng Khánh
-11	3	f	Thân Thị Ngọc Vân
-11	7	f	Nguyễn Minh Sang
-11	13	f	Ngô Đăng Hà An
-11	2	f	Đặng Ngọc Minh Đức
-11	6	f	Nguyễn Tấn Phúc
-17	12	f	Nguyễn Trí Thông
-17	16	f	Trần Thanh Nguyên
-17	10	f	Nguyễn Trọng Tài
-17	13	f	Ngô Đăng Hà An
-17	14	f	Vũ Thị Thùy Dương
-6	15	f	Lại Đức Hùng
-6	17	f	Kiều Trọng Khánh
-6	1	f	Lâm Hữu Khánh Phương
-6	2	f	Đặng Ngọc Minh Đức
-6	9	f	Trương Long
-13	18	f	Nguyễn Thị Cẩm Hương
-13	3	f	Thân Thị Ngọc Vân
-13	6	f	Nguyễn Tấn Phúc
-13	11	f	Nguyễn Ngọc Lâm
-13	12	f	Nguyễn Trí Thông
-4	4	f	Phan Minh Tâm
-4	3	f	Thân Thị Ngọc Vân
-4	10	f	Nguyễn Trọng Tài
-4	13	f	Ngô Đăng Hà An
-4	14	f	Vũ Thị Thùy Dương
-12	5	f	Đỗ Tấn Nhàn
-12	15	f	Lại Đức Hùng
-12	17	f	Kiều Trọng Khánh
-12	1	f	Lâm Hữu Khánh Phương
-12	2	f	Đặng Ngọc Minh Đức
 \.
 
 
 --
--- Data for Name: schedule_assignments; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: schedule_assignments; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.schedule_assignments (id, schedule_version_id, group_id, project_id, timeslot_id, start_at, end_at) FROM stdin;
-1	13	42	43	1941	2026-09-06 10:30:00+00	2026-09-06 11:15:00+00
-2	13	45	38	1902	2026-09-04 02:30:00+00	2026-09-04 03:15:00+00
-3	13	61	64	1943	2026-09-06 12:00:00+00	2026-09-06 12:45:00+00
-4	14	42	43	1941	2026-09-06 10:30:00+00	2026-09-06 11:15:00+00
-5	14	44	51	1918	2026-09-05 03:15:00+00	2026-09-05 04:00:00+00
-6	14	45	38	1935	2026-09-06 05:30:00+00	2026-09-06 06:15:00+00
-7	14	46	54	1913	2026-09-04 12:00:00+00	2026-09-04 12:45:00+00
-8	14	48	48	1919	2026-09-05 04:00:00+00	2026-09-05 04:45:00+00
-9	14	49	57	1904	2026-09-04 04:00:00+00	2026-09-04 04:45:00+00
-10	14	52	35	1917	2026-09-05 02:30:00+00	2026-09-05 03:15:00+00
-11	14	55	44	1928	2026-09-05 12:00:00+00	2026-09-05 12:45:00+00
-12	14	57	61	1943	2026-09-06 12:00:00+00	2026-09-06 12:45:00+00
-13	14	58	63	1938	2026-09-06 08:00:00+00	2026-09-06 08:45:00+00
-14	14	59	66	1900	2026-09-04 00:45:00+00	2026-09-04 01:30:00+00
-15	14	61	64	1910	2026-09-04 09:30:00+00	2026-09-04 10:15:00+00
-16	14	62	59	1906	2026-09-04 06:15:00+00	2026-09-04 07:00:00+00
-17	14	65	65	1929	2026-09-06 00:00:00+00	2026-09-06 00:45:00+00
-18	14	68	40	1902	2026-09-04 02:30:00+00	2026-09-04 03:15:00+00
-19	14	69	71	1912	2026-09-04 11:15:00+00	2026-09-04 12:00:00+00
 \.
 
 
 --
--- Data for Name: schedule_change_records; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: schedule_change_records; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.schedule_change_records (id, round_id, schedule_version_id, session_id, actor_id, reason, before_json, after_json, created_at) FROM stdin;
@@ -8997,29 +8758,23 @@ COPY public.schedule_change_records (id, round_id, schedule_version_id, session_
 
 
 --
--- Data for Name: schedule_versions; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: schedule_versions; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.schedule_versions (id, round_id, version_no, status, input_snapshot, algorithm_parameters, random_seed, solver_status, total_score, soft_scores, created_by, created_at, activated_at) FROM stdin;
-12	164	3	DISCARDED	{"groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "h_rules": {"H11": {"waiver_actors": {}, "waiver_groups": [], "waiver_reasons": {}}, "H12": {"semester_quota": null, "sessions_per_day": 8, "sessions_per_part": 4}}, "round_id": 164, "conflicts": [], "timeslots": [1899, 1900, 1901, 1902, 1903, 1904, 1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1937, 1938, 1939, 1940, 1941, 1942, 1943], "round_type": "DEFENSE_1_2", "unscheduled": [{"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}], "availability": [{"lecturer_id": 1, "timeslot_id": 1899}, {"lecturer_id": 1, "timeslot_id": 1901}, {"lecturer_id": 1, "timeslot_id": 1902}, {"lecturer_id": 1, "timeslot_id": 1903}, {"lecturer_id": 1, "timeslot_id": 1904}, {"lecturer_id": 1, "timeslot_id": 1905}, {"lecturer_id": 1, "timeslot_id": 1906}, {"lecturer_id": 1, "timeslot_id": 1907}, {"lecturer_id": 1, "timeslot_id": 1908}, {"lecturer_id": 1, "timeslot_id": 1910}, {"lecturer_id": 1, "timeslot_id": 1911}, {"lecturer_id": 1, "timeslot_id": 1912}, {"lecturer_id": 1, "timeslot_id": 1913}, {"lecturer_id": 1, "timeslot_id": 1914}, {"lecturer_id": 1, "timeslot_id": 1916}, {"lecturer_id": 1, "timeslot_id": 1917}, {"lecturer_id": 1, "timeslot_id": 1918}, {"lecturer_id": 1, "timeslot_id": 1919}, {"lecturer_id": 1, "timeslot_id": 1920}, {"lecturer_id": 1, "timeslot_id": 1922}, {"lecturer_id": 1, "timeslot_id": 1923}, {"lecturer_id": 1, "timeslot_id": 1924}, {"lecturer_id": 1, "timeslot_id": 1925}, {"lecturer_id": 1, "timeslot_id": 1926}, {"lecturer_id": 1, "timeslot_id": 1927}, {"lecturer_id": 1, "timeslot_id": 1928}, {"lecturer_id": 1, "timeslot_id": 1929}, {"lecturer_id": 1, "timeslot_id": 1930}, {"lecturer_id": 1, "timeslot_id": 1931}, {"lecturer_id": 1, "timeslot_id": 1932}, {"lecturer_id": 1, "timeslot_id": 1933}, {"lecturer_id": 1, "timeslot_id": 1934}, {"lecturer_id": 1, "timeslot_id": 1935}, {"lecturer_id": 1, "timeslot_id": 1937}, {"lecturer_id": 1, "timeslot_id": 1938}, {"lecturer_id": 1, "timeslot_id": 1939}, {"lecturer_id": 1, "timeslot_id": 1941}, {"lecturer_id": 1, "timeslot_id": 1943}, {"lecturer_id": 2, "timeslot_id": 1899}, {"lecturer_id": 2, "timeslot_id": 1900}, {"lecturer_id": 2, "timeslot_id": 1904}, {"lecturer_id": 2, "timeslot_id": 1905}, {"lecturer_id": 2, "timeslot_id": 1907}, {"lecturer_id": 2, "timeslot_id": 1908}, {"lecturer_id": 2, "timeslot_id": 1914}, {"lecturer_id": 2, "timeslot_id": 1916}, {"lecturer_id": 2, "timeslot_id": 1917}, {"lecturer_id": 2, "timeslot_id": 1918}, {"lecturer_id": 2, "timeslot_id": 1920}, {"lecturer_id": 2, "timeslot_id": 1921}, {"lecturer_id": 2, "timeslot_id": 1924}, {"lecturer_id": 2, "timeslot_id": 1925}, {"lecturer_id": 2, "timeslot_id": 1928}, {"lecturer_id": 2, "timeslot_id": 1932}, {"lecturer_id": 2, "timeslot_id": 1933}, {"lecturer_id": 2, "timeslot_id": 1935}, {"lecturer_id": 2, "timeslot_id": 1936}, {"lecturer_id": 2, "timeslot_id": 1938}, {"lecturer_id": 2, "timeslot_id": 1940}, {"lecturer_id": 2, "timeslot_id": 1941}, {"lecturer_id": 2, "timeslot_id": 1942}, {"lecturer_id": 2, "timeslot_id": 1943}, {"lecturer_id": 3, "timeslot_id": 1900}, {"lecturer_id": 3, "timeslot_id": 1901}, {"lecturer_id": 3, "timeslot_id": 1902}, {"lecturer_id": 3, "timeslot_id": 1906}, {"lecturer_id": 3, "timeslot_id": 1912}, {"lecturer_id": 3, "timeslot_id": 1915}, {"lecturer_id": 3, "timeslot_id": 1923}, {"lecturer_id": 3, "timeslot_id": 1925}, {"lecturer_id": 3, "timeslot_id": 1928}, {"lecturer_id": 3, "timeslot_id": 1938}, {"lecturer_id": 3, "timeslot_id": 1941}, {"lecturer_id": 3, "timeslot_id": 1942}, {"lecturer_id": 3, "timeslot_id": 1943}, {"lecturer_id": 4, "timeslot_id": 1902}, {"lecturer_id": 4, "timeslot_id": 1910}, {"lecturer_id": 4, "timeslot_id": 1912}, {"lecturer_id": 4, "timeslot_id": 1913}, {"lecturer_id": 4, "timeslot_id": 1923}, {"lecturer_id": 4, "timeslot_id": 1931}, {"lecturer_id": 4, "timeslot_id": 1941}, {"lecturer_id": 4, "timeslot_id": 1943}, {"lecturer_id": 5, "timeslot_id": 1899}, {"lecturer_id": 5, "timeslot_id": 1900}, {"lecturer_id": 5, "timeslot_id": 1902}, {"lecturer_id": 5, "timeslot_id": 1904}, {"lecturer_id": 5, "timeslot_id": 1906}, {"lecturer_id": 5, "timeslot_id": 1907}, {"lecturer_id": 5, "timeslot_id": 1922}, {"lecturer_id": 5, "timeslot_id": 1939}, {"lecturer_id": 5, "timeslot_id": 1942}, {"lecturer_id": 5, "timeslot_id": 1943}, {"lecturer_id": 6, "timeslot_id": 1900}, {"lecturer_id": 6, "timeslot_id": 1902}, {"lecturer_id": 6, "timeslot_id": 1903}, {"lecturer_id": 6, "timeslot_id": 1906}, {"lecturer_id": 6, "timeslot_id": 1908}, {"lecturer_id": 6, "timeslot_id": 1911}, {"lecturer_id": 6, "timeslot_id": 1912}, {"lecturer_id": 6, "timeslot_id": 1917}, {"lecturer_id": 6, "timeslot_id": 1918}, {"lecturer_id": 6, "timeslot_id": 1919}, {"lecturer_id": 6, "timeslot_id": 1920}, {"lecturer_id": 6, "timeslot_id": 1923}, {"lecturer_id": 6, "timeslot_id": 1924}, {"lecturer_id": 6, "timeslot_id": 1925}, {"lecturer_id": 6, "timeslot_id": 1926}, {"lecturer_id": 6, "timeslot_id": 1927}, {"lecturer_id": 6, "timeslot_id": 1928}, {"lecturer_id": 6, "timeslot_id": 1929}, {"lecturer_id": 6, "timeslot_id": 1932}, {"lecturer_id": 6, "timeslot_id": 1936}, {"lecturer_id": 6, "timeslot_id": 1937}, {"lecturer_id": 6, "timeslot_id": 1938}, {"lecturer_id": 6, "timeslot_id": 1939}, {"lecturer_id": 6, "timeslot_id": 1940}, {"lecturer_id": 6, "timeslot_id": 1941}, {"lecturer_id": 7, "timeslot_id": 1901}, {"lecturer_id": 7, "timeslot_id": 1902}, {"lecturer_id": 7, "timeslot_id": 1904}, {"lecturer_id": 7, "timeslot_id": 1911}, {"lecturer_id": 7, "timeslot_id": 1912}, {"lecturer_id": 7, "timeslot_id": 1915}, {"lecturer_id": 7, "timeslot_id": 1916}, {"lecturer_id": 7, "timeslot_id": 1918}, {"lecturer_id": 7, "timeslot_id": 1920}, {"lecturer_id": 7, "timeslot_id": 1921}, {"lecturer_id": 7, "timeslot_id": 1922}, {"lecturer_id": 7, "timeslot_id": 1923}, {"lecturer_id": 7, "timeslot_id": 1924}, {"lecturer_id": 7, "timeslot_id": 1925}, {"lecturer_id": 7, "timeslot_id": 1928}, {"lecturer_id": 7, "timeslot_id": 1930}, {"lecturer_id": 7, "timeslot_id": 1931}, {"lecturer_id": 7, "timeslot_id": 1932}, {"lecturer_id": 7, "timeslot_id": 1933}, {"lecturer_id": 7, "timeslot_id": 1934}, {"lecturer_id": 7, "timeslot_id": 1937}, {"lecturer_id": 7, "timeslot_id": 1939}, {"lecturer_id": 7, "timeslot_id": 1940}, {"lecturer_id": 7, "timeslot_id": 1942}, {"lecturer_id": 8, "timeslot_id": 1900}, {"lecturer_id": 8, "timeslot_id": 1903}, {"lecturer_id": 8, "timeslot_id": 1905}, {"lecturer_id": 8, "timeslot_id": 1906}, {"lecturer_id": 8, "timeslot_id": 1908}, {"lecturer_id": 8, "timeslot_id": 1911}, {"lecturer_id": 8, "timeslot_id": 1913}, {"lecturer_id": 8, "timeslot_id": 1915}, {"lecturer_id": 8, "timeslot_id": 1919}, {"lecturer_id": 8, "timeslot_id": 1927}, {"lecturer_id": 8, "timeslot_id": 1934}, {"lecturer_id": 8, "timeslot_id": 1936}, {"lecturer_id": 8, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1899}, {"lecturer_id": 9, "timeslot_id": 1900}, {"lecturer_id": 9, "timeslot_id": 1901}, {"lecturer_id": 9, "timeslot_id": 1902}, {"lecturer_id": 9, "timeslot_id": 1903}, {"lecturer_id": 9, "timeslot_id": 1904}, {"lecturer_id": 9, "timeslot_id": 1905}, {"lecturer_id": 9, "timeslot_id": 1906}, {"lecturer_id": 9, "timeslot_id": 1907}, {"lecturer_id": 9, "timeslot_id": 1908}, {"lecturer_id": 9, "timeslot_id": 1909}, {"lecturer_id": 9, "timeslot_id": 1910}, {"lecturer_id": 9, "timeslot_id": 1911}, {"lecturer_id": 9, "timeslot_id": 1912}, {"lecturer_id": 9, "timeslot_id": 1913}, {"lecturer_id": 9, "timeslot_id": 1914}, {"lecturer_id": 9, "timeslot_id": 1915}, {"lecturer_id": 9, "timeslot_id": 1916}, {"lecturer_id": 9, "timeslot_id": 1917}, {"lecturer_id": 9, "timeslot_id": 1918}, {"lecturer_id": 9, "timeslot_id": 1919}, {"lecturer_id": 9, "timeslot_id": 1920}, {"lecturer_id": 9, "timeslot_id": 1921}, {"lecturer_id": 9, "timeslot_id": 1922}, {"lecturer_id": 9, "timeslot_id": 1923}, {"lecturer_id": 9, "timeslot_id": 1924}, {"lecturer_id": 9, "timeslot_id": 1925}, {"lecturer_id": 9, "timeslot_id": 1926}, {"lecturer_id": 9, "timeslot_id": 1927}, {"lecturer_id": 9, "timeslot_id": 1928}, {"lecturer_id": 9, "timeslot_id": 1929}, {"lecturer_id": 9, "timeslot_id": 1930}, {"lecturer_id": 9, "timeslot_id": 1931}, {"lecturer_id": 9, "timeslot_id": 1932}, {"lecturer_id": 9, "timeslot_id": 1933}, {"lecturer_id": 9, "timeslot_id": 1934}, {"lecturer_id": 9, "timeslot_id": 1935}, {"lecturer_id": 9, "timeslot_id": 1936}, {"lecturer_id": 9, "timeslot_id": 1937}, {"lecturer_id": 9, "timeslot_id": 1938}, {"lecturer_id": 9, "timeslot_id": 1939}, {"lecturer_id": 9, "timeslot_id": 1940}, {"lecturer_id": 9, "timeslot_id": 1941}, {"lecturer_id": 9, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1943}, {"lecturer_id": 10, "timeslot_id": 1899}, {"lecturer_id": 10, "timeslot_id": 1900}, {"lecturer_id": 10, "timeslot_id": 1901}, {"lecturer_id": 10, "timeslot_id": 1904}, {"lecturer_id": 10, "timeslot_id": 1906}, {"lecturer_id": 10, "timeslot_id": 1907}, {"lecturer_id": 10, "timeslot_id": 1909}, {"lecturer_id": 10, "timeslot_id": 1910}, {"lecturer_id": 10, "timeslot_id": 1912}, {"lecturer_id": 10, "timeslot_id": 1914}, {"lecturer_id": 10, "timeslot_id": 1915}, {"lecturer_id": 10, "timeslot_id": 1917}, {"lecturer_id": 10, "timeslot_id": 1918}, {"lecturer_id": 10, "timeslot_id": 1919}, {"lecturer_id": 10, "timeslot_id": 1920}, {"lecturer_id": 10, "timeslot_id": 1921}, {"lecturer_id": 10, "timeslot_id": 1924}, {"lecturer_id": 10, "timeslot_id": 1925}, {"lecturer_id": 10, "timeslot_id": 1926}, {"lecturer_id": 10, "timeslot_id": 1927}, {"lecturer_id": 10, "timeslot_id": 1929}, {"lecturer_id": 10, "timeslot_id": 1930}, {"lecturer_id": 10, "timeslot_id": 1932}, {"lecturer_id": 10, "timeslot_id": 1935}, {"lecturer_id": 10, "timeslot_id": 1937}, {"lecturer_id": 10, "timeslot_id": 1940}, {"lecturer_id": 10, "timeslot_id": 1941}, {"lecturer_id": 11, "timeslot_id": 1900}, {"lecturer_id": 11, "timeslot_id": 1901}, {"lecturer_id": 11, "timeslot_id": 1902}, {"lecturer_id": 11, "timeslot_id": 1904}, {"lecturer_id": 11, "timeslot_id": 1906}, {"lecturer_id": 11, "timeslot_id": 1907}, {"lecturer_id": 11, "timeslot_id": 1909}, {"lecturer_id": 11, "timeslot_id": 1910}, {"lecturer_id": 11, "timeslot_id": 1912}, {"lecturer_id": 11, "timeslot_id": 1913}, {"lecturer_id": 11, "timeslot_id": 1915}, {"lecturer_id": 11, "timeslot_id": 1919}, {"lecturer_id": 11, "timeslot_id": 1920}, {"lecturer_id": 11, "timeslot_id": 1921}, {"lecturer_id": 11, "timeslot_id": 1922}, {"lecturer_id": 11, "timeslot_id": 1923}, {"lecturer_id": 11, "timeslot_id": 1924}, {"lecturer_id": 11, "timeslot_id": 1926}, {"lecturer_id": 11, "timeslot_id": 1927}, {"lecturer_id": 11, "timeslot_id": 1929}, {"lecturer_id": 11, "timeslot_id": 1930}, {"lecturer_id": 11, "timeslot_id": 1932}, {"lecturer_id": 11, "timeslot_id": 1935}, {"lecturer_id": 11, "timeslot_id": 1936}, {"lecturer_id": 11, "timeslot_id": 1937}, {"lecturer_id": 11, "timeslot_id": 1938}, {"lecturer_id": 11, "timeslot_id": 1940}, {"lecturer_id": 11, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1900}, {"lecturer_id": 12, "timeslot_id": 1907}, {"lecturer_id": 12, "timeslot_id": 1909}, {"lecturer_id": 12, "timeslot_id": 1915}, {"lecturer_id": 12, "timeslot_id": 1917}, {"lecturer_id": 12, "timeslot_id": 1919}, {"lecturer_id": 12, "timeslot_id": 1920}, {"lecturer_id": 12, "timeslot_id": 1922}, {"lecturer_id": 12, "timeslot_id": 1925}, {"lecturer_id": 12, "timeslot_id": 1926}, {"lecturer_id": 12, "timeslot_id": 1928}, {"lecturer_id": 12, "timeslot_id": 1929}, {"lecturer_id": 12, "timeslot_id": 1933}, {"lecturer_id": 12, "timeslot_id": 1938}, {"lecturer_id": 12, "timeslot_id": 1939}, {"lecturer_id": 12, "timeslot_id": 1940}, {"lecturer_id": 12, "timeslot_id": 1941}, {"lecturer_id": 12, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1943}, {"lecturer_id": 13, "timeslot_id": 1900}, {"lecturer_id": 13, "timeslot_id": 1903}, {"lecturer_id": 13, "timeslot_id": 1905}, {"lecturer_id": 13, "timeslot_id": 1908}, {"lecturer_id": 13, "timeslot_id": 1910}, {"lecturer_id": 13, "timeslot_id": 1911}, {"lecturer_id": 13, "timeslot_id": 1914}, {"lecturer_id": 13, "timeslot_id": 1916}, {"lecturer_id": 13, "timeslot_id": 1918}, {"lecturer_id": 13, "timeslot_id": 1925}, {"lecturer_id": 13, "timeslot_id": 1927}, {"lecturer_id": 13, "timeslot_id": 1928}, {"lecturer_id": 13, "timeslot_id": 1929}, {"lecturer_id": 13, "timeslot_id": 1931}, {"lecturer_id": 13, "timeslot_id": 1932}, {"lecturer_id": 13, "timeslot_id": 1935}, {"lecturer_id": 13, "timeslot_id": 1936}, {"lecturer_id": 13, "timeslot_id": 1937}, {"lecturer_id": 13, "timeslot_id": 1938}, {"lecturer_id": 13, "timeslot_id": 1939}, {"lecturer_id": 13, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1899}, {"lecturer_id": 14, "timeslot_id": 1900}, {"lecturer_id": 14, "timeslot_id": 1901}, {"lecturer_id": 14, "timeslot_id": 1902}, {"lecturer_id": 14, "timeslot_id": 1903}, {"lecturer_id": 14, "timeslot_id": 1905}, {"lecturer_id": 14, "timeslot_id": 1906}, {"lecturer_id": 14, "timeslot_id": 1908}, {"lecturer_id": 14, "timeslot_id": 1909}, {"lecturer_id": 14, "timeslot_id": 1910}, {"lecturer_id": 14, "timeslot_id": 1911}, {"lecturer_id": 14, "timeslot_id": 1912}, {"lecturer_id": 14, "timeslot_id": 1913}, {"lecturer_id": 14, "timeslot_id": 1914}, {"lecturer_id": 14, "timeslot_id": 1915}, {"lecturer_id": 14, "timeslot_id": 1917}, {"lecturer_id": 14, "timeslot_id": 1918}, {"lecturer_id": 14, "timeslot_id": 1920}, {"lecturer_id": 14, "timeslot_id": 1921}, {"lecturer_id": 14, "timeslot_id": 1922}, {"lecturer_id": 14, "timeslot_id": 1923}, {"lecturer_id": 14, "timeslot_id": 1924}, {"lecturer_id": 14, "timeslot_id": 1925}, {"lecturer_id": 14, "timeslot_id": 1926}, {"lecturer_id": 14, "timeslot_id": 1928}, {"lecturer_id": 14, "timeslot_id": 1929}, {"lecturer_id": 14, "timeslot_id": 1930}, {"lecturer_id": 14, "timeslot_id": 1931}, {"lecturer_id": 14, "timeslot_id": 1932}, {"lecturer_id": 14, "timeslot_id": 1933}, {"lecturer_id": 14, "timeslot_id": 1934}, {"lecturer_id": 14, "timeslot_id": 1935}, {"lecturer_id": 14, "timeslot_id": 1936}, {"lecturer_id": 14, "timeslot_id": 1938}, {"lecturer_id": 14, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1942}, {"lecturer_id": 14, "timeslot_id": 1943}, {"lecturer_id": 15, "timeslot_id": 1899}, {"lecturer_id": 15, "timeslot_id": 1900}, {"lecturer_id": 15, "timeslot_id": 1901}, {"lecturer_id": 15, "timeslot_id": 1902}, {"lecturer_id": 15, "timeslot_id": 1903}, {"lecturer_id": 15, "timeslot_id": 1904}, {"lecturer_id": 15, "timeslot_id": 1905}, {"lecturer_id": 15, "timeslot_id": 1906}, {"lecturer_id": 15, "timeslot_id": 1907}, {"lecturer_id": 15, "timeslot_id": 1908}, {"lecturer_id": 15, "timeslot_id": 1909}, {"lecturer_id": 15, "timeslot_id": 1910}, {"lecturer_id": 15, "timeslot_id": 1911}, {"lecturer_id": 15, "timeslot_id": 1912}, {"lecturer_id": 15, "timeslot_id": 1913}, {"lecturer_id": 15, "timeslot_id": 1914}, {"lecturer_id": 15, "timeslot_id": 1915}, {"lecturer_id": 15, "timeslot_id": 1916}, {"lecturer_id": 15, "timeslot_id": 1917}, {"lecturer_id": 15, "timeslot_id": 1918}, {"lecturer_id": 15, "timeslot_id": 1919}, {"lecturer_id": 15, "timeslot_id": 1920}, {"lecturer_id": 15, "timeslot_id": 1921}, {"lecturer_id": 15, "timeslot_id": 1922}, {"lecturer_id": 15, "timeslot_id": 1923}, {"lecturer_id": 15, "timeslot_id": 1924}, {"lecturer_id": 15, "timeslot_id": 1925}, {"lecturer_id": 15, "timeslot_id": 1926}, {"lecturer_id": 15, "timeslot_id": 1927}, {"lecturer_id": 15, "timeslot_id": 1928}, {"lecturer_id": 15, "timeslot_id": 1929}, {"lecturer_id": 15, "timeslot_id": 1930}, {"lecturer_id": 15, "timeslot_id": 1931}, {"lecturer_id": 15, "timeslot_id": 1932}, {"lecturer_id": 15, "timeslot_id": 1933}, {"lecturer_id": 15, "timeslot_id": 1934}, {"lecturer_id": 15, "timeslot_id": 1935}, {"lecturer_id": 15, "timeslot_id": 1936}, {"lecturer_id": 15, "timeslot_id": 1937}, {"lecturer_id": 15, "timeslot_id": 1938}, {"lecturer_id": 15, "timeslot_id": 1939}, {"lecturer_id": 15, "timeslot_id": 1940}, {"lecturer_id": 15, "timeslot_id": 1941}, {"lecturer_id": 15, "timeslot_id": 1942}, {"lecturer_id": 15, "timeslot_id": 1943}, {"lecturer_id": 16, "timeslot_id": 1900}, {"lecturer_id": 16, "timeslot_id": 1909}, {"lecturer_id": 16, "timeslot_id": 1910}, {"lecturer_id": 16, "timeslot_id": 1912}, {"lecturer_id": 16, "timeslot_id": 1914}, {"lecturer_id": 16, "timeslot_id": 1919}, {"lecturer_id": 16, "timeslot_id": 1921}, {"lecturer_id": 16, "timeslot_id": 1922}, {"lecturer_id": 16, "timeslot_id": 1924}, {"lecturer_id": 16, "timeslot_id": 1926}, {"lecturer_id": 16, "timeslot_id": 1929}, {"lecturer_id": 16, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1899}, {"lecturer_id": 17, "timeslot_id": 1900}, {"lecturer_id": 17, "timeslot_id": 1901}, {"lecturer_id": 17, "timeslot_id": 1902}, {"lecturer_id": 17, "timeslot_id": 1903}, {"lecturer_id": 17, "timeslot_id": 1904}, {"lecturer_id": 17, "timeslot_id": 1905}, {"lecturer_id": 17, "timeslot_id": 1910}, {"lecturer_id": 17, "timeslot_id": 1911}, {"lecturer_id": 17, "timeslot_id": 1912}, {"lecturer_id": 17, "timeslot_id": 1914}, {"lecturer_id": 17, "timeslot_id": 1915}, {"lecturer_id": 17, "timeslot_id": 1916}, {"lecturer_id": 17, "timeslot_id": 1917}, {"lecturer_id": 17, "timeslot_id": 1918}, {"lecturer_id": 17, "timeslot_id": 1919}, {"lecturer_id": 17, "timeslot_id": 1920}, {"lecturer_id": 17, "timeslot_id": 1921}, {"lecturer_id": 17, "timeslot_id": 1922}, {"lecturer_id": 17, "timeslot_id": 1923}, {"lecturer_id": 17, "timeslot_id": 1925}, {"lecturer_id": 17, "timeslot_id": 1926}, {"lecturer_id": 17, "timeslot_id": 1927}, {"lecturer_id": 17, "timeslot_id": 1928}, {"lecturer_id": 17, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1932}, {"lecturer_id": 17, "timeslot_id": 1933}, {"lecturer_id": 17, "timeslot_id": 1934}, {"lecturer_id": 17, "timeslot_id": 1935}, {"lecturer_id": 17, "timeslot_id": 1936}, {"lecturer_id": 17, "timeslot_id": 1938}, {"lecturer_id": 17, "timeslot_id": 1939}, {"lecturer_id": 17, "timeslot_id": 1940}, {"lecturer_id": 17, "timeslot_id": 1941}, {"lecturer_id": 17, "timeslot_id": 1942}, {"lecturer_id": 17, "timeslot_id": 1943}, {"lecturer_id": 18, "timeslot_id": 1900}, {"lecturer_id": 18, "timeslot_id": 1904}, {"lecturer_id": 18, "timeslot_id": 1916}, {"lecturer_id": 18, "timeslot_id": 1921}, {"lecturer_id": 18, "timeslot_id": 1927}, {"lecturer_id": 18, "timeslot_id": 1937}, {"lecturer_id": 18, "timeslot_id": 1938}, {"lecturer_id": 18, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1902}, {"lecturer_id": 19, "timeslot_id": 1903}, {"lecturer_id": 19, "timeslot_id": 1905}, {"lecturer_id": 19, "timeslot_id": 1909}, {"lecturer_id": 19, "timeslot_id": 1910}, {"lecturer_id": 19, "timeslot_id": 1911}, {"lecturer_id": 19, "timeslot_id": 1912}, {"lecturer_id": 19, "timeslot_id": 1915}, {"lecturer_id": 19, "timeslot_id": 1916}, {"lecturer_id": 19, "timeslot_id": 1918}, {"lecturer_id": 19, "timeslot_id": 1920}, {"lecturer_id": 19, "timeslot_id": 1922}, {"lecturer_id": 19, "timeslot_id": 1925}, {"lecturer_id": 19, "timeslot_id": 1926}, {"lecturer_id": 19, "timeslot_id": 1927}, {"lecturer_id": 19, "timeslot_id": 1930}, {"lecturer_id": 19, "timeslot_id": 1931}, {"lecturer_id": 19, "timeslot_id": 1935}, {"lecturer_id": 19, "timeslot_id": 1936}, {"lecturer_id": 19, "timeslot_id": 1937}, {"lecturer_id": 19, "timeslot_id": 1938}, {"lecturer_id": 19, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1940}, {"lecturer_id": 20, "timeslot_id": 1900}, {"lecturer_id": 20, "timeslot_id": 1903}, {"lecturer_id": 20, "timeslot_id": 1910}, {"lecturer_id": 20, "timeslot_id": 1918}, {"lecturer_id": 20, "timeslot_id": 1922}, {"lecturer_id": 20, "timeslot_id": 1923}, {"lecturer_id": 20, "timeslot_id": 1929}, {"lecturer_id": 20, "timeslot_id": 1936}, {"lecturer_id": 20, "timeslot_id": 1939}, {"lecturer_id": 20, "timeslot_id": 1942}, {"lecturer_id": 20, "timeslot_id": 1943}, {"lecturer_id": 21, "timeslot_id": 1899}, {"lecturer_id": 21, "timeslot_id": 1900}, {"lecturer_id": 21, "timeslot_id": 1901}, {"lecturer_id": 21, "timeslot_id": 1902}, {"lecturer_id": 21, "timeslot_id": 1903}, {"lecturer_id": 21, "timeslot_id": 1904}, {"lecturer_id": 21, "timeslot_id": 1905}, {"lecturer_id": 21, "timeslot_id": 1906}, {"lecturer_id": 21, "timeslot_id": 1907}, {"lecturer_id": 21, "timeslot_id": 1908}, {"lecturer_id": 21, "timeslot_id": 1909}, {"lecturer_id": 21, "timeslot_id": 1910}, {"lecturer_id": 21, "timeslot_id": 1911}, {"lecturer_id": 21, "timeslot_id": 1912}, {"lecturer_id": 21, "timeslot_id": 1913}, {"lecturer_id": 21, "timeslot_id": 1914}, {"lecturer_id": 21, "timeslot_id": 1915}, {"lecturer_id": 21, "timeslot_id": 1916}, {"lecturer_id": 21, "timeslot_id": 1917}, {"lecturer_id": 21, "timeslot_id": 1918}, {"lecturer_id": 21, "timeslot_id": 1919}, {"lecturer_id": 21, "timeslot_id": 1920}, {"lecturer_id": 21, "timeslot_id": 1921}, {"lecturer_id": 21, "timeslot_id": 1922}, {"lecturer_id": 21, "timeslot_id": 1923}, {"lecturer_id": 21, "timeslot_id": 1924}, {"lecturer_id": 21, "timeslot_id": 1925}, {"lecturer_id": 21, "timeslot_id": 1926}, {"lecturer_id": 21, "timeslot_id": 1927}, {"lecturer_id": 21, "timeslot_id": 1928}, {"lecturer_id": 21, "timeslot_id": 1929}, {"lecturer_id": 21, "timeslot_id": 1930}, {"lecturer_id": 21, "timeslot_id": 1931}, {"lecturer_id": 21, "timeslot_id": 1932}, {"lecturer_id": 21, "timeslot_id": 1933}, {"lecturer_id": 21, "timeslot_id": 1934}, {"lecturer_id": 21, "timeslot_id": 1935}, {"lecturer_id": 21, "timeslot_id": 1936}, {"lecturer_id": 21, "timeslot_id": 1937}, {"lecturer_id": 21, "timeslot_id": 1938}, {"lecturer_id": 21, "timeslot_id": 1939}, {"lecturer_id": 21, "timeslot_id": 1940}, {"lecturer_id": 21, "timeslot_id": 1941}, {"lecturer_id": 21, "timeslot_id": 1942}, {"lecturer_id": 21, "timeslot_id": 1943}, {"lecturer_id": 22, "timeslot_id": 1899}, {"lecturer_id": 22, "timeslot_id": 1901}, {"lecturer_id": 22, "timeslot_id": 1902}, {"lecturer_id": 22, "timeslot_id": 1903}, {"lecturer_id": 22, "timeslot_id": 1904}, {"lecturer_id": 22, "timeslot_id": 1905}, {"lecturer_id": 22, "timeslot_id": 1906}, {"lecturer_id": 22, "timeslot_id": 1907}, {"lecturer_id": 22, "timeslot_id": 1911}, {"lecturer_id": 22, "timeslot_id": 1912}, {"lecturer_id": 22, "timeslot_id": 1913}, {"lecturer_id": 22, "timeslot_id": 1914}, {"lecturer_id": 22, "timeslot_id": 1915}, {"lecturer_id": 22, "timeslot_id": 1916}, {"lecturer_id": 22, "timeslot_id": 1917}, {"lecturer_id": 22, "timeslot_id": 1918}, {"lecturer_id": 22, "timeslot_id": 1919}, {"lecturer_id": 22, "timeslot_id": 1920}, {"lecturer_id": 22, "timeslot_id": 1921}, {"lecturer_id": 22, "timeslot_id": 1923}, {"lecturer_id": 22, "timeslot_id": 1925}, {"lecturer_id": 22, "timeslot_id": 1926}, {"lecturer_id": 22, "timeslot_id": 1927}, {"lecturer_id": 22, "timeslot_id": 1928}, {"lecturer_id": 22, "timeslot_id": 1929}, {"lecturer_id": 22, "timeslot_id": 1931}, {"lecturer_id": 22, "timeslot_id": 1932}, {"lecturer_id": 22, "timeslot_id": 1933}, {"lecturer_id": 22, "timeslot_id": 1934}, {"lecturer_id": 22, "timeslot_id": 1935}, {"lecturer_id": 22, "timeslot_id": 1936}, {"lecturer_id": 22, "timeslot_id": 1937}, {"lecturer_id": 22, "timeslot_id": 1938}, {"lecturer_id": 22, "timeslot_id": 1939}, {"lecturer_id": 22, "timeslot_id": 1940}, {"lecturer_id": 22, "timeslot_id": 1942}, {"lecturer_id": 22, "timeslot_id": 1943}, {"lecturer_id": 23, "timeslot_id": 1899}, {"lecturer_id": 23, "timeslot_id": 1900}, {"lecturer_id": 23, "timeslot_id": 1901}, {"lecturer_id": 23, "timeslot_id": 1902}, {"lecturer_id": 23, "timeslot_id": 1903}, {"lecturer_id": 23, "timeslot_id": 1904}, {"lecturer_id": 23, "timeslot_id": 1905}, {"lecturer_id": 23, "timeslot_id": 1906}, {"lecturer_id": 23, "timeslot_id": 1907}, {"lecturer_id": 23, "timeslot_id": 1908}, {"lecturer_id": 23, "timeslot_id": 1909}, {"lecturer_id": 23, "timeslot_id": 1910}, {"lecturer_id": 23, "timeslot_id": 1911}, {"lecturer_id": 23, "timeslot_id": 1912}, {"lecturer_id": 23, "timeslot_id": 1913}, {"lecturer_id": 23, "timeslot_id": 1914}, {"lecturer_id": 23, "timeslot_id": 1915}, {"lecturer_id": 23, "timeslot_id": 1916}, {"lecturer_id": 23, "timeslot_id": 1917}, {"lecturer_id": 23, "timeslot_id": 1918}, {"lecturer_id": 23, "timeslot_id": 1919}, {"lecturer_id": 23, "timeslot_id": 1920}, {"lecturer_id": 23, "timeslot_id": 1921}, {"lecturer_id": 23, "timeslot_id": 1922}, {"lecturer_id": 23, "timeslot_id": 1923}, {"lecturer_id": 23, "timeslot_id": 1924}, {"lecturer_id": 23, "timeslot_id": 1925}, {"lecturer_id": 23, "timeslot_id": 1926}, {"lecturer_id": 23, "timeslot_id": 1927}, {"lecturer_id": 23, "timeslot_id": 1928}, {"lecturer_id": 23, "timeslot_id": 1929}, {"lecturer_id": 23, "timeslot_id": 1930}, {"lecturer_id": 23, "timeslot_id": 1931}, {"lecturer_id": 23, "timeslot_id": 1932}, {"lecturer_id": 23, "timeslot_id": 1933}, {"lecturer_id": 23, "timeslot_id": 1934}, {"lecturer_id": 23, "timeslot_id": 1935}, {"lecturer_id": 23, "timeslot_id": 1936}, {"lecturer_id": 23, "timeslot_id": 1937}, {"lecturer_id": 23, "timeslot_id": 1938}, {"lecturer_id": 23, "timeslot_id": 1939}, {"lecturer_id": 23, "timeslot_id": 1940}, {"lecturer_id": 23, "timeslot_id": 1941}, {"lecturer_id": 23, "timeslot_id": 1942}, {"lecturer_id": 23, "timeslot_id": 1943}, {"lecturer_id": 24, "timeslot_id": 1902}, {"lecturer_id": 24, "timeslot_id": 1904}, {"lecturer_id": 24, "timeslot_id": 1905}, {"lecturer_id": 24, "timeslot_id": 1907}, {"lecturer_id": 24, "timeslot_id": 1909}, {"lecturer_id": 24, "timeslot_id": 1911}, {"lecturer_id": 24, "timeslot_id": 1912}, {"lecturer_id": 24, "timeslot_id": 1913}, {"lecturer_id": 24, "timeslot_id": 1916}, {"lecturer_id": 24, "timeslot_id": 1919}, {"lecturer_id": 24, "timeslot_id": 1931}, {"lecturer_id": 24, "timeslot_id": 1932}, {"lecturer_id": 24, "timeslot_id": 1933}, {"lecturer_id": 24, "timeslot_id": 1938}, {"lecturer_id": 25, "timeslot_id": 1914}, {"lecturer_id": 25, "timeslot_id": 1915}, {"lecturer_id": 25, "timeslot_id": 1919}, {"lecturer_id": 25, "timeslot_id": 1921}, {"lecturer_id": 25, "timeslot_id": 1925}, {"lecturer_id": 25, "timeslot_id": 1931}, {"lecturer_id": 25, "timeslot_id": 1937}, {"lecturer_id": 25, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1899}, {"lecturer_id": 26, "timeslot_id": 1900}, {"lecturer_id": 26, "timeslot_id": 1901}, {"lecturer_id": 26, "timeslot_id": 1902}, {"lecturer_id": 26, "timeslot_id": 1903}, {"lecturer_id": 26, "timeslot_id": 1904}, {"lecturer_id": 26, "timeslot_id": 1905}, {"lecturer_id": 26, "timeslot_id": 1906}, {"lecturer_id": 26, "timeslot_id": 1907}, {"lecturer_id": 26, "timeslot_id": 1908}, {"lecturer_id": 26, "timeslot_id": 1909}, {"lecturer_id": 26, "timeslot_id": 1910}, {"lecturer_id": 26, "timeslot_id": 1911}, {"lecturer_id": 26, "timeslot_id": 1912}, {"lecturer_id": 26, "timeslot_id": 1913}, {"lecturer_id": 26, "timeslot_id": 1914}, {"lecturer_id": 26, "timeslot_id": 1915}, {"lecturer_id": 26, "timeslot_id": 1916}, {"lecturer_id": 26, "timeslot_id": 1917}, {"lecturer_id": 26, "timeslot_id": 1918}, {"lecturer_id": 26, "timeslot_id": 1919}, {"lecturer_id": 26, "timeslot_id": 1920}, {"lecturer_id": 26, "timeslot_id": 1921}, {"lecturer_id": 26, "timeslot_id": 1922}, {"lecturer_id": 26, "timeslot_id": 1923}, {"lecturer_id": 26, "timeslot_id": 1924}, {"lecturer_id": 26, "timeslot_id": 1925}, {"lecturer_id": 26, "timeslot_id": 1926}, {"lecturer_id": 26, "timeslot_id": 1927}, {"lecturer_id": 26, "timeslot_id": 1928}, {"lecturer_id": 26, "timeslot_id": 1929}, {"lecturer_id": 26, "timeslot_id": 1930}, {"lecturer_id": 26, "timeslot_id": 1931}, {"lecturer_id": 26, "timeslot_id": 1932}, {"lecturer_id": 26, "timeslot_id": 1933}, {"lecturer_id": 26, "timeslot_id": 1934}, {"lecturer_id": 26, "timeslot_id": 1935}, {"lecturer_id": 26, "timeslot_id": 1936}, {"lecturer_id": 26, "timeslot_id": 1937}, {"lecturer_id": 26, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1939}, {"lecturer_id": 26, "timeslot_id": 1940}, {"lecturer_id": 26, "timeslot_id": 1941}, {"lecturer_id": 26, "timeslot_id": 1942}, {"lecturer_id": 26, "timeslot_id": 1943}, {"lecturer_id": 1090, "timeslot_id": 1899}, {"lecturer_id": 1090, "timeslot_id": 1900}, {"lecturer_id": 1090, "timeslot_id": 1903}, {"lecturer_id": 1090, "timeslot_id": 1904}, {"lecturer_id": 1090, "timeslot_id": 1905}, {"lecturer_id": 1090, "timeslot_id": 1906}, {"lecturer_id": 1090, "timeslot_id": 1908}, {"lecturer_id": 1090, "timeslot_id": 1909}, {"lecturer_id": 1090, "timeslot_id": 1910}, {"lecturer_id": 1090, "timeslot_id": 1912}, {"lecturer_id": 1090, "timeslot_id": 1913}, {"lecturer_id": 1090, "timeslot_id": 1916}, {"lecturer_id": 1090, "timeslot_id": 1917}, {"lecturer_id": 1090, "timeslot_id": 1918}, {"lecturer_id": 1090, "timeslot_id": 1921}, {"lecturer_id": 1090, "timeslot_id": 1922}, {"lecturer_id": 1090, "timeslot_id": 1923}, {"lecturer_id": 1090, "timeslot_id": 1924}, {"lecturer_id": 1090, "timeslot_id": 1925}, {"lecturer_id": 1090, "timeslot_id": 1926}, {"lecturer_id": 1090, "timeslot_id": 1929}, {"lecturer_id": 1090, "timeslot_id": 1931}, {"lecturer_id": 1090, "timeslot_id": 1933}, {"lecturer_id": 1090, "timeslot_id": 1934}, {"lecturer_id": 1090, "timeslot_id": 1935}, {"lecturer_id": 1090, "timeslot_id": 1938}, {"lecturer_id": 1090, "timeslot_id": 1939}, {"lecturer_id": 1090, "timeslot_id": 1940}, {"lecturer_id": 1090, "timeslot_id": 1942}, {"lecturer_id": 1090, "timeslot_id": 1943}], "group_status": {"42": "ELIGIBLE_D12", "44": "ELIGIBLE_D12", "45": "ELIGIBLE_D12", "46": "ELIGIBLE_D12", "48": "ELIGIBLE_D12", "49": "ELIGIBLE_D12", "52": "ELIGIBLE_D12", "55": "ELIGIBLE_D12", "57": "ELIGIBLE_D12", "58": "ELIGIBLE_D12", "59": "ELIGIBLE_D12", "61": "ELIGIBLE_D12", "62": "ELIGIBLE_D12", "65": "ELIGIBLE_D12", "68": "ELIGIBLE_D12", "69": "ELIGIBLE_D12"}, "soft_weights": {}, "group_project": {"42": 43, "44": 51, "45": 38, "46": 54, "48": 48, "49": 57, "52": 35, "55": 44, "57": 61, "58": 63, "59": 66, "61": 64, "62": 59, "65": 65, "68": 40, "69": 71}, "result_owner_mode": false, "project_supervisors": {"35": [4], "38": [7], "40": [4], "43": [9], "44": [4], "48": [1], "51": [7], "54": [12], "57": [15], "59": [17], "61": [4], "63": [4], "64": [19], "65": [4], "66": [20], "71": [22]}, "group_selected_slots": {"42": [1901, 1907, 1923, 1927, 1933, 1936, 1941, 1943], "44": [1904, 1905, 1907, 1911, 1918, 1922, 1925, 1929, 1937], "45": [1901, 1902, 1905, 1935], "46": [1899, 1900, 1906, 1910, 1913, 1930, 1931, 1941], "48": [1901, 1902, 1906, 1914, 1917, 1919, 1928, 1933, 1943], "49": [1904, 1908, 1910, 1924, 1927, 1934, 1938, 1941], "52": [1902, 1906, 1916, 1917, 1928, 1935, 1939, 1943], "55": [1899, 1916, 1928, 1938], "57": [1907, 1924, 1925, 1938, 1943], "58": [1902, 1906, 1936, 1938], "59": [1900, 1906, 1927], "61": [1902, 1905, 1910, 1923, 1924, 1929, 1935, 1943], "62": [1906, 1921, 1922, 1925, 1933], "65": [1921, 1923, 1929, 1930], "68": [1902, 1933, 1936], "69": [1903, 1909, 1911, 1912, 1915, 1918, 1921, 1925, 1938]}, "group_selection_mode": true, "reviewer_assignments": {}, "committee_constraints": [], "expected_reviewer_count": 5, "lecturer_load_preferences": {}, "prior_reviewer_continuity": {}, "committee_constraints_active": false}	{"random_seed": 0, "time_limit_seconds": 10}	0	PARTIAL	0	{"S1": 0, "S2": 0, "S3": 0, "S4": 0, "S5": 0, "S6": 0, "S7": 0, "S8": 0, "S9": 0}	2	2026-08-22 17:44:54.346494+00	2026-08-22 17:45:06.470254+00
-13	164	4	DISCARDED	{"groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "h_rules": {"H11": {"waiver_actors": {"42": "MANAGER", "44": "MANAGER", "45": "MANAGER", "46": "MANAGER", "48": "MANAGER", "49": "MANAGER", "52": "MANAGER", "55": "MANAGER", "57": "MANAGER", "58": "MANAGER", "59": "MANAGER", "61": "MANAGER", "62": "MANAGER", "65": "MANAGER", "68": "MANAGER", "69": "MANAGER"}, "waiver_groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "waiver_reasons": {"42": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "44": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "45": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "46": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "48": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "49": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "52": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "55": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "57": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "58": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "59": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "61": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "62": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "65": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "68": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "69": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round."}}, "H12": {"semester_quota": null, "sessions_per_day": 8, "sessions_per_part": 4}}, "round_id": 164, "conflicts": [], "timeslots": [1899, 1900, 1901, 1902, 1903, 1904, 1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1937, 1938, 1939, 1940, 1941, 1942, 1943], "round_type": "DEFENSE_1_2", "unscheduled": [{"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}], "availability": [{"lecturer_id": 1, "timeslot_id": 1899}, {"lecturer_id": 1, "timeslot_id": 1901}, {"lecturer_id": 1, "timeslot_id": 1902}, {"lecturer_id": 1, "timeslot_id": 1903}, {"lecturer_id": 1, "timeslot_id": 1904}, {"lecturer_id": 1, "timeslot_id": 1905}, {"lecturer_id": 1, "timeslot_id": 1906}, {"lecturer_id": 1, "timeslot_id": 1907}, {"lecturer_id": 1, "timeslot_id": 1908}, {"lecturer_id": 1, "timeslot_id": 1910}, {"lecturer_id": 1, "timeslot_id": 1911}, {"lecturer_id": 1, "timeslot_id": 1912}, {"lecturer_id": 1, "timeslot_id": 1913}, {"lecturer_id": 1, "timeslot_id": 1914}, {"lecturer_id": 1, "timeslot_id": 1916}, {"lecturer_id": 1, "timeslot_id": 1917}, {"lecturer_id": 1, "timeslot_id": 1918}, {"lecturer_id": 1, "timeslot_id": 1919}, {"lecturer_id": 1, "timeslot_id": 1920}, {"lecturer_id": 1, "timeslot_id": 1922}, {"lecturer_id": 1, "timeslot_id": 1923}, {"lecturer_id": 1, "timeslot_id": 1924}, {"lecturer_id": 1, "timeslot_id": 1925}, {"lecturer_id": 1, "timeslot_id": 1926}, {"lecturer_id": 1, "timeslot_id": 1927}, {"lecturer_id": 1, "timeslot_id": 1928}, {"lecturer_id": 1, "timeslot_id": 1929}, {"lecturer_id": 1, "timeslot_id": 1930}, {"lecturer_id": 1, "timeslot_id": 1931}, {"lecturer_id": 1, "timeslot_id": 1932}, {"lecturer_id": 1, "timeslot_id": 1933}, {"lecturer_id": 1, "timeslot_id": 1934}, {"lecturer_id": 1, "timeslot_id": 1935}, {"lecturer_id": 1, "timeslot_id": 1937}, {"lecturer_id": 1, "timeslot_id": 1938}, {"lecturer_id": 1, "timeslot_id": 1939}, {"lecturer_id": 1, "timeslot_id": 1941}, {"lecturer_id": 1, "timeslot_id": 1943}, {"lecturer_id": 2, "timeslot_id": 1899}, {"lecturer_id": 2, "timeslot_id": 1900}, {"lecturer_id": 2, "timeslot_id": 1904}, {"lecturer_id": 2, "timeslot_id": 1905}, {"lecturer_id": 2, "timeslot_id": 1907}, {"lecturer_id": 2, "timeslot_id": 1908}, {"lecturer_id": 2, "timeslot_id": 1914}, {"lecturer_id": 2, "timeslot_id": 1916}, {"lecturer_id": 2, "timeslot_id": 1917}, {"lecturer_id": 2, "timeslot_id": 1918}, {"lecturer_id": 2, "timeslot_id": 1920}, {"lecturer_id": 2, "timeslot_id": 1921}, {"lecturer_id": 2, "timeslot_id": 1924}, {"lecturer_id": 2, "timeslot_id": 1925}, {"lecturer_id": 2, "timeslot_id": 1928}, {"lecturer_id": 2, "timeslot_id": 1932}, {"lecturer_id": 2, "timeslot_id": 1933}, {"lecturer_id": 2, "timeslot_id": 1935}, {"lecturer_id": 2, "timeslot_id": 1936}, {"lecturer_id": 2, "timeslot_id": 1938}, {"lecturer_id": 2, "timeslot_id": 1940}, {"lecturer_id": 2, "timeslot_id": 1941}, {"lecturer_id": 2, "timeslot_id": 1942}, {"lecturer_id": 2, "timeslot_id": 1943}, {"lecturer_id": 3, "timeslot_id": 1900}, {"lecturer_id": 3, "timeslot_id": 1901}, {"lecturer_id": 3, "timeslot_id": 1902}, {"lecturer_id": 3, "timeslot_id": 1906}, {"lecturer_id": 3, "timeslot_id": 1912}, {"lecturer_id": 3, "timeslot_id": 1915}, {"lecturer_id": 3, "timeslot_id": 1923}, {"lecturer_id": 3, "timeslot_id": 1925}, {"lecturer_id": 3, "timeslot_id": 1928}, {"lecturer_id": 3, "timeslot_id": 1938}, {"lecturer_id": 3, "timeslot_id": 1941}, {"lecturer_id": 3, "timeslot_id": 1942}, {"lecturer_id": 3, "timeslot_id": 1943}, {"lecturer_id": 4, "timeslot_id": 1902}, {"lecturer_id": 4, "timeslot_id": 1910}, {"lecturer_id": 4, "timeslot_id": 1912}, {"lecturer_id": 4, "timeslot_id": 1913}, {"lecturer_id": 4, "timeslot_id": 1923}, {"lecturer_id": 4, "timeslot_id": 1931}, {"lecturer_id": 4, "timeslot_id": 1941}, {"lecturer_id": 4, "timeslot_id": 1943}, {"lecturer_id": 5, "timeslot_id": 1899}, {"lecturer_id": 5, "timeslot_id": 1900}, {"lecturer_id": 5, "timeslot_id": 1902}, {"lecturer_id": 5, "timeslot_id": 1904}, {"lecturer_id": 5, "timeslot_id": 1906}, {"lecturer_id": 5, "timeslot_id": 1907}, {"lecturer_id": 5, "timeslot_id": 1922}, {"lecturer_id": 5, "timeslot_id": 1939}, {"lecturer_id": 5, "timeslot_id": 1942}, {"lecturer_id": 5, "timeslot_id": 1943}, {"lecturer_id": 6, "timeslot_id": 1900}, {"lecturer_id": 6, "timeslot_id": 1902}, {"lecturer_id": 6, "timeslot_id": 1903}, {"lecturer_id": 6, "timeslot_id": 1906}, {"lecturer_id": 6, "timeslot_id": 1908}, {"lecturer_id": 6, "timeslot_id": 1911}, {"lecturer_id": 6, "timeslot_id": 1912}, {"lecturer_id": 6, "timeslot_id": 1917}, {"lecturer_id": 6, "timeslot_id": 1918}, {"lecturer_id": 6, "timeslot_id": 1919}, {"lecturer_id": 6, "timeslot_id": 1920}, {"lecturer_id": 6, "timeslot_id": 1923}, {"lecturer_id": 6, "timeslot_id": 1924}, {"lecturer_id": 6, "timeslot_id": 1925}, {"lecturer_id": 6, "timeslot_id": 1926}, {"lecturer_id": 6, "timeslot_id": 1927}, {"lecturer_id": 6, "timeslot_id": 1928}, {"lecturer_id": 6, "timeslot_id": 1929}, {"lecturer_id": 6, "timeslot_id": 1932}, {"lecturer_id": 6, "timeslot_id": 1936}, {"lecturer_id": 6, "timeslot_id": 1937}, {"lecturer_id": 6, "timeslot_id": 1938}, {"lecturer_id": 6, "timeslot_id": 1939}, {"lecturer_id": 6, "timeslot_id": 1940}, {"lecturer_id": 6, "timeslot_id": 1941}, {"lecturer_id": 7, "timeslot_id": 1901}, {"lecturer_id": 7, "timeslot_id": 1902}, {"lecturer_id": 7, "timeslot_id": 1904}, {"lecturer_id": 7, "timeslot_id": 1911}, {"lecturer_id": 7, "timeslot_id": 1912}, {"lecturer_id": 7, "timeslot_id": 1915}, {"lecturer_id": 7, "timeslot_id": 1916}, {"lecturer_id": 7, "timeslot_id": 1918}, {"lecturer_id": 7, "timeslot_id": 1920}, {"lecturer_id": 7, "timeslot_id": 1921}, {"lecturer_id": 7, "timeslot_id": 1922}, {"lecturer_id": 7, "timeslot_id": 1923}, {"lecturer_id": 7, "timeslot_id": 1924}, {"lecturer_id": 7, "timeslot_id": 1925}, {"lecturer_id": 7, "timeslot_id": 1928}, {"lecturer_id": 7, "timeslot_id": 1930}, {"lecturer_id": 7, "timeslot_id": 1931}, {"lecturer_id": 7, "timeslot_id": 1932}, {"lecturer_id": 7, "timeslot_id": 1933}, {"lecturer_id": 7, "timeslot_id": 1934}, {"lecturer_id": 7, "timeslot_id": 1937}, {"lecturer_id": 7, "timeslot_id": 1939}, {"lecturer_id": 7, "timeslot_id": 1940}, {"lecturer_id": 7, "timeslot_id": 1942}, {"lecturer_id": 8, "timeslot_id": 1900}, {"lecturer_id": 8, "timeslot_id": 1903}, {"lecturer_id": 8, "timeslot_id": 1905}, {"lecturer_id": 8, "timeslot_id": 1906}, {"lecturer_id": 8, "timeslot_id": 1908}, {"lecturer_id": 8, "timeslot_id": 1911}, {"lecturer_id": 8, "timeslot_id": 1913}, {"lecturer_id": 8, "timeslot_id": 1915}, {"lecturer_id": 8, "timeslot_id": 1919}, {"lecturer_id": 8, "timeslot_id": 1927}, {"lecturer_id": 8, "timeslot_id": 1934}, {"lecturer_id": 8, "timeslot_id": 1936}, {"lecturer_id": 8, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1899}, {"lecturer_id": 9, "timeslot_id": 1900}, {"lecturer_id": 9, "timeslot_id": 1901}, {"lecturer_id": 9, "timeslot_id": 1902}, {"lecturer_id": 9, "timeslot_id": 1903}, {"lecturer_id": 9, "timeslot_id": 1904}, {"lecturer_id": 9, "timeslot_id": 1905}, {"lecturer_id": 9, "timeslot_id": 1906}, {"lecturer_id": 9, "timeslot_id": 1907}, {"lecturer_id": 9, "timeslot_id": 1908}, {"lecturer_id": 9, "timeslot_id": 1909}, {"lecturer_id": 9, "timeslot_id": 1910}, {"lecturer_id": 9, "timeslot_id": 1911}, {"lecturer_id": 9, "timeslot_id": 1912}, {"lecturer_id": 9, "timeslot_id": 1913}, {"lecturer_id": 9, "timeslot_id": 1914}, {"lecturer_id": 9, "timeslot_id": 1915}, {"lecturer_id": 9, "timeslot_id": 1916}, {"lecturer_id": 9, "timeslot_id": 1917}, {"lecturer_id": 9, "timeslot_id": 1918}, {"lecturer_id": 9, "timeslot_id": 1919}, {"lecturer_id": 9, "timeslot_id": 1920}, {"lecturer_id": 9, "timeslot_id": 1921}, {"lecturer_id": 9, "timeslot_id": 1922}, {"lecturer_id": 9, "timeslot_id": 1923}, {"lecturer_id": 9, "timeslot_id": 1924}, {"lecturer_id": 9, "timeslot_id": 1925}, {"lecturer_id": 9, "timeslot_id": 1926}, {"lecturer_id": 9, "timeslot_id": 1927}, {"lecturer_id": 9, "timeslot_id": 1928}, {"lecturer_id": 9, "timeslot_id": 1929}, {"lecturer_id": 9, "timeslot_id": 1930}, {"lecturer_id": 9, "timeslot_id": 1931}, {"lecturer_id": 9, "timeslot_id": 1932}, {"lecturer_id": 9, "timeslot_id": 1933}, {"lecturer_id": 9, "timeslot_id": 1934}, {"lecturer_id": 9, "timeslot_id": 1935}, {"lecturer_id": 9, "timeslot_id": 1936}, {"lecturer_id": 9, "timeslot_id": 1937}, {"lecturer_id": 9, "timeslot_id": 1938}, {"lecturer_id": 9, "timeslot_id": 1939}, {"lecturer_id": 9, "timeslot_id": 1940}, {"lecturer_id": 9, "timeslot_id": 1941}, {"lecturer_id": 9, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1943}, {"lecturer_id": 10, "timeslot_id": 1899}, {"lecturer_id": 10, "timeslot_id": 1900}, {"lecturer_id": 10, "timeslot_id": 1901}, {"lecturer_id": 10, "timeslot_id": 1904}, {"lecturer_id": 10, "timeslot_id": 1906}, {"lecturer_id": 10, "timeslot_id": 1907}, {"lecturer_id": 10, "timeslot_id": 1909}, {"lecturer_id": 10, "timeslot_id": 1910}, {"lecturer_id": 10, "timeslot_id": 1912}, {"lecturer_id": 10, "timeslot_id": 1914}, {"lecturer_id": 10, "timeslot_id": 1915}, {"lecturer_id": 10, "timeslot_id": 1917}, {"lecturer_id": 10, "timeslot_id": 1918}, {"lecturer_id": 10, "timeslot_id": 1919}, {"lecturer_id": 10, "timeslot_id": 1920}, {"lecturer_id": 10, "timeslot_id": 1921}, {"lecturer_id": 10, "timeslot_id": 1924}, {"lecturer_id": 10, "timeslot_id": 1925}, {"lecturer_id": 10, "timeslot_id": 1926}, {"lecturer_id": 10, "timeslot_id": 1927}, {"lecturer_id": 10, "timeslot_id": 1929}, {"lecturer_id": 10, "timeslot_id": 1930}, {"lecturer_id": 10, "timeslot_id": 1932}, {"lecturer_id": 10, "timeslot_id": 1935}, {"lecturer_id": 10, "timeslot_id": 1937}, {"lecturer_id": 10, "timeslot_id": 1940}, {"lecturer_id": 10, "timeslot_id": 1941}, {"lecturer_id": 11, "timeslot_id": 1900}, {"lecturer_id": 11, "timeslot_id": 1901}, {"lecturer_id": 11, "timeslot_id": 1902}, {"lecturer_id": 11, "timeslot_id": 1904}, {"lecturer_id": 11, "timeslot_id": 1906}, {"lecturer_id": 11, "timeslot_id": 1907}, {"lecturer_id": 11, "timeslot_id": 1909}, {"lecturer_id": 11, "timeslot_id": 1910}, {"lecturer_id": 11, "timeslot_id": 1912}, {"lecturer_id": 11, "timeslot_id": 1913}, {"lecturer_id": 11, "timeslot_id": 1915}, {"lecturer_id": 11, "timeslot_id": 1919}, {"lecturer_id": 11, "timeslot_id": 1920}, {"lecturer_id": 11, "timeslot_id": 1921}, {"lecturer_id": 11, "timeslot_id": 1922}, {"lecturer_id": 11, "timeslot_id": 1923}, {"lecturer_id": 11, "timeslot_id": 1924}, {"lecturer_id": 11, "timeslot_id": 1926}, {"lecturer_id": 11, "timeslot_id": 1927}, {"lecturer_id": 11, "timeslot_id": 1929}, {"lecturer_id": 11, "timeslot_id": 1930}, {"lecturer_id": 11, "timeslot_id": 1932}, {"lecturer_id": 11, "timeslot_id": 1935}, {"lecturer_id": 11, "timeslot_id": 1936}, {"lecturer_id": 11, "timeslot_id": 1937}, {"lecturer_id": 11, "timeslot_id": 1938}, {"lecturer_id": 11, "timeslot_id": 1940}, {"lecturer_id": 11, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1900}, {"lecturer_id": 12, "timeslot_id": 1907}, {"lecturer_id": 12, "timeslot_id": 1909}, {"lecturer_id": 12, "timeslot_id": 1915}, {"lecturer_id": 12, "timeslot_id": 1917}, {"lecturer_id": 12, "timeslot_id": 1919}, {"lecturer_id": 12, "timeslot_id": 1920}, {"lecturer_id": 12, "timeslot_id": 1922}, {"lecturer_id": 12, "timeslot_id": 1925}, {"lecturer_id": 12, "timeslot_id": 1926}, {"lecturer_id": 12, "timeslot_id": 1928}, {"lecturer_id": 12, "timeslot_id": 1929}, {"lecturer_id": 12, "timeslot_id": 1933}, {"lecturer_id": 12, "timeslot_id": 1938}, {"lecturer_id": 12, "timeslot_id": 1939}, {"lecturer_id": 12, "timeslot_id": 1940}, {"lecturer_id": 12, "timeslot_id": 1941}, {"lecturer_id": 12, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1943}, {"lecturer_id": 13, "timeslot_id": 1900}, {"lecturer_id": 13, "timeslot_id": 1903}, {"lecturer_id": 13, "timeslot_id": 1905}, {"lecturer_id": 13, "timeslot_id": 1908}, {"lecturer_id": 13, "timeslot_id": 1910}, {"lecturer_id": 13, "timeslot_id": 1911}, {"lecturer_id": 13, "timeslot_id": 1914}, {"lecturer_id": 13, "timeslot_id": 1916}, {"lecturer_id": 13, "timeslot_id": 1918}, {"lecturer_id": 13, "timeslot_id": 1925}, {"lecturer_id": 13, "timeslot_id": 1927}, {"lecturer_id": 13, "timeslot_id": 1928}, {"lecturer_id": 13, "timeslot_id": 1929}, {"lecturer_id": 13, "timeslot_id": 1931}, {"lecturer_id": 13, "timeslot_id": 1932}, {"lecturer_id": 13, "timeslot_id": 1935}, {"lecturer_id": 13, "timeslot_id": 1936}, {"lecturer_id": 13, "timeslot_id": 1937}, {"lecturer_id": 13, "timeslot_id": 1938}, {"lecturer_id": 13, "timeslot_id": 1939}, {"lecturer_id": 13, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1899}, {"lecturer_id": 14, "timeslot_id": 1900}, {"lecturer_id": 14, "timeslot_id": 1901}, {"lecturer_id": 14, "timeslot_id": 1902}, {"lecturer_id": 14, "timeslot_id": 1903}, {"lecturer_id": 14, "timeslot_id": 1905}, {"lecturer_id": 14, "timeslot_id": 1906}, {"lecturer_id": 14, "timeslot_id": 1908}, {"lecturer_id": 14, "timeslot_id": 1909}, {"lecturer_id": 14, "timeslot_id": 1910}, {"lecturer_id": 14, "timeslot_id": 1911}, {"lecturer_id": 14, "timeslot_id": 1912}, {"lecturer_id": 14, "timeslot_id": 1913}, {"lecturer_id": 14, "timeslot_id": 1914}, {"lecturer_id": 14, "timeslot_id": 1915}, {"lecturer_id": 14, "timeslot_id": 1917}, {"lecturer_id": 14, "timeslot_id": 1918}, {"lecturer_id": 14, "timeslot_id": 1920}, {"lecturer_id": 14, "timeslot_id": 1921}, {"lecturer_id": 14, "timeslot_id": 1922}, {"lecturer_id": 14, "timeslot_id": 1923}, {"lecturer_id": 14, "timeslot_id": 1924}, {"lecturer_id": 14, "timeslot_id": 1925}, {"lecturer_id": 14, "timeslot_id": 1926}, {"lecturer_id": 14, "timeslot_id": 1928}, {"lecturer_id": 14, "timeslot_id": 1929}, {"lecturer_id": 14, "timeslot_id": 1930}, {"lecturer_id": 14, "timeslot_id": 1931}, {"lecturer_id": 14, "timeslot_id": 1932}, {"lecturer_id": 14, "timeslot_id": 1933}, {"lecturer_id": 14, "timeslot_id": 1934}, {"lecturer_id": 14, "timeslot_id": 1935}, {"lecturer_id": 14, "timeslot_id": 1936}, {"lecturer_id": 14, "timeslot_id": 1938}, {"lecturer_id": 14, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1942}, {"lecturer_id": 14, "timeslot_id": 1943}, {"lecturer_id": 15, "timeslot_id": 1899}, {"lecturer_id": 15, "timeslot_id": 1900}, {"lecturer_id": 15, "timeslot_id": 1901}, {"lecturer_id": 15, "timeslot_id": 1902}, {"lecturer_id": 15, "timeslot_id": 1903}, {"lecturer_id": 15, "timeslot_id": 1904}, {"lecturer_id": 15, "timeslot_id": 1905}, {"lecturer_id": 15, "timeslot_id": 1906}, {"lecturer_id": 15, "timeslot_id": 1907}, {"lecturer_id": 15, "timeslot_id": 1908}, {"lecturer_id": 15, "timeslot_id": 1909}, {"lecturer_id": 15, "timeslot_id": 1910}, {"lecturer_id": 15, "timeslot_id": 1911}, {"lecturer_id": 15, "timeslot_id": 1912}, {"lecturer_id": 15, "timeslot_id": 1913}, {"lecturer_id": 15, "timeslot_id": 1914}, {"lecturer_id": 15, "timeslot_id": 1915}, {"lecturer_id": 15, "timeslot_id": 1916}, {"lecturer_id": 15, "timeslot_id": 1917}, {"lecturer_id": 15, "timeslot_id": 1918}, {"lecturer_id": 15, "timeslot_id": 1919}, {"lecturer_id": 15, "timeslot_id": 1920}, {"lecturer_id": 15, "timeslot_id": 1921}, {"lecturer_id": 15, "timeslot_id": 1922}, {"lecturer_id": 15, "timeslot_id": 1923}, {"lecturer_id": 15, "timeslot_id": 1924}, {"lecturer_id": 15, "timeslot_id": 1925}, {"lecturer_id": 15, "timeslot_id": 1926}, {"lecturer_id": 15, "timeslot_id": 1927}, {"lecturer_id": 15, "timeslot_id": 1928}, {"lecturer_id": 15, "timeslot_id": 1929}, {"lecturer_id": 15, "timeslot_id": 1930}, {"lecturer_id": 15, "timeslot_id": 1931}, {"lecturer_id": 15, "timeslot_id": 1932}, {"lecturer_id": 15, "timeslot_id": 1933}, {"lecturer_id": 15, "timeslot_id": 1934}, {"lecturer_id": 15, "timeslot_id": 1935}, {"lecturer_id": 15, "timeslot_id": 1936}, {"lecturer_id": 15, "timeslot_id": 1937}, {"lecturer_id": 15, "timeslot_id": 1938}, {"lecturer_id": 15, "timeslot_id": 1939}, {"lecturer_id": 15, "timeslot_id": 1940}, {"lecturer_id": 15, "timeslot_id": 1941}, {"lecturer_id": 15, "timeslot_id": 1942}, {"lecturer_id": 15, "timeslot_id": 1943}, {"lecturer_id": 16, "timeslot_id": 1900}, {"lecturer_id": 16, "timeslot_id": 1909}, {"lecturer_id": 16, "timeslot_id": 1910}, {"lecturer_id": 16, "timeslot_id": 1912}, {"lecturer_id": 16, "timeslot_id": 1914}, {"lecturer_id": 16, "timeslot_id": 1919}, {"lecturer_id": 16, "timeslot_id": 1921}, {"lecturer_id": 16, "timeslot_id": 1922}, {"lecturer_id": 16, "timeslot_id": 1924}, {"lecturer_id": 16, "timeslot_id": 1926}, {"lecturer_id": 16, "timeslot_id": 1929}, {"lecturer_id": 16, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1899}, {"lecturer_id": 17, "timeslot_id": 1900}, {"lecturer_id": 17, "timeslot_id": 1901}, {"lecturer_id": 17, "timeslot_id": 1902}, {"lecturer_id": 17, "timeslot_id": 1903}, {"lecturer_id": 17, "timeslot_id": 1904}, {"lecturer_id": 17, "timeslot_id": 1905}, {"lecturer_id": 17, "timeslot_id": 1910}, {"lecturer_id": 17, "timeslot_id": 1911}, {"lecturer_id": 17, "timeslot_id": 1912}, {"lecturer_id": 17, "timeslot_id": 1914}, {"lecturer_id": 17, "timeslot_id": 1915}, {"lecturer_id": 17, "timeslot_id": 1916}, {"lecturer_id": 17, "timeslot_id": 1917}, {"lecturer_id": 17, "timeslot_id": 1918}, {"lecturer_id": 17, "timeslot_id": 1919}, {"lecturer_id": 17, "timeslot_id": 1920}, {"lecturer_id": 17, "timeslot_id": 1921}, {"lecturer_id": 17, "timeslot_id": 1922}, {"lecturer_id": 17, "timeslot_id": 1923}, {"lecturer_id": 17, "timeslot_id": 1925}, {"lecturer_id": 17, "timeslot_id": 1926}, {"lecturer_id": 17, "timeslot_id": 1927}, {"lecturer_id": 17, "timeslot_id": 1928}, {"lecturer_id": 17, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1932}, {"lecturer_id": 17, "timeslot_id": 1933}, {"lecturer_id": 17, "timeslot_id": 1934}, {"lecturer_id": 17, "timeslot_id": 1935}, {"lecturer_id": 17, "timeslot_id": 1936}, {"lecturer_id": 17, "timeslot_id": 1938}, {"lecturer_id": 17, "timeslot_id": 1939}, {"lecturer_id": 17, "timeslot_id": 1940}, {"lecturer_id": 17, "timeslot_id": 1941}, {"lecturer_id": 17, "timeslot_id": 1942}, {"lecturer_id": 17, "timeslot_id": 1943}, {"lecturer_id": 18, "timeslot_id": 1900}, {"lecturer_id": 18, "timeslot_id": 1904}, {"lecturer_id": 18, "timeslot_id": 1916}, {"lecturer_id": 18, "timeslot_id": 1921}, {"lecturer_id": 18, "timeslot_id": 1927}, {"lecturer_id": 18, "timeslot_id": 1937}, {"lecturer_id": 18, "timeslot_id": 1938}, {"lecturer_id": 18, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1902}, {"lecturer_id": 19, "timeslot_id": 1903}, {"lecturer_id": 19, "timeslot_id": 1905}, {"lecturer_id": 19, "timeslot_id": 1909}, {"lecturer_id": 19, "timeslot_id": 1910}, {"lecturer_id": 19, "timeslot_id": 1911}, {"lecturer_id": 19, "timeslot_id": 1912}, {"lecturer_id": 19, "timeslot_id": 1915}, {"lecturer_id": 19, "timeslot_id": 1916}, {"lecturer_id": 19, "timeslot_id": 1918}, {"lecturer_id": 19, "timeslot_id": 1920}, {"lecturer_id": 19, "timeslot_id": 1922}, {"lecturer_id": 19, "timeslot_id": 1925}, {"lecturer_id": 19, "timeslot_id": 1926}, {"lecturer_id": 19, "timeslot_id": 1927}, {"lecturer_id": 19, "timeslot_id": 1930}, {"lecturer_id": 19, "timeslot_id": 1931}, {"lecturer_id": 19, "timeslot_id": 1935}, {"lecturer_id": 19, "timeslot_id": 1936}, {"lecturer_id": 19, "timeslot_id": 1937}, {"lecturer_id": 19, "timeslot_id": 1938}, {"lecturer_id": 19, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1940}, {"lecturer_id": 20, "timeslot_id": 1900}, {"lecturer_id": 20, "timeslot_id": 1903}, {"lecturer_id": 20, "timeslot_id": 1910}, {"lecturer_id": 20, "timeslot_id": 1918}, {"lecturer_id": 20, "timeslot_id": 1922}, {"lecturer_id": 20, "timeslot_id": 1923}, {"lecturer_id": 20, "timeslot_id": 1929}, {"lecturer_id": 20, "timeslot_id": 1936}, {"lecturer_id": 20, "timeslot_id": 1939}, {"lecturer_id": 20, "timeslot_id": 1942}, {"lecturer_id": 20, "timeslot_id": 1943}, {"lecturer_id": 21, "timeslot_id": 1899}, {"lecturer_id": 21, "timeslot_id": 1900}, {"lecturer_id": 21, "timeslot_id": 1901}, {"lecturer_id": 21, "timeslot_id": 1902}, {"lecturer_id": 21, "timeslot_id": 1903}, {"lecturer_id": 21, "timeslot_id": 1904}, {"lecturer_id": 21, "timeslot_id": 1905}, {"lecturer_id": 21, "timeslot_id": 1906}, {"lecturer_id": 21, "timeslot_id": 1907}, {"lecturer_id": 21, "timeslot_id": 1908}, {"lecturer_id": 21, "timeslot_id": 1909}, {"lecturer_id": 21, "timeslot_id": 1910}, {"lecturer_id": 21, "timeslot_id": 1911}, {"lecturer_id": 21, "timeslot_id": 1912}, {"lecturer_id": 21, "timeslot_id": 1913}, {"lecturer_id": 21, "timeslot_id": 1914}, {"lecturer_id": 21, "timeslot_id": 1915}, {"lecturer_id": 21, "timeslot_id": 1916}, {"lecturer_id": 21, "timeslot_id": 1917}, {"lecturer_id": 21, "timeslot_id": 1918}, {"lecturer_id": 21, "timeslot_id": 1919}, {"lecturer_id": 21, "timeslot_id": 1920}, {"lecturer_id": 21, "timeslot_id": 1921}, {"lecturer_id": 21, "timeslot_id": 1922}, {"lecturer_id": 21, "timeslot_id": 1923}, {"lecturer_id": 21, "timeslot_id": 1924}, {"lecturer_id": 21, "timeslot_id": 1925}, {"lecturer_id": 21, "timeslot_id": 1926}, {"lecturer_id": 21, "timeslot_id": 1927}, {"lecturer_id": 21, "timeslot_id": 1928}, {"lecturer_id": 21, "timeslot_id": 1929}, {"lecturer_id": 21, "timeslot_id": 1930}, {"lecturer_id": 21, "timeslot_id": 1931}, {"lecturer_id": 21, "timeslot_id": 1932}, {"lecturer_id": 21, "timeslot_id": 1933}, {"lecturer_id": 21, "timeslot_id": 1934}, {"lecturer_id": 21, "timeslot_id": 1935}, {"lecturer_id": 21, "timeslot_id": 1936}, {"lecturer_id": 21, "timeslot_id": 1937}, {"lecturer_id": 21, "timeslot_id": 1938}, {"lecturer_id": 21, "timeslot_id": 1939}, {"lecturer_id": 21, "timeslot_id": 1940}, {"lecturer_id": 21, "timeslot_id": 1941}, {"lecturer_id": 21, "timeslot_id": 1942}, {"lecturer_id": 21, "timeslot_id": 1943}, {"lecturer_id": 22, "timeslot_id": 1899}, {"lecturer_id": 22, "timeslot_id": 1901}, {"lecturer_id": 22, "timeslot_id": 1902}, {"lecturer_id": 22, "timeslot_id": 1903}, {"lecturer_id": 22, "timeslot_id": 1904}, {"lecturer_id": 22, "timeslot_id": 1905}, {"lecturer_id": 22, "timeslot_id": 1906}, {"lecturer_id": 22, "timeslot_id": 1907}, {"lecturer_id": 22, "timeslot_id": 1911}, {"lecturer_id": 22, "timeslot_id": 1912}, {"lecturer_id": 22, "timeslot_id": 1913}, {"lecturer_id": 22, "timeslot_id": 1914}, {"lecturer_id": 22, "timeslot_id": 1915}, {"lecturer_id": 22, "timeslot_id": 1916}, {"lecturer_id": 22, "timeslot_id": 1917}, {"lecturer_id": 22, "timeslot_id": 1918}, {"lecturer_id": 22, "timeslot_id": 1919}, {"lecturer_id": 22, "timeslot_id": 1920}, {"lecturer_id": 22, "timeslot_id": 1921}, {"lecturer_id": 22, "timeslot_id": 1923}, {"lecturer_id": 22, "timeslot_id": 1925}, {"lecturer_id": 22, "timeslot_id": 1926}, {"lecturer_id": 22, "timeslot_id": 1927}, {"lecturer_id": 22, "timeslot_id": 1928}, {"lecturer_id": 22, "timeslot_id": 1929}, {"lecturer_id": 22, "timeslot_id": 1931}, {"lecturer_id": 22, "timeslot_id": 1932}, {"lecturer_id": 22, "timeslot_id": 1933}, {"lecturer_id": 22, "timeslot_id": 1934}, {"lecturer_id": 22, "timeslot_id": 1935}, {"lecturer_id": 22, "timeslot_id": 1936}, {"lecturer_id": 22, "timeslot_id": 1937}, {"lecturer_id": 22, "timeslot_id": 1938}, {"lecturer_id": 22, "timeslot_id": 1939}, {"lecturer_id": 22, "timeslot_id": 1940}, {"lecturer_id": 22, "timeslot_id": 1942}, {"lecturer_id": 22, "timeslot_id": 1943}, {"lecturer_id": 23, "timeslot_id": 1899}, {"lecturer_id": 23, "timeslot_id": 1900}, {"lecturer_id": 23, "timeslot_id": 1901}, {"lecturer_id": 23, "timeslot_id": 1902}, {"lecturer_id": 23, "timeslot_id": 1903}, {"lecturer_id": 23, "timeslot_id": 1904}, {"lecturer_id": 23, "timeslot_id": 1905}, {"lecturer_id": 23, "timeslot_id": 1906}, {"lecturer_id": 23, "timeslot_id": 1907}, {"lecturer_id": 23, "timeslot_id": 1908}, {"lecturer_id": 23, "timeslot_id": 1909}, {"lecturer_id": 23, "timeslot_id": 1910}, {"lecturer_id": 23, "timeslot_id": 1911}, {"lecturer_id": 23, "timeslot_id": 1912}, {"lecturer_id": 23, "timeslot_id": 1913}, {"lecturer_id": 23, "timeslot_id": 1914}, {"lecturer_id": 23, "timeslot_id": 1915}, {"lecturer_id": 23, "timeslot_id": 1916}, {"lecturer_id": 23, "timeslot_id": 1917}, {"lecturer_id": 23, "timeslot_id": 1918}, {"lecturer_id": 23, "timeslot_id": 1919}, {"lecturer_id": 23, "timeslot_id": 1920}, {"lecturer_id": 23, "timeslot_id": 1921}, {"lecturer_id": 23, "timeslot_id": 1922}, {"lecturer_id": 23, "timeslot_id": 1923}, {"lecturer_id": 23, "timeslot_id": 1924}, {"lecturer_id": 23, "timeslot_id": 1925}, {"lecturer_id": 23, "timeslot_id": 1926}, {"lecturer_id": 23, "timeslot_id": 1927}, {"lecturer_id": 23, "timeslot_id": 1928}, {"lecturer_id": 23, "timeslot_id": 1929}, {"lecturer_id": 23, "timeslot_id": 1930}, {"lecturer_id": 23, "timeslot_id": 1931}, {"lecturer_id": 23, "timeslot_id": 1932}, {"lecturer_id": 23, "timeslot_id": 1933}, {"lecturer_id": 23, "timeslot_id": 1934}, {"lecturer_id": 23, "timeslot_id": 1935}, {"lecturer_id": 23, "timeslot_id": 1936}, {"lecturer_id": 23, "timeslot_id": 1937}, {"lecturer_id": 23, "timeslot_id": 1938}, {"lecturer_id": 23, "timeslot_id": 1939}, {"lecturer_id": 23, "timeslot_id": 1940}, {"lecturer_id": 23, "timeslot_id": 1941}, {"lecturer_id": 23, "timeslot_id": 1942}, {"lecturer_id": 23, "timeslot_id": 1943}, {"lecturer_id": 24, "timeslot_id": 1902}, {"lecturer_id": 24, "timeslot_id": 1904}, {"lecturer_id": 24, "timeslot_id": 1905}, {"lecturer_id": 24, "timeslot_id": 1907}, {"lecturer_id": 24, "timeslot_id": 1909}, {"lecturer_id": 24, "timeslot_id": 1911}, {"lecturer_id": 24, "timeslot_id": 1912}, {"lecturer_id": 24, "timeslot_id": 1913}, {"lecturer_id": 24, "timeslot_id": 1916}, {"lecturer_id": 24, "timeslot_id": 1919}, {"lecturer_id": 24, "timeslot_id": 1931}, {"lecturer_id": 24, "timeslot_id": 1932}, {"lecturer_id": 24, "timeslot_id": 1933}, {"lecturer_id": 24, "timeslot_id": 1938}, {"lecturer_id": 25, "timeslot_id": 1914}, {"lecturer_id": 25, "timeslot_id": 1915}, {"lecturer_id": 25, "timeslot_id": 1919}, {"lecturer_id": 25, "timeslot_id": 1921}, {"lecturer_id": 25, "timeslot_id": 1925}, {"lecturer_id": 25, "timeslot_id": 1931}, {"lecturer_id": 25, "timeslot_id": 1937}, {"lecturer_id": 25, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1899}, {"lecturer_id": 26, "timeslot_id": 1900}, {"lecturer_id": 26, "timeslot_id": 1901}, {"lecturer_id": 26, "timeslot_id": 1902}, {"lecturer_id": 26, "timeslot_id": 1903}, {"lecturer_id": 26, "timeslot_id": 1904}, {"lecturer_id": 26, "timeslot_id": 1905}, {"lecturer_id": 26, "timeslot_id": 1906}, {"lecturer_id": 26, "timeslot_id": 1907}, {"lecturer_id": 26, "timeslot_id": 1908}, {"lecturer_id": 26, "timeslot_id": 1909}, {"lecturer_id": 26, "timeslot_id": 1910}, {"lecturer_id": 26, "timeslot_id": 1911}, {"lecturer_id": 26, "timeslot_id": 1912}, {"lecturer_id": 26, "timeslot_id": 1913}, {"lecturer_id": 26, "timeslot_id": 1914}, {"lecturer_id": 26, "timeslot_id": 1915}, {"lecturer_id": 26, "timeslot_id": 1916}, {"lecturer_id": 26, "timeslot_id": 1917}, {"lecturer_id": 26, "timeslot_id": 1918}, {"lecturer_id": 26, "timeslot_id": 1919}, {"lecturer_id": 26, "timeslot_id": 1920}, {"lecturer_id": 26, "timeslot_id": 1921}, {"lecturer_id": 26, "timeslot_id": 1922}, {"lecturer_id": 26, "timeslot_id": 1923}, {"lecturer_id": 26, "timeslot_id": 1924}, {"lecturer_id": 26, "timeslot_id": 1925}, {"lecturer_id": 26, "timeslot_id": 1926}, {"lecturer_id": 26, "timeslot_id": 1927}, {"lecturer_id": 26, "timeslot_id": 1928}, {"lecturer_id": 26, "timeslot_id": 1929}, {"lecturer_id": 26, "timeslot_id": 1930}, {"lecturer_id": 26, "timeslot_id": 1931}, {"lecturer_id": 26, "timeslot_id": 1932}, {"lecturer_id": 26, "timeslot_id": 1933}, {"lecturer_id": 26, "timeslot_id": 1934}, {"lecturer_id": 26, "timeslot_id": 1935}, {"lecturer_id": 26, "timeslot_id": 1936}, {"lecturer_id": 26, "timeslot_id": 1937}, {"lecturer_id": 26, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1939}, {"lecturer_id": 26, "timeslot_id": 1940}, {"lecturer_id": 26, "timeslot_id": 1941}, {"lecturer_id": 26, "timeslot_id": 1942}, {"lecturer_id": 26, "timeslot_id": 1943}, {"lecturer_id": 1090, "timeslot_id": 1899}, {"lecturer_id": 1090, "timeslot_id": 1900}, {"lecturer_id": 1090, "timeslot_id": 1903}, {"lecturer_id": 1090, "timeslot_id": 1904}, {"lecturer_id": 1090, "timeslot_id": 1905}, {"lecturer_id": 1090, "timeslot_id": 1906}, {"lecturer_id": 1090, "timeslot_id": 1908}, {"lecturer_id": 1090, "timeslot_id": 1909}, {"lecturer_id": 1090, "timeslot_id": 1910}, {"lecturer_id": 1090, "timeslot_id": 1912}, {"lecturer_id": 1090, "timeslot_id": 1913}, {"lecturer_id": 1090, "timeslot_id": 1916}, {"lecturer_id": 1090, "timeslot_id": 1917}, {"lecturer_id": 1090, "timeslot_id": 1918}, {"lecturer_id": 1090, "timeslot_id": 1921}, {"lecturer_id": 1090, "timeslot_id": 1922}, {"lecturer_id": 1090, "timeslot_id": 1923}, {"lecturer_id": 1090, "timeslot_id": 1924}, {"lecturer_id": 1090, "timeslot_id": 1925}, {"lecturer_id": 1090, "timeslot_id": 1926}, {"lecturer_id": 1090, "timeslot_id": 1929}, {"lecturer_id": 1090, "timeslot_id": 1931}, {"lecturer_id": 1090, "timeslot_id": 1933}, {"lecturer_id": 1090, "timeslot_id": 1934}, {"lecturer_id": 1090, "timeslot_id": 1935}, {"lecturer_id": 1090, "timeslot_id": 1938}, {"lecturer_id": 1090, "timeslot_id": 1939}, {"lecturer_id": 1090, "timeslot_id": 1940}, {"lecturer_id": 1090, "timeslot_id": 1942}, {"lecturer_id": 1090, "timeslot_id": 1943}], "group_status": {"42": "ELIGIBLE_D12", "44": "ELIGIBLE_D12", "45": "ELIGIBLE_D12", "46": "ELIGIBLE_D12", "48": "ELIGIBLE_D12", "49": "ELIGIBLE_D12", "52": "ELIGIBLE_D12", "55": "ELIGIBLE_D12", "57": "ELIGIBLE_D12", "58": "ELIGIBLE_D12", "59": "ELIGIBLE_D12", "61": "ELIGIBLE_D12", "62": "ELIGIBLE_D12", "65": "ELIGIBLE_D12", "68": "ELIGIBLE_D12", "69": "ELIGIBLE_D12"}, "soft_weights": {}, "group_project": {"42": 43, "44": 51, "45": 38, "46": 54, "48": 48, "49": 57, "52": 35, "55": 44, "57": 61, "58": 63, "59": 66, "61": 64, "62": 59, "65": 65, "68": 40, "69": 71}, "result_owner_mode": false, "project_supervisors": {"35": [4], "38": [7], "40": [4], "43": [9], "44": [4], "48": [1], "51": [7], "54": [12], "57": [15], "59": [17], "61": [4], "63": [4], "64": [19], "65": [4], "66": [20], "71": [22]}, "group_selected_slots": {"42": [1901, 1907, 1923, 1927, 1933, 1936, 1941, 1943], "44": [1904, 1905, 1907, 1911, 1918, 1922, 1925, 1929, 1937], "45": [1901, 1902, 1905, 1935], "46": [1899, 1900, 1906, 1910, 1913, 1930, 1931, 1941], "48": [1901, 1902, 1906, 1914, 1917, 1919, 1928, 1933, 1943], "49": [1904, 1908, 1910, 1924, 1927, 1934, 1938, 1941], "52": [1902, 1906, 1916, 1917, 1928, 1935, 1939, 1943], "55": [1899, 1916, 1928, 1938], "57": [1907, 1924, 1925, 1938, 1943], "58": [1902, 1906, 1936, 1938], "59": [1900, 1906, 1927], "61": [1902, 1905, 1910, 1923, 1924, 1929, 1935, 1943], "62": [1906, 1921, 1922, 1925, 1933], "65": [1921, 1923, 1929, 1930], "68": [1902, 1933, 1936], "69": [1903, 1909, 1911, 1912, 1915, 1918, 1921, 1925, 1938]}, "group_selection_mode": true, "reviewer_assignments": {"42": [1, 2, 3, 4, 6], "45": [1, 3, 4, 5, 6], "61": [1, 2, 3, 4, 5]}, "committee_constraints": [], "expected_reviewer_count": 5, "lecturer_load_preferences": {}, "prior_reviewer_continuity": {}, "committee_constraints_active": false}	{"random_seed": 1642026, "time_limit_seconds": 15.0}	1642026	PARTIAL	3	{"S1": 0, "S2": 0, "S3": 0, "S4": 1, "S5": 3, "S6": 0, "S7": 15, "S8": 0, "S9": 0}	2	2026-08-22 18:02:13.457866+00	\N
-14	164	5	ACTIVE	{"groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "h_rules": {"H11": {"waiver_actors": {"42": "MANAGER", "44": "MANAGER", "45": "MANAGER", "46": "MANAGER", "48": "MANAGER", "49": "MANAGER", "52": "MANAGER", "55": "MANAGER", "57": "MANAGER", "58": "MANAGER", "59": "MANAGER", "61": "MANAGER", "62": "MANAGER", "65": "MANAGER", "68": "MANAGER", "69": "MANAGER"}, "waiver_groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "waiver_reasons": {"42": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "44": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "45": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "46": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "48": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "49": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "52": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "55": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "57": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "58": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "59": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "61": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "62": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "65": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "68": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "69": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round."}}, "H12": {"semester_quota": null, "sessions_per_day": 8, "sessions_per_part": 4}}, "round_id": 164, "conflicts": [], "timeslots": [1899, 1900, 1901, 1902, 1903, 1904, 1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1937, 1938, 1939, 1940, 1941, 1942, 1943], "round_type": "DEFENSE_1_2", "unscheduled": [], "availability": [{"lecturer_id": 1, "timeslot_id": 1899}, {"lecturer_id": 1, "timeslot_id": 1901}, {"lecturer_id": 1, "timeslot_id": 1902}, {"lecturer_id": 1, "timeslot_id": 1903}, {"lecturer_id": 1, "timeslot_id": 1904}, {"lecturer_id": 1, "timeslot_id": 1905}, {"lecturer_id": 1, "timeslot_id": 1906}, {"lecturer_id": 1, "timeslot_id": 1907}, {"lecturer_id": 1, "timeslot_id": 1908}, {"lecturer_id": 1, "timeslot_id": 1910}, {"lecturer_id": 1, "timeslot_id": 1911}, {"lecturer_id": 1, "timeslot_id": 1912}, {"lecturer_id": 1, "timeslot_id": 1913}, {"lecturer_id": 1, "timeslot_id": 1914}, {"lecturer_id": 1, "timeslot_id": 1916}, {"lecturer_id": 1, "timeslot_id": 1917}, {"lecturer_id": 1, "timeslot_id": 1918}, {"lecturer_id": 1, "timeslot_id": 1919}, {"lecturer_id": 1, "timeslot_id": 1920}, {"lecturer_id": 1, "timeslot_id": 1922}, {"lecturer_id": 1, "timeslot_id": 1923}, {"lecturer_id": 1, "timeslot_id": 1924}, {"lecturer_id": 1, "timeslot_id": 1925}, {"lecturer_id": 1, "timeslot_id": 1926}, {"lecturer_id": 1, "timeslot_id": 1927}, {"lecturer_id": 1, "timeslot_id": 1928}, {"lecturer_id": 1, "timeslot_id": 1929}, {"lecturer_id": 1, "timeslot_id": 1930}, {"lecturer_id": 1, "timeslot_id": 1931}, {"lecturer_id": 1, "timeslot_id": 1932}, {"lecturer_id": 1, "timeslot_id": 1933}, {"lecturer_id": 1, "timeslot_id": 1934}, {"lecturer_id": 1, "timeslot_id": 1935}, {"lecturer_id": 1, "timeslot_id": 1937}, {"lecturer_id": 1, "timeslot_id": 1938}, {"lecturer_id": 1, "timeslot_id": 1939}, {"lecturer_id": 1, "timeslot_id": 1941}, {"lecturer_id": 1, "timeslot_id": 1943}, {"lecturer_id": 2, "timeslot_id": 1899}, {"lecturer_id": 2, "timeslot_id": 1900}, {"lecturer_id": 2, "timeslot_id": 1904}, {"lecturer_id": 2, "timeslot_id": 1905}, {"lecturer_id": 2, "timeslot_id": 1907}, {"lecturer_id": 2, "timeslot_id": 1908}, {"lecturer_id": 2, "timeslot_id": 1914}, {"lecturer_id": 2, "timeslot_id": 1916}, {"lecturer_id": 2, "timeslot_id": 1917}, {"lecturer_id": 2, "timeslot_id": 1918}, {"lecturer_id": 2, "timeslot_id": 1920}, {"lecturer_id": 2, "timeslot_id": 1921}, {"lecturer_id": 2, "timeslot_id": 1924}, {"lecturer_id": 2, "timeslot_id": 1925}, {"lecturer_id": 2, "timeslot_id": 1928}, {"lecturer_id": 2, "timeslot_id": 1932}, {"lecturer_id": 2, "timeslot_id": 1933}, {"lecturer_id": 2, "timeslot_id": 1935}, {"lecturer_id": 2, "timeslot_id": 1936}, {"lecturer_id": 2, "timeslot_id": 1938}, {"lecturer_id": 2, "timeslot_id": 1940}, {"lecturer_id": 2, "timeslot_id": 1941}, {"lecturer_id": 2, "timeslot_id": 1942}, {"lecturer_id": 2, "timeslot_id": 1943}, {"lecturer_id": 3, "timeslot_id": 1900}, {"lecturer_id": 3, "timeslot_id": 1901}, {"lecturer_id": 3, "timeslot_id": 1902}, {"lecturer_id": 3, "timeslot_id": 1906}, {"lecturer_id": 3, "timeslot_id": 1912}, {"lecturer_id": 3, "timeslot_id": 1915}, {"lecturer_id": 3, "timeslot_id": 1923}, {"lecturer_id": 3, "timeslot_id": 1925}, {"lecturer_id": 3, "timeslot_id": 1928}, {"lecturer_id": 3, "timeslot_id": 1938}, {"lecturer_id": 3, "timeslot_id": 1941}, {"lecturer_id": 3, "timeslot_id": 1942}, {"lecturer_id": 3, "timeslot_id": 1943}, {"lecturer_id": 4, "timeslot_id": 1902}, {"lecturer_id": 4, "timeslot_id": 1910}, {"lecturer_id": 4, "timeslot_id": 1912}, {"lecturer_id": 4, "timeslot_id": 1913}, {"lecturer_id": 4, "timeslot_id": 1923}, {"lecturer_id": 4, "timeslot_id": 1931}, {"lecturer_id": 4, "timeslot_id": 1941}, {"lecturer_id": 4, "timeslot_id": 1943}, {"lecturer_id": 5, "timeslot_id": 1899}, {"lecturer_id": 5, "timeslot_id": 1900}, {"lecturer_id": 5, "timeslot_id": 1902}, {"lecturer_id": 5, "timeslot_id": 1904}, {"lecturer_id": 5, "timeslot_id": 1906}, {"lecturer_id": 5, "timeslot_id": 1907}, {"lecturer_id": 5, "timeslot_id": 1922}, {"lecturer_id": 5, "timeslot_id": 1939}, {"lecturer_id": 5, "timeslot_id": 1942}, {"lecturer_id": 5, "timeslot_id": 1943}, {"lecturer_id": 6, "timeslot_id": 1900}, {"lecturer_id": 6, "timeslot_id": 1902}, {"lecturer_id": 6, "timeslot_id": 1903}, {"lecturer_id": 6, "timeslot_id": 1906}, {"lecturer_id": 6, "timeslot_id": 1908}, {"lecturer_id": 6, "timeslot_id": 1911}, {"lecturer_id": 6, "timeslot_id": 1912}, {"lecturer_id": 6, "timeslot_id": 1917}, {"lecturer_id": 6, "timeslot_id": 1918}, {"lecturer_id": 6, "timeslot_id": 1919}, {"lecturer_id": 6, "timeslot_id": 1920}, {"lecturer_id": 6, "timeslot_id": 1923}, {"lecturer_id": 6, "timeslot_id": 1924}, {"lecturer_id": 6, "timeslot_id": 1925}, {"lecturer_id": 6, "timeslot_id": 1926}, {"lecturer_id": 6, "timeslot_id": 1927}, {"lecturer_id": 6, "timeslot_id": 1928}, {"lecturer_id": 6, "timeslot_id": 1929}, {"lecturer_id": 6, "timeslot_id": 1932}, {"lecturer_id": 6, "timeslot_id": 1936}, {"lecturer_id": 6, "timeslot_id": 1937}, {"lecturer_id": 6, "timeslot_id": 1938}, {"lecturer_id": 6, "timeslot_id": 1939}, {"lecturer_id": 6, "timeslot_id": 1940}, {"lecturer_id": 6, "timeslot_id": 1941}, {"lecturer_id": 7, "timeslot_id": 1901}, {"lecturer_id": 7, "timeslot_id": 1902}, {"lecturer_id": 7, "timeslot_id": 1904}, {"lecturer_id": 7, "timeslot_id": 1911}, {"lecturer_id": 7, "timeslot_id": 1912}, {"lecturer_id": 7, "timeslot_id": 1915}, {"lecturer_id": 7, "timeslot_id": 1916}, {"lecturer_id": 7, "timeslot_id": 1918}, {"lecturer_id": 7, "timeslot_id": 1920}, {"lecturer_id": 7, "timeslot_id": 1921}, {"lecturer_id": 7, "timeslot_id": 1922}, {"lecturer_id": 7, "timeslot_id": 1923}, {"lecturer_id": 7, "timeslot_id": 1924}, {"lecturer_id": 7, "timeslot_id": 1925}, {"lecturer_id": 7, "timeslot_id": 1928}, {"lecturer_id": 7, "timeslot_id": 1930}, {"lecturer_id": 7, "timeslot_id": 1931}, {"lecturer_id": 7, "timeslot_id": 1932}, {"lecturer_id": 7, "timeslot_id": 1933}, {"lecturer_id": 7, "timeslot_id": 1934}, {"lecturer_id": 7, "timeslot_id": 1937}, {"lecturer_id": 7, "timeslot_id": 1939}, {"lecturer_id": 7, "timeslot_id": 1940}, {"lecturer_id": 7, "timeslot_id": 1942}, {"lecturer_id": 8, "timeslot_id": 1900}, {"lecturer_id": 8, "timeslot_id": 1903}, {"lecturer_id": 8, "timeslot_id": 1905}, {"lecturer_id": 8, "timeslot_id": 1906}, {"lecturer_id": 8, "timeslot_id": 1908}, {"lecturer_id": 8, "timeslot_id": 1911}, {"lecturer_id": 8, "timeslot_id": 1913}, {"lecturer_id": 8, "timeslot_id": 1915}, {"lecturer_id": 8, "timeslot_id": 1919}, {"lecturer_id": 8, "timeslot_id": 1927}, {"lecturer_id": 8, "timeslot_id": 1934}, {"lecturer_id": 8, "timeslot_id": 1936}, {"lecturer_id": 8, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1899}, {"lecturer_id": 9, "timeslot_id": 1900}, {"lecturer_id": 9, "timeslot_id": 1901}, {"lecturer_id": 9, "timeslot_id": 1902}, {"lecturer_id": 9, "timeslot_id": 1903}, {"lecturer_id": 9, "timeslot_id": 1904}, {"lecturer_id": 9, "timeslot_id": 1905}, {"lecturer_id": 9, "timeslot_id": 1906}, {"lecturer_id": 9, "timeslot_id": 1907}, {"lecturer_id": 9, "timeslot_id": 1908}, {"lecturer_id": 9, "timeslot_id": 1909}, {"lecturer_id": 9, "timeslot_id": 1910}, {"lecturer_id": 9, "timeslot_id": 1911}, {"lecturer_id": 9, "timeslot_id": 1912}, {"lecturer_id": 9, "timeslot_id": 1913}, {"lecturer_id": 9, "timeslot_id": 1914}, {"lecturer_id": 9, "timeslot_id": 1915}, {"lecturer_id": 9, "timeslot_id": 1916}, {"lecturer_id": 9, "timeslot_id": 1917}, {"lecturer_id": 9, "timeslot_id": 1918}, {"lecturer_id": 9, "timeslot_id": 1919}, {"lecturer_id": 9, "timeslot_id": 1920}, {"lecturer_id": 9, "timeslot_id": 1921}, {"lecturer_id": 9, "timeslot_id": 1922}, {"lecturer_id": 9, "timeslot_id": 1923}, {"lecturer_id": 9, "timeslot_id": 1924}, {"lecturer_id": 9, "timeslot_id": 1925}, {"lecturer_id": 9, "timeslot_id": 1926}, {"lecturer_id": 9, "timeslot_id": 1927}, {"lecturer_id": 9, "timeslot_id": 1928}, {"lecturer_id": 9, "timeslot_id": 1929}, {"lecturer_id": 9, "timeslot_id": 1930}, {"lecturer_id": 9, "timeslot_id": 1931}, {"lecturer_id": 9, "timeslot_id": 1932}, {"lecturer_id": 9, "timeslot_id": 1933}, {"lecturer_id": 9, "timeslot_id": 1934}, {"lecturer_id": 9, "timeslot_id": 1935}, {"lecturer_id": 9, "timeslot_id": 1936}, {"lecturer_id": 9, "timeslot_id": 1937}, {"lecturer_id": 9, "timeslot_id": 1938}, {"lecturer_id": 9, "timeslot_id": 1939}, {"lecturer_id": 9, "timeslot_id": 1940}, {"lecturer_id": 9, "timeslot_id": 1941}, {"lecturer_id": 9, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1943}, {"lecturer_id": 10, "timeslot_id": 1899}, {"lecturer_id": 10, "timeslot_id": 1900}, {"lecturer_id": 10, "timeslot_id": 1901}, {"lecturer_id": 10, "timeslot_id": 1904}, {"lecturer_id": 10, "timeslot_id": 1906}, {"lecturer_id": 10, "timeslot_id": 1907}, {"lecturer_id": 10, "timeslot_id": 1909}, {"lecturer_id": 10, "timeslot_id": 1910}, {"lecturer_id": 10, "timeslot_id": 1912}, {"lecturer_id": 10, "timeslot_id": 1914}, {"lecturer_id": 10, "timeslot_id": 1915}, {"lecturer_id": 10, "timeslot_id": 1917}, {"lecturer_id": 10, "timeslot_id": 1918}, {"lecturer_id": 10, "timeslot_id": 1919}, {"lecturer_id": 10, "timeslot_id": 1920}, {"lecturer_id": 10, "timeslot_id": 1921}, {"lecturer_id": 10, "timeslot_id": 1924}, {"lecturer_id": 10, "timeslot_id": 1925}, {"lecturer_id": 10, "timeslot_id": 1926}, {"lecturer_id": 10, "timeslot_id": 1927}, {"lecturer_id": 10, "timeslot_id": 1929}, {"lecturer_id": 10, "timeslot_id": 1930}, {"lecturer_id": 10, "timeslot_id": 1932}, {"lecturer_id": 10, "timeslot_id": 1935}, {"lecturer_id": 10, "timeslot_id": 1937}, {"lecturer_id": 10, "timeslot_id": 1940}, {"lecturer_id": 10, "timeslot_id": 1941}, {"lecturer_id": 11, "timeslot_id": 1900}, {"lecturer_id": 11, "timeslot_id": 1901}, {"lecturer_id": 11, "timeslot_id": 1902}, {"lecturer_id": 11, "timeslot_id": 1904}, {"lecturer_id": 11, "timeslot_id": 1906}, {"lecturer_id": 11, "timeslot_id": 1907}, {"lecturer_id": 11, "timeslot_id": 1909}, {"lecturer_id": 11, "timeslot_id": 1910}, {"lecturer_id": 11, "timeslot_id": 1912}, {"lecturer_id": 11, "timeslot_id": 1913}, {"lecturer_id": 11, "timeslot_id": 1915}, {"lecturer_id": 11, "timeslot_id": 1919}, {"lecturer_id": 11, "timeslot_id": 1920}, {"lecturer_id": 11, "timeslot_id": 1921}, {"lecturer_id": 11, "timeslot_id": 1922}, {"lecturer_id": 11, "timeslot_id": 1923}, {"lecturer_id": 11, "timeslot_id": 1924}, {"lecturer_id": 11, "timeslot_id": 1926}, {"lecturer_id": 11, "timeslot_id": 1927}, {"lecturer_id": 11, "timeslot_id": 1929}, {"lecturer_id": 11, "timeslot_id": 1930}, {"lecturer_id": 11, "timeslot_id": 1932}, {"lecturer_id": 11, "timeslot_id": 1935}, {"lecturer_id": 11, "timeslot_id": 1936}, {"lecturer_id": 11, "timeslot_id": 1937}, {"lecturer_id": 11, "timeslot_id": 1938}, {"lecturer_id": 11, "timeslot_id": 1940}, {"lecturer_id": 11, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1900}, {"lecturer_id": 12, "timeslot_id": 1907}, {"lecturer_id": 12, "timeslot_id": 1909}, {"lecturer_id": 12, "timeslot_id": 1915}, {"lecturer_id": 12, "timeslot_id": 1917}, {"lecturer_id": 12, "timeslot_id": 1919}, {"lecturer_id": 12, "timeslot_id": 1920}, {"lecturer_id": 12, "timeslot_id": 1922}, {"lecturer_id": 12, "timeslot_id": 1925}, {"lecturer_id": 12, "timeslot_id": 1926}, {"lecturer_id": 12, "timeslot_id": 1928}, {"lecturer_id": 12, "timeslot_id": 1929}, {"lecturer_id": 12, "timeslot_id": 1933}, {"lecturer_id": 12, "timeslot_id": 1938}, {"lecturer_id": 12, "timeslot_id": 1939}, {"lecturer_id": 12, "timeslot_id": 1940}, {"lecturer_id": 12, "timeslot_id": 1941}, {"lecturer_id": 12, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1943}, {"lecturer_id": 13, "timeslot_id": 1900}, {"lecturer_id": 13, "timeslot_id": 1903}, {"lecturer_id": 13, "timeslot_id": 1905}, {"lecturer_id": 13, "timeslot_id": 1908}, {"lecturer_id": 13, "timeslot_id": 1910}, {"lecturer_id": 13, "timeslot_id": 1911}, {"lecturer_id": 13, "timeslot_id": 1914}, {"lecturer_id": 13, "timeslot_id": 1916}, {"lecturer_id": 13, "timeslot_id": 1918}, {"lecturer_id": 13, "timeslot_id": 1925}, {"lecturer_id": 13, "timeslot_id": 1927}, {"lecturer_id": 13, "timeslot_id": 1928}, {"lecturer_id": 13, "timeslot_id": 1929}, {"lecturer_id": 13, "timeslot_id": 1931}, {"lecturer_id": 13, "timeslot_id": 1932}, {"lecturer_id": 13, "timeslot_id": 1935}, {"lecturer_id": 13, "timeslot_id": 1936}, {"lecturer_id": 13, "timeslot_id": 1937}, {"lecturer_id": 13, "timeslot_id": 1938}, {"lecturer_id": 13, "timeslot_id": 1939}, {"lecturer_id": 13, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1899}, {"lecturer_id": 14, "timeslot_id": 1900}, {"lecturer_id": 14, "timeslot_id": 1901}, {"lecturer_id": 14, "timeslot_id": 1902}, {"lecturer_id": 14, "timeslot_id": 1903}, {"lecturer_id": 14, "timeslot_id": 1905}, {"lecturer_id": 14, "timeslot_id": 1906}, {"lecturer_id": 14, "timeslot_id": 1908}, {"lecturer_id": 14, "timeslot_id": 1909}, {"lecturer_id": 14, "timeslot_id": 1910}, {"lecturer_id": 14, "timeslot_id": 1911}, {"lecturer_id": 14, "timeslot_id": 1912}, {"lecturer_id": 14, "timeslot_id": 1913}, {"lecturer_id": 14, "timeslot_id": 1914}, {"lecturer_id": 14, "timeslot_id": 1915}, {"lecturer_id": 14, "timeslot_id": 1917}, {"lecturer_id": 14, "timeslot_id": 1918}, {"lecturer_id": 14, "timeslot_id": 1920}, {"lecturer_id": 14, "timeslot_id": 1921}, {"lecturer_id": 14, "timeslot_id": 1922}, {"lecturer_id": 14, "timeslot_id": 1923}, {"lecturer_id": 14, "timeslot_id": 1924}, {"lecturer_id": 14, "timeslot_id": 1925}, {"lecturer_id": 14, "timeslot_id": 1926}, {"lecturer_id": 14, "timeslot_id": 1928}, {"lecturer_id": 14, "timeslot_id": 1929}, {"lecturer_id": 14, "timeslot_id": 1930}, {"lecturer_id": 14, "timeslot_id": 1931}, {"lecturer_id": 14, "timeslot_id": 1932}, {"lecturer_id": 14, "timeslot_id": 1933}, {"lecturer_id": 14, "timeslot_id": 1934}, {"lecturer_id": 14, "timeslot_id": 1935}, {"lecturer_id": 14, "timeslot_id": 1936}, {"lecturer_id": 14, "timeslot_id": 1938}, {"lecturer_id": 14, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1942}, {"lecturer_id": 14, "timeslot_id": 1943}, {"lecturer_id": 15, "timeslot_id": 1899}, {"lecturer_id": 15, "timeslot_id": 1900}, {"lecturer_id": 15, "timeslot_id": 1901}, {"lecturer_id": 15, "timeslot_id": 1902}, {"lecturer_id": 15, "timeslot_id": 1903}, {"lecturer_id": 15, "timeslot_id": 1904}, {"lecturer_id": 15, "timeslot_id": 1905}, {"lecturer_id": 15, "timeslot_id": 1906}, {"lecturer_id": 15, "timeslot_id": 1907}, {"lecturer_id": 15, "timeslot_id": 1908}, {"lecturer_id": 15, "timeslot_id": 1909}, {"lecturer_id": 15, "timeslot_id": 1910}, {"lecturer_id": 15, "timeslot_id": 1911}, {"lecturer_id": 15, "timeslot_id": 1912}, {"lecturer_id": 15, "timeslot_id": 1913}, {"lecturer_id": 15, "timeslot_id": 1914}, {"lecturer_id": 15, "timeslot_id": 1915}, {"lecturer_id": 15, "timeslot_id": 1916}, {"lecturer_id": 15, "timeslot_id": 1917}, {"lecturer_id": 15, "timeslot_id": 1918}, {"lecturer_id": 15, "timeslot_id": 1919}, {"lecturer_id": 15, "timeslot_id": 1920}, {"lecturer_id": 15, "timeslot_id": 1921}, {"lecturer_id": 15, "timeslot_id": 1922}, {"lecturer_id": 15, "timeslot_id": 1923}, {"lecturer_id": 15, "timeslot_id": 1924}, {"lecturer_id": 15, "timeslot_id": 1925}, {"lecturer_id": 15, "timeslot_id": 1926}, {"lecturer_id": 15, "timeslot_id": 1927}, {"lecturer_id": 15, "timeslot_id": 1928}, {"lecturer_id": 15, "timeslot_id": 1929}, {"lecturer_id": 15, "timeslot_id": 1930}, {"lecturer_id": 15, "timeslot_id": 1931}, {"lecturer_id": 15, "timeslot_id": 1932}, {"lecturer_id": 15, "timeslot_id": 1933}, {"lecturer_id": 15, "timeslot_id": 1934}, {"lecturer_id": 15, "timeslot_id": 1935}, {"lecturer_id": 15, "timeslot_id": 1936}, {"lecturer_id": 15, "timeslot_id": 1937}, {"lecturer_id": 15, "timeslot_id": 1938}, {"lecturer_id": 15, "timeslot_id": 1939}, {"lecturer_id": 15, "timeslot_id": 1940}, {"lecturer_id": 15, "timeslot_id": 1941}, {"lecturer_id": 15, "timeslot_id": 1942}, {"lecturer_id": 15, "timeslot_id": 1943}, {"lecturer_id": 16, "timeslot_id": 1900}, {"lecturer_id": 16, "timeslot_id": 1909}, {"lecturer_id": 16, "timeslot_id": 1910}, {"lecturer_id": 16, "timeslot_id": 1912}, {"lecturer_id": 16, "timeslot_id": 1914}, {"lecturer_id": 16, "timeslot_id": 1919}, {"lecturer_id": 16, "timeslot_id": 1921}, {"lecturer_id": 16, "timeslot_id": 1922}, {"lecturer_id": 16, "timeslot_id": 1924}, {"lecturer_id": 16, "timeslot_id": 1926}, {"lecturer_id": 16, "timeslot_id": 1929}, {"lecturer_id": 16, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1899}, {"lecturer_id": 17, "timeslot_id": 1900}, {"lecturer_id": 17, "timeslot_id": 1901}, {"lecturer_id": 17, "timeslot_id": 1902}, {"lecturer_id": 17, "timeslot_id": 1903}, {"lecturer_id": 17, "timeslot_id": 1904}, {"lecturer_id": 17, "timeslot_id": 1905}, {"lecturer_id": 17, "timeslot_id": 1910}, {"lecturer_id": 17, "timeslot_id": 1911}, {"lecturer_id": 17, "timeslot_id": 1912}, {"lecturer_id": 17, "timeslot_id": 1914}, {"lecturer_id": 17, "timeslot_id": 1915}, {"lecturer_id": 17, "timeslot_id": 1916}, {"lecturer_id": 17, "timeslot_id": 1917}, {"lecturer_id": 17, "timeslot_id": 1918}, {"lecturer_id": 17, "timeslot_id": 1919}, {"lecturer_id": 17, "timeslot_id": 1920}, {"lecturer_id": 17, "timeslot_id": 1921}, {"lecturer_id": 17, "timeslot_id": 1922}, {"lecturer_id": 17, "timeslot_id": 1923}, {"lecturer_id": 17, "timeslot_id": 1925}, {"lecturer_id": 17, "timeslot_id": 1926}, {"lecturer_id": 17, "timeslot_id": 1927}, {"lecturer_id": 17, "timeslot_id": 1928}, {"lecturer_id": 17, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1932}, {"lecturer_id": 17, "timeslot_id": 1933}, {"lecturer_id": 17, "timeslot_id": 1934}, {"lecturer_id": 17, "timeslot_id": 1935}, {"lecturer_id": 17, "timeslot_id": 1936}, {"lecturer_id": 17, "timeslot_id": 1938}, {"lecturer_id": 17, "timeslot_id": 1939}, {"lecturer_id": 17, "timeslot_id": 1940}, {"lecturer_id": 17, "timeslot_id": 1941}, {"lecturer_id": 17, "timeslot_id": 1942}, {"lecturer_id": 17, "timeslot_id": 1943}, {"lecturer_id": 18, "timeslot_id": 1900}, {"lecturer_id": 18, "timeslot_id": 1904}, {"lecturer_id": 18, "timeslot_id": 1916}, {"lecturer_id": 18, "timeslot_id": 1921}, {"lecturer_id": 18, "timeslot_id": 1927}, {"lecturer_id": 18, "timeslot_id": 1937}, {"lecturer_id": 18, "timeslot_id": 1938}, {"lecturer_id": 18, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1902}, {"lecturer_id": 19, "timeslot_id": 1903}, {"lecturer_id": 19, "timeslot_id": 1905}, {"lecturer_id": 19, "timeslot_id": 1909}, {"lecturer_id": 19, "timeslot_id": 1910}, {"lecturer_id": 19, "timeslot_id": 1911}, {"lecturer_id": 19, "timeslot_id": 1912}, {"lecturer_id": 19, "timeslot_id": 1915}, {"lecturer_id": 19, "timeslot_id": 1916}, {"lecturer_id": 19, "timeslot_id": 1918}, {"lecturer_id": 19, "timeslot_id": 1920}, {"lecturer_id": 19, "timeslot_id": 1922}, {"lecturer_id": 19, "timeslot_id": 1925}, {"lecturer_id": 19, "timeslot_id": 1926}, {"lecturer_id": 19, "timeslot_id": 1927}, {"lecturer_id": 19, "timeslot_id": 1930}, {"lecturer_id": 19, "timeslot_id": 1931}, {"lecturer_id": 19, "timeslot_id": 1935}, {"lecturer_id": 19, "timeslot_id": 1936}, {"lecturer_id": 19, "timeslot_id": 1937}, {"lecturer_id": 19, "timeslot_id": 1938}, {"lecturer_id": 19, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1940}, {"lecturer_id": 20, "timeslot_id": 1900}, {"lecturer_id": 20, "timeslot_id": 1903}, {"lecturer_id": 20, "timeslot_id": 1910}, {"lecturer_id": 20, "timeslot_id": 1918}, {"lecturer_id": 20, "timeslot_id": 1922}, {"lecturer_id": 20, "timeslot_id": 1923}, {"lecturer_id": 20, "timeslot_id": 1929}, {"lecturer_id": 20, "timeslot_id": 1936}, {"lecturer_id": 20, "timeslot_id": 1939}, {"lecturer_id": 20, "timeslot_id": 1942}, {"lecturer_id": 20, "timeslot_id": 1943}, {"lecturer_id": 21, "timeslot_id": 1899}, {"lecturer_id": 21, "timeslot_id": 1900}, {"lecturer_id": 21, "timeslot_id": 1901}, {"lecturer_id": 21, "timeslot_id": 1902}, {"lecturer_id": 21, "timeslot_id": 1903}, {"lecturer_id": 21, "timeslot_id": 1904}, {"lecturer_id": 21, "timeslot_id": 1905}, {"lecturer_id": 21, "timeslot_id": 1906}, {"lecturer_id": 21, "timeslot_id": 1907}, {"lecturer_id": 21, "timeslot_id": 1908}, {"lecturer_id": 21, "timeslot_id": 1909}, {"lecturer_id": 21, "timeslot_id": 1910}, {"lecturer_id": 21, "timeslot_id": 1911}, {"lecturer_id": 21, "timeslot_id": 1912}, {"lecturer_id": 21, "timeslot_id": 1913}, {"lecturer_id": 21, "timeslot_id": 1914}, {"lecturer_id": 21, "timeslot_id": 1915}, {"lecturer_id": 21, "timeslot_id": 1916}, {"lecturer_id": 21, "timeslot_id": 1917}, {"lecturer_id": 21, "timeslot_id": 1918}, {"lecturer_id": 21, "timeslot_id": 1919}, {"lecturer_id": 21, "timeslot_id": 1920}, {"lecturer_id": 21, "timeslot_id": 1921}, {"lecturer_id": 21, "timeslot_id": 1922}, {"lecturer_id": 21, "timeslot_id": 1923}, {"lecturer_id": 21, "timeslot_id": 1924}, {"lecturer_id": 21, "timeslot_id": 1925}, {"lecturer_id": 21, "timeslot_id": 1926}, {"lecturer_id": 21, "timeslot_id": 1927}, {"lecturer_id": 21, "timeslot_id": 1928}, {"lecturer_id": 21, "timeslot_id": 1929}, {"lecturer_id": 21, "timeslot_id": 1930}, {"lecturer_id": 21, "timeslot_id": 1931}, {"lecturer_id": 21, "timeslot_id": 1932}, {"lecturer_id": 21, "timeslot_id": 1933}, {"lecturer_id": 21, "timeslot_id": 1934}, {"lecturer_id": 21, "timeslot_id": 1935}, {"lecturer_id": 21, "timeslot_id": 1936}, {"lecturer_id": 21, "timeslot_id": 1937}, {"lecturer_id": 21, "timeslot_id": 1938}, {"lecturer_id": 21, "timeslot_id": 1939}, {"lecturer_id": 21, "timeslot_id": 1940}, {"lecturer_id": 21, "timeslot_id": 1941}, {"lecturer_id": 21, "timeslot_id": 1942}, {"lecturer_id": 21, "timeslot_id": 1943}, {"lecturer_id": 22, "timeslot_id": 1899}, {"lecturer_id": 22, "timeslot_id": 1901}, {"lecturer_id": 22, "timeslot_id": 1902}, {"lecturer_id": 22, "timeslot_id": 1903}, {"lecturer_id": 22, "timeslot_id": 1904}, {"lecturer_id": 22, "timeslot_id": 1905}, {"lecturer_id": 22, "timeslot_id": 1906}, {"lecturer_id": 22, "timeslot_id": 1907}, {"lecturer_id": 22, "timeslot_id": 1911}, {"lecturer_id": 22, "timeslot_id": 1912}, {"lecturer_id": 22, "timeslot_id": 1913}, {"lecturer_id": 22, "timeslot_id": 1914}, {"lecturer_id": 22, "timeslot_id": 1915}, {"lecturer_id": 22, "timeslot_id": 1916}, {"lecturer_id": 22, "timeslot_id": 1917}, {"lecturer_id": 22, "timeslot_id": 1918}, {"lecturer_id": 22, "timeslot_id": 1919}, {"lecturer_id": 22, "timeslot_id": 1920}, {"lecturer_id": 22, "timeslot_id": 1921}, {"lecturer_id": 22, "timeslot_id": 1923}, {"lecturer_id": 22, "timeslot_id": 1925}, {"lecturer_id": 22, "timeslot_id": 1926}, {"lecturer_id": 22, "timeslot_id": 1927}, {"lecturer_id": 22, "timeslot_id": 1928}, {"lecturer_id": 22, "timeslot_id": 1929}, {"lecturer_id": 22, "timeslot_id": 1931}, {"lecturer_id": 22, "timeslot_id": 1932}, {"lecturer_id": 22, "timeslot_id": 1933}, {"lecturer_id": 22, "timeslot_id": 1934}, {"lecturer_id": 22, "timeslot_id": 1935}, {"lecturer_id": 22, "timeslot_id": 1936}, {"lecturer_id": 22, "timeslot_id": 1937}, {"lecturer_id": 22, "timeslot_id": 1938}, {"lecturer_id": 22, "timeslot_id": 1939}, {"lecturer_id": 22, "timeslot_id": 1940}, {"lecturer_id": 22, "timeslot_id": 1942}, {"lecturer_id": 22, "timeslot_id": 1943}, {"lecturer_id": 23, "timeslot_id": 1899}, {"lecturer_id": 23, "timeslot_id": 1900}, {"lecturer_id": 23, "timeslot_id": 1901}, {"lecturer_id": 23, "timeslot_id": 1902}, {"lecturer_id": 23, "timeslot_id": 1903}, {"lecturer_id": 23, "timeslot_id": 1904}, {"lecturer_id": 23, "timeslot_id": 1905}, {"lecturer_id": 23, "timeslot_id": 1906}, {"lecturer_id": 23, "timeslot_id": 1907}, {"lecturer_id": 23, "timeslot_id": 1908}, {"lecturer_id": 23, "timeslot_id": 1909}, {"lecturer_id": 23, "timeslot_id": 1910}, {"lecturer_id": 23, "timeslot_id": 1911}, {"lecturer_id": 23, "timeslot_id": 1912}, {"lecturer_id": 23, "timeslot_id": 1913}, {"lecturer_id": 23, "timeslot_id": 1914}, {"lecturer_id": 23, "timeslot_id": 1915}, {"lecturer_id": 23, "timeslot_id": 1916}, {"lecturer_id": 23, "timeslot_id": 1917}, {"lecturer_id": 23, "timeslot_id": 1918}, {"lecturer_id": 23, "timeslot_id": 1919}, {"lecturer_id": 23, "timeslot_id": 1920}, {"lecturer_id": 23, "timeslot_id": 1921}, {"lecturer_id": 23, "timeslot_id": 1922}, {"lecturer_id": 23, "timeslot_id": 1923}, {"lecturer_id": 23, "timeslot_id": 1924}, {"lecturer_id": 23, "timeslot_id": 1925}, {"lecturer_id": 23, "timeslot_id": 1926}, {"lecturer_id": 23, "timeslot_id": 1927}, {"lecturer_id": 23, "timeslot_id": 1928}, {"lecturer_id": 23, "timeslot_id": 1929}, {"lecturer_id": 23, "timeslot_id": 1930}, {"lecturer_id": 23, "timeslot_id": 1931}, {"lecturer_id": 23, "timeslot_id": 1932}, {"lecturer_id": 23, "timeslot_id": 1933}, {"lecturer_id": 23, "timeslot_id": 1934}, {"lecturer_id": 23, "timeslot_id": 1935}, {"lecturer_id": 23, "timeslot_id": 1936}, {"lecturer_id": 23, "timeslot_id": 1937}, {"lecturer_id": 23, "timeslot_id": 1938}, {"lecturer_id": 23, "timeslot_id": 1939}, {"lecturer_id": 23, "timeslot_id": 1940}, {"lecturer_id": 23, "timeslot_id": 1941}, {"lecturer_id": 23, "timeslot_id": 1942}, {"lecturer_id": 23, "timeslot_id": 1943}, {"lecturer_id": 24, "timeslot_id": 1902}, {"lecturer_id": 24, "timeslot_id": 1904}, {"lecturer_id": 24, "timeslot_id": 1905}, {"lecturer_id": 24, "timeslot_id": 1907}, {"lecturer_id": 24, "timeslot_id": 1909}, {"lecturer_id": 24, "timeslot_id": 1911}, {"lecturer_id": 24, "timeslot_id": 1912}, {"lecturer_id": 24, "timeslot_id": 1913}, {"lecturer_id": 24, "timeslot_id": 1916}, {"lecturer_id": 24, "timeslot_id": 1919}, {"lecturer_id": 24, "timeslot_id": 1931}, {"lecturer_id": 24, "timeslot_id": 1932}, {"lecturer_id": 24, "timeslot_id": 1933}, {"lecturer_id": 24, "timeslot_id": 1938}, {"lecturer_id": 25, "timeslot_id": 1914}, {"lecturer_id": 25, "timeslot_id": 1915}, {"lecturer_id": 25, "timeslot_id": 1919}, {"lecturer_id": 25, "timeslot_id": 1921}, {"lecturer_id": 25, "timeslot_id": 1925}, {"lecturer_id": 25, "timeslot_id": 1931}, {"lecturer_id": 25, "timeslot_id": 1937}, {"lecturer_id": 25, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1899}, {"lecturer_id": 26, "timeslot_id": 1900}, {"lecturer_id": 26, "timeslot_id": 1901}, {"lecturer_id": 26, "timeslot_id": 1902}, {"lecturer_id": 26, "timeslot_id": 1903}, {"lecturer_id": 26, "timeslot_id": 1904}, {"lecturer_id": 26, "timeslot_id": 1905}, {"lecturer_id": 26, "timeslot_id": 1906}, {"lecturer_id": 26, "timeslot_id": 1907}, {"lecturer_id": 26, "timeslot_id": 1908}, {"lecturer_id": 26, "timeslot_id": 1909}, {"lecturer_id": 26, "timeslot_id": 1910}, {"lecturer_id": 26, "timeslot_id": 1911}, {"lecturer_id": 26, "timeslot_id": 1912}, {"lecturer_id": 26, "timeslot_id": 1913}, {"lecturer_id": 26, "timeslot_id": 1914}, {"lecturer_id": 26, "timeslot_id": 1915}, {"lecturer_id": 26, "timeslot_id": 1916}, {"lecturer_id": 26, "timeslot_id": 1917}, {"lecturer_id": 26, "timeslot_id": 1918}, {"lecturer_id": 26, "timeslot_id": 1919}, {"lecturer_id": 26, "timeslot_id": 1920}, {"lecturer_id": 26, "timeslot_id": 1921}, {"lecturer_id": 26, "timeslot_id": 1922}, {"lecturer_id": 26, "timeslot_id": 1923}, {"lecturer_id": 26, "timeslot_id": 1924}, {"lecturer_id": 26, "timeslot_id": 1925}, {"lecturer_id": 26, "timeslot_id": 1926}, {"lecturer_id": 26, "timeslot_id": 1927}, {"lecturer_id": 26, "timeslot_id": 1928}, {"lecturer_id": 26, "timeslot_id": 1929}, {"lecturer_id": 26, "timeslot_id": 1930}, {"lecturer_id": 26, "timeslot_id": 1931}, {"lecturer_id": 26, "timeslot_id": 1932}, {"lecturer_id": 26, "timeslot_id": 1933}, {"lecturer_id": 26, "timeslot_id": 1934}, {"lecturer_id": 26, "timeslot_id": 1935}, {"lecturer_id": 26, "timeslot_id": 1936}, {"lecturer_id": 26, "timeslot_id": 1937}, {"lecturer_id": 26, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1939}, {"lecturer_id": 26, "timeslot_id": 1940}, {"lecturer_id": 26, "timeslot_id": 1941}, {"lecturer_id": 26, "timeslot_id": 1942}, {"lecturer_id": 26, "timeslot_id": 1943}, {"lecturer_id": 1090, "timeslot_id": 1899}, {"lecturer_id": 1090, "timeslot_id": 1900}, {"lecturer_id": 1090, "timeslot_id": 1903}, {"lecturer_id": 1090, "timeslot_id": 1904}, {"lecturer_id": 1090, "timeslot_id": 1905}, {"lecturer_id": 1090, "timeslot_id": 1906}, {"lecturer_id": 1090, "timeslot_id": 1908}, {"lecturer_id": 1090, "timeslot_id": 1909}, {"lecturer_id": 1090, "timeslot_id": 1910}, {"lecturer_id": 1090, "timeslot_id": 1912}, {"lecturer_id": 1090, "timeslot_id": 1913}, {"lecturer_id": 1090, "timeslot_id": 1916}, {"lecturer_id": 1090, "timeslot_id": 1917}, {"lecturer_id": 1090, "timeslot_id": 1918}, {"lecturer_id": 1090, "timeslot_id": 1921}, {"lecturer_id": 1090, "timeslot_id": 1922}, {"lecturer_id": 1090, "timeslot_id": 1923}, {"lecturer_id": 1090, "timeslot_id": 1924}, {"lecturer_id": 1090, "timeslot_id": 1925}, {"lecturer_id": 1090, "timeslot_id": 1926}, {"lecturer_id": 1090, "timeslot_id": 1929}, {"lecturer_id": 1090, "timeslot_id": 1931}, {"lecturer_id": 1090, "timeslot_id": 1933}, {"lecturer_id": 1090, "timeslot_id": 1934}, {"lecturer_id": 1090, "timeslot_id": 1935}, {"lecturer_id": 1090, "timeslot_id": 1938}, {"lecturer_id": 1090, "timeslot_id": 1939}, {"lecturer_id": 1090, "timeslot_id": 1940}, {"lecturer_id": 1090, "timeslot_id": 1942}, {"lecturer_id": 1090, "timeslot_id": 1943}], "group_status": {"42": "ELIGIBLE_D12", "44": "ELIGIBLE_D12", "45": "ELIGIBLE_D12", "46": "ELIGIBLE_D12", "48": "ELIGIBLE_D12", "49": "ELIGIBLE_D12", "52": "ELIGIBLE_D12", "55": "ELIGIBLE_D12", "57": "ELIGIBLE_D12", "58": "ELIGIBLE_D12", "59": "ELIGIBLE_D12", "61": "ELIGIBLE_D12", "62": "ELIGIBLE_D12", "65": "ELIGIBLE_D12", "68": "ELIGIBLE_D12", "69": "ELIGIBLE_D12"}, "soft_weights": {}, "group_project": {"42": 43, "44": 51, "45": 38, "46": 54, "48": 48, "49": 57, "52": 35, "55": 44, "57": 61, "58": 63, "59": 66, "61": 64, "62": 59, "65": 65, "68": 40, "69": 71}, "result_owner_mode": false, "project_supervisors": {"35": [4], "38": [7], "40": [4], "43": [9], "44": [4], "48": [1], "51": [7], "54": [12], "57": [15], "59": [17], "61": [4], "63": [4], "64": [19], "65": [4], "66": [20], "71": [22]}, "group_selected_slots": {"42": [1901, 1907, 1923, 1927, 1933, 1936, 1941, 1943], "44": [1904, 1905, 1907, 1911, 1918, 1922, 1925, 1929, 1937], "45": [1901, 1902, 1905, 1935], "46": [1899, 1900, 1906, 1910, 1913, 1930, 1931, 1941], "48": [1901, 1902, 1906, 1914, 1917, 1919, 1928, 1933, 1943], "49": [1904, 1908, 1910, 1924, 1927, 1934, 1938, 1941], "52": [1902, 1906, 1916, 1917, 1928, 1935, 1939, 1943], "55": [1899, 1916, 1928, 1938], "57": [1907, 1924, 1925, 1938, 1943], "58": [1902, 1906, 1936, 1938], "59": [1900, 1906, 1927], "61": [1902, 1905, 1910, 1923, 1924, 1929, 1935, 1943], "62": [1906, 1921, 1922, 1925, 1933], "65": [1921, 1923, 1929, 1930], "68": [1902, 1933, 1936], "69": [1903, 1909, 1911, 1912, 1915, 1918, 1921, 1925, 1938]}, "group_selection_mode": true, "reviewer_assignments": {"42": [4, 3, 10, 13, 14], "44": [13, 14, 15, 1, 9], "45": [15, 17, 1, 2, 9], "46": [1, 4, 8, 9, 11], "48": [16, 8, 11, 12, 17], "49": [10, 17, 18, 1, 2], "52": [12, 17, 2, 6, 10], "55": [3, 7, 13, 2, 6], "57": [5, 15, 17, 1, 2], "58": [18, 3, 6, 11, 12], "59": [2, 3, 5, 6, 8], "61": [4, 13, 16, 9, 10], "62": [15, 3, 5, 6, 8], "65": [12, 16, 10, 13, 14], "68": [1, 7, 9, 11, 14], "69": [4, 7, 11, 14, 15]}, "committee_constraints": [], "expected_reviewer_count": 5, "lecturer_load_preferences": {}, "prior_reviewer_continuity": {}, "committee_constraints_active": false}	{"random_seed": 1642027, "time_limit_seconds": 20.0}	1642027	OPTIMAL	16	{"S1": 0, "S2": 0, "S3": 0, "S4": 8, "S5": 16, "S6": 0, "S7": 80, "S8": 0, "S9": 0}	2	2026-08-22 18:02:39.049961+00	2026-08-22 18:06:42.159027+00
 \.
 
 
 --
--- Data for Name: scheduler_jobs; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: scheduler_jobs; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.scheduler_jobs (id, round_id, status, attempt, idempotency_key, input_snapshot, algorithm_parameters, random_seed, schedule_version_id, error, queued_at, started_at, finished_at) FROM stdin;
-3	164	PARTIAL	1	\N	{"groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "h_rules": {"H11": {"waiver_actors": {}, "waiver_groups": [], "waiver_reasons": {}}, "H12": {"semester_quota": null, "sessions_per_day": 8, "sessions_per_part": 4}}, "round_id": 164, "conflicts": [], "timeslots": [1899, 1900, 1901, 1902, 1903, 1904, 1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1937, 1938, 1939, 1940, 1941, 1942, 1943], "round_type": "DEFENSE_1_2", "unscheduled": [{"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}], "availability": [{"lecturer_id": 1, "timeslot_id": 1899}, {"lecturer_id": 1, "timeslot_id": 1901}, {"lecturer_id": 1, "timeslot_id": 1902}, {"lecturer_id": 1, "timeslot_id": 1903}, {"lecturer_id": 1, "timeslot_id": 1904}, {"lecturer_id": 1, "timeslot_id": 1905}, {"lecturer_id": 1, "timeslot_id": 1906}, {"lecturer_id": 1, "timeslot_id": 1907}, {"lecturer_id": 1, "timeslot_id": 1908}, {"lecturer_id": 1, "timeslot_id": 1910}, {"lecturer_id": 1, "timeslot_id": 1911}, {"lecturer_id": 1, "timeslot_id": 1912}, {"lecturer_id": 1, "timeslot_id": 1913}, {"lecturer_id": 1, "timeslot_id": 1914}, {"lecturer_id": 1, "timeslot_id": 1916}, {"lecturer_id": 1, "timeslot_id": 1917}, {"lecturer_id": 1, "timeslot_id": 1918}, {"lecturer_id": 1, "timeslot_id": 1919}, {"lecturer_id": 1, "timeslot_id": 1920}, {"lecturer_id": 1, "timeslot_id": 1922}, {"lecturer_id": 1, "timeslot_id": 1923}, {"lecturer_id": 1, "timeslot_id": 1924}, {"lecturer_id": 1, "timeslot_id": 1925}, {"lecturer_id": 1, "timeslot_id": 1926}, {"lecturer_id": 1, "timeslot_id": 1927}, {"lecturer_id": 1, "timeslot_id": 1928}, {"lecturer_id": 1, "timeslot_id": 1929}, {"lecturer_id": 1, "timeslot_id": 1930}, {"lecturer_id": 1, "timeslot_id": 1931}, {"lecturer_id": 1, "timeslot_id": 1932}, {"lecturer_id": 1, "timeslot_id": 1933}, {"lecturer_id": 1, "timeslot_id": 1934}, {"lecturer_id": 1, "timeslot_id": 1935}, {"lecturer_id": 1, "timeslot_id": 1937}, {"lecturer_id": 1, "timeslot_id": 1938}, {"lecturer_id": 1, "timeslot_id": 1939}, {"lecturer_id": 1, "timeslot_id": 1941}, {"lecturer_id": 1, "timeslot_id": 1943}, {"lecturer_id": 2, "timeslot_id": 1899}, {"lecturer_id": 2, "timeslot_id": 1900}, {"lecturer_id": 2, "timeslot_id": 1904}, {"lecturer_id": 2, "timeslot_id": 1905}, {"lecturer_id": 2, "timeslot_id": 1907}, {"lecturer_id": 2, "timeslot_id": 1908}, {"lecturer_id": 2, "timeslot_id": 1914}, {"lecturer_id": 2, "timeslot_id": 1916}, {"lecturer_id": 2, "timeslot_id": 1917}, {"lecturer_id": 2, "timeslot_id": 1918}, {"lecturer_id": 2, "timeslot_id": 1920}, {"lecturer_id": 2, "timeslot_id": 1921}, {"lecturer_id": 2, "timeslot_id": 1924}, {"lecturer_id": 2, "timeslot_id": 1925}, {"lecturer_id": 2, "timeslot_id": 1928}, {"lecturer_id": 2, "timeslot_id": 1932}, {"lecturer_id": 2, "timeslot_id": 1933}, {"lecturer_id": 2, "timeslot_id": 1935}, {"lecturer_id": 2, "timeslot_id": 1936}, {"lecturer_id": 2, "timeslot_id": 1938}, {"lecturer_id": 2, "timeslot_id": 1940}, {"lecturer_id": 2, "timeslot_id": 1941}, {"lecturer_id": 2, "timeslot_id": 1942}, {"lecturer_id": 2, "timeslot_id": 1943}, {"lecturer_id": 3, "timeslot_id": 1900}, {"lecturer_id": 3, "timeslot_id": 1901}, {"lecturer_id": 3, "timeslot_id": 1902}, {"lecturer_id": 3, "timeslot_id": 1906}, {"lecturer_id": 3, "timeslot_id": 1912}, {"lecturer_id": 3, "timeslot_id": 1915}, {"lecturer_id": 3, "timeslot_id": 1923}, {"lecturer_id": 3, "timeslot_id": 1925}, {"lecturer_id": 3, "timeslot_id": 1928}, {"lecturer_id": 3, "timeslot_id": 1938}, {"lecturer_id": 3, "timeslot_id": 1941}, {"lecturer_id": 3, "timeslot_id": 1942}, {"lecturer_id": 3, "timeslot_id": 1943}, {"lecturer_id": 4, "timeslot_id": 1902}, {"lecturer_id": 4, "timeslot_id": 1910}, {"lecturer_id": 4, "timeslot_id": 1912}, {"lecturer_id": 4, "timeslot_id": 1913}, {"lecturer_id": 4, "timeslot_id": 1923}, {"lecturer_id": 4, "timeslot_id": 1931}, {"lecturer_id": 4, "timeslot_id": 1941}, {"lecturer_id": 4, "timeslot_id": 1943}, {"lecturer_id": 5, "timeslot_id": 1899}, {"lecturer_id": 5, "timeslot_id": 1900}, {"lecturer_id": 5, "timeslot_id": 1902}, {"lecturer_id": 5, "timeslot_id": 1904}, {"lecturer_id": 5, "timeslot_id": 1906}, {"lecturer_id": 5, "timeslot_id": 1907}, {"lecturer_id": 5, "timeslot_id": 1922}, {"lecturer_id": 5, "timeslot_id": 1939}, {"lecturer_id": 5, "timeslot_id": 1942}, {"lecturer_id": 5, "timeslot_id": 1943}, {"lecturer_id": 6, "timeslot_id": 1900}, {"lecturer_id": 6, "timeslot_id": 1902}, {"lecturer_id": 6, "timeslot_id": 1903}, {"lecturer_id": 6, "timeslot_id": 1906}, {"lecturer_id": 6, "timeslot_id": 1908}, {"lecturer_id": 6, "timeslot_id": 1911}, {"lecturer_id": 6, "timeslot_id": 1912}, {"lecturer_id": 6, "timeslot_id": 1917}, {"lecturer_id": 6, "timeslot_id": 1918}, {"lecturer_id": 6, "timeslot_id": 1919}, {"lecturer_id": 6, "timeslot_id": 1920}, {"lecturer_id": 6, "timeslot_id": 1923}, {"lecturer_id": 6, "timeslot_id": 1924}, {"lecturer_id": 6, "timeslot_id": 1925}, {"lecturer_id": 6, "timeslot_id": 1926}, {"lecturer_id": 6, "timeslot_id": 1927}, {"lecturer_id": 6, "timeslot_id": 1928}, {"lecturer_id": 6, "timeslot_id": 1929}, {"lecturer_id": 6, "timeslot_id": 1932}, {"lecturer_id": 6, "timeslot_id": 1936}, {"lecturer_id": 6, "timeslot_id": 1937}, {"lecturer_id": 6, "timeslot_id": 1938}, {"lecturer_id": 6, "timeslot_id": 1939}, {"lecturer_id": 6, "timeslot_id": 1940}, {"lecturer_id": 6, "timeslot_id": 1941}, {"lecturer_id": 7, "timeslot_id": 1901}, {"lecturer_id": 7, "timeslot_id": 1902}, {"lecturer_id": 7, "timeslot_id": 1904}, {"lecturer_id": 7, "timeslot_id": 1911}, {"lecturer_id": 7, "timeslot_id": 1912}, {"lecturer_id": 7, "timeslot_id": 1915}, {"lecturer_id": 7, "timeslot_id": 1916}, {"lecturer_id": 7, "timeslot_id": 1918}, {"lecturer_id": 7, "timeslot_id": 1920}, {"lecturer_id": 7, "timeslot_id": 1921}, {"lecturer_id": 7, "timeslot_id": 1922}, {"lecturer_id": 7, "timeslot_id": 1923}, {"lecturer_id": 7, "timeslot_id": 1924}, {"lecturer_id": 7, "timeslot_id": 1925}, {"lecturer_id": 7, "timeslot_id": 1928}, {"lecturer_id": 7, "timeslot_id": 1930}, {"lecturer_id": 7, "timeslot_id": 1931}, {"lecturer_id": 7, "timeslot_id": 1932}, {"lecturer_id": 7, "timeslot_id": 1933}, {"lecturer_id": 7, "timeslot_id": 1934}, {"lecturer_id": 7, "timeslot_id": 1937}, {"lecturer_id": 7, "timeslot_id": 1939}, {"lecturer_id": 7, "timeslot_id": 1940}, {"lecturer_id": 7, "timeslot_id": 1942}, {"lecturer_id": 8, "timeslot_id": 1900}, {"lecturer_id": 8, "timeslot_id": 1903}, {"lecturer_id": 8, "timeslot_id": 1905}, {"lecturer_id": 8, "timeslot_id": 1906}, {"lecturer_id": 8, "timeslot_id": 1908}, {"lecturer_id": 8, "timeslot_id": 1911}, {"lecturer_id": 8, "timeslot_id": 1913}, {"lecturer_id": 8, "timeslot_id": 1915}, {"lecturer_id": 8, "timeslot_id": 1919}, {"lecturer_id": 8, "timeslot_id": 1927}, {"lecturer_id": 8, "timeslot_id": 1934}, {"lecturer_id": 8, "timeslot_id": 1936}, {"lecturer_id": 8, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1899}, {"lecturer_id": 9, "timeslot_id": 1900}, {"lecturer_id": 9, "timeslot_id": 1901}, {"lecturer_id": 9, "timeslot_id": 1902}, {"lecturer_id": 9, "timeslot_id": 1903}, {"lecturer_id": 9, "timeslot_id": 1904}, {"lecturer_id": 9, "timeslot_id": 1905}, {"lecturer_id": 9, "timeslot_id": 1906}, {"lecturer_id": 9, "timeslot_id": 1907}, {"lecturer_id": 9, "timeslot_id": 1908}, {"lecturer_id": 9, "timeslot_id": 1909}, {"lecturer_id": 9, "timeslot_id": 1910}, {"lecturer_id": 9, "timeslot_id": 1911}, {"lecturer_id": 9, "timeslot_id": 1912}, {"lecturer_id": 9, "timeslot_id": 1913}, {"lecturer_id": 9, "timeslot_id": 1914}, {"lecturer_id": 9, "timeslot_id": 1915}, {"lecturer_id": 9, "timeslot_id": 1916}, {"lecturer_id": 9, "timeslot_id": 1917}, {"lecturer_id": 9, "timeslot_id": 1918}, {"lecturer_id": 9, "timeslot_id": 1919}, {"lecturer_id": 9, "timeslot_id": 1920}, {"lecturer_id": 9, "timeslot_id": 1921}, {"lecturer_id": 9, "timeslot_id": 1922}, {"lecturer_id": 9, "timeslot_id": 1923}, {"lecturer_id": 9, "timeslot_id": 1924}, {"lecturer_id": 9, "timeslot_id": 1925}, {"lecturer_id": 9, "timeslot_id": 1926}, {"lecturer_id": 9, "timeslot_id": 1927}, {"lecturer_id": 9, "timeslot_id": 1928}, {"lecturer_id": 9, "timeslot_id": 1929}, {"lecturer_id": 9, "timeslot_id": 1930}, {"lecturer_id": 9, "timeslot_id": 1931}, {"lecturer_id": 9, "timeslot_id": 1932}, {"lecturer_id": 9, "timeslot_id": 1933}, {"lecturer_id": 9, "timeslot_id": 1934}, {"lecturer_id": 9, "timeslot_id": 1935}, {"lecturer_id": 9, "timeslot_id": 1936}, {"lecturer_id": 9, "timeslot_id": 1937}, {"lecturer_id": 9, "timeslot_id": 1938}, {"lecturer_id": 9, "timeslot_id": 1939}, {"lecturer_id": 9, "timeslot_id": 1940}, {"lecturer_id": 9, "timeslot_id": 1941}, {"lecturer_id": 9, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1943}, {"lecturer_id": 10, "timeslot_id": 1899}, {"lecturer_id": 10, "timeslot_id": 1900}, {"lecturer_id": 10, "timeslot_id": 1901}, {"lecturer_id": 10, "timeslot_id": 1904}, {"lecturer_id": 10, "timeslot_id": 1906}, {"lecturer_id": 10, "timeslot_id": 1907}, {"lecturer_id": 10, "timeslot_id": 1909}, {"lecturer_id": 10, "timeslot_id": 1910}, {"lecturer_id": 10, "timeslot_id": 1912}, {"lecturer_id": 10, "timeslot_id": 1914}, {"lecturer_id": 10, "timeslot_id": 1915}, {"lecturer_id": 10, "timeslot_id": 1917}, {"lecturer_id": 10, "timeslot_id": 1918}, {"lecturer_id": 10, "timeslot_id": 1919}, {"lecturer_id": 10, "timeslot_id": 1920}, {"lecturer_id": 10, "timeslot_id": 1921}, {"lecturer_id": 10, "timeslot_id": 1924}, {"lecturer_id": 10, "timeslot_id": 1925}, {"lecturer_id": 10, "timeslot_id": 1926}, {"lecturer_id": 10, "timeslot_id": 1927}, {"lecturer_id": 10, "timeslot_id": 1929}, {"lecturer_id": 10, "timeslot_id": 1930}, {"lecturer_id": 10, "timeslot_id": 1932}, {"lecturer_id": 10, "timeslot_id": 1935}, {"lecturer_id": 10, "timeslot_id": 1937}, {"lecturer_id": 10, "timeslot_id": 1940}, {"lecturer_id": 10, "timeslot_id": 1941}, {"lecturer_id": 11, "timeslot_id": 1900}, {"lecturer_id": 11, "timeslot_id": 1901}, {"lecturer_id": 11, "timeslot_id": 1902}, {"lecturer_id": 11, "timeslot_id": 1904}, {"lecturer_id": 11, "timeslot_id": 1906}, {"lecturer_id": 11, "timeslot_id": 1907}, {"lecturer_id": 11, "timeslot_id": 1909}, {"lecturer_id": 11, "timeslot_id": 1910}, {"lecturer_id": 11, "timeslot_id": 1912}, {"lecturer_id": 11, "timeslot_id": 1913}, {"lecturer_id": 11, "timeslot_id": 1915}, {"lecturer_id": 11, "timeslot_id": 1919}, {"lecturer_id": 11, "timeslot_id": 1920}, {"lecturer_id": 11, "timeslot_id": 1921}, {"lecturer_id": 11, "timeslot_id": 1922}, {"lecturer_id": 11, "timeslot_id": 1923}, {"lecturer_id": 11, "timeslot_id": 1924}, {"lecturer_id": 11, "timeslot_id": 1926}, {"lecturer_id": 11, "timeslot_id": 1927}, {"lecturer_id": 11, "timeslot_id": 1929}, {"lecturer_id": 11, "timeslot_id": 1930}, {"lecturer_id": 11, "timeslot_id": 1932}, {"lecturer_id": 11, "timeslot_id": 1935}, {"lecturer_id": 11, "timeslot_id": 1936}, {"lecturer_id": 11, "timeslot_id": 1937}, {"lecturer_id": 11, "timeslot_id": 1938}, {"lecturer_id": 11, "timeslot_id": 1940}, {"lecturer_id": 11, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1900}, {"lecturer_id": 12, "timeslot_id": 1907}, {"lecturer_id": 12, "timeslot_id": 1909}, {"lecturer_id": 12, "timeslot_id": 1915}, {"lecturer_id": 12, "timeslot_id": 1917}, {"lecturer_id": 12, "timeslot_id": 1919}, {"lecturer_id": 12, "timeslot_id": 1920}, {"lecturer_id": 12, "timeslot_id": 1922}, {"lecturer_id": 12, "timeslot_id": 1925}, {"lecturer_id": 12, "timeslot_id": 1926}, {"lecturer_id": 12, "timeslot_id": 1928}, {"lecturer_id": 12, "timeslot_id": 1929}, {"lecturer_id": 12, "timeslot_id": 1933}, {"lecturer_id": 12, "timeslot_id": 1938}, {"lecturer_id": 12, "timeslot_id": 1939}, {"lecturer_id": 12, "timeslot_id": 1940}, {"lecturer_id": 12, "timeslot_id": 1941}, {"lecturer_id": 12, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1943}, {"lecturer_id": 13, "timeslot_id": 1900}, {"lecturer_id": 13, "timeslot_id": 1903}, {"lecturer_id": 13, "timeslot_id": 1905}, {"lecturer_id": 13, "timeslot_id": 1908}, {"lecturer_id": 13, "timeslot_id": 1910}, {"lecturer_id": 13, "timeslot_id": 1911}, {"lecturer_id": 13, "timeslot_id": 1914}, {"lecturer_id": 13, "timeslot_id": 1916}, {"lecturer_id": 13, "timeslot_id": 1918}, {"lecturer_id": 13, "timeslot_id": 1925}, {"lecturer_id": 13, "timeslot_id": 1927}, {"lecturer_id": 13, "timeslot_id": 1928}, {"lecturer_id": 13, "timeslot_id": 1929}, {"lecturer_id": 13, "timeslot_id": 1931}, {"lecturer_id": 13, "timeslot_id": 1932}, {"lecturer_id": 13, "timeslot_id": 1935}, {"lecturer_id": 13, "timeslot_id": 1936}, {"lecturer_id": 13, "timeslot_id": 1937}, {"lecturer_id": 13, "timeslot_id": 1938}, {"lecturer_id": 13, "timeslot_id": 1939}, {"lecturer_id": 13, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1899}, {"lecturer_id": 14, "timeslot_id": 1900}, {"lecturer_id": 14, "timeslot_id": 1901}, {"lecturer_id": 14, "timeslot_id": 1902}, {"lecturer_id": 14, "timeslot_id": 1903}, {"lecturer_id": 14, "timeslot_id": 1905}, {"lecturer_id": 14, "timeslot_id": 1906}, {"lecturer_id": 14, "timeslot_id": 1908}, {"lecturer_id": 14, "timeslot_id": 1909}, {"lecturer_id": 14, "timeslot_id": 1910}, {"lecturer_id": 14, "timeslot_id": 1911}, {"lecturer_id": 14, "timeslot_id": 1912}, {"lecturer_id": 14, "timeslot_id": 1913}, {"lecturer_id": 14, "timeslot_id": 1914}, {"lecturer_id": 14, "timeslot_id": 1915}, {"lecturer_id": 14, "timeslot_id": 1917}, {"lecturer_id": 14, "timeslot_id": 1918}, {"lecturer_id": 14, "timeslot_id": 1920}, {"lecturer_id": 14, "timeslot_id": 1921}, {"lecturer_id": 14, "timeslot_id": 1922}, {"lecturer_id": 14, "timeslot_id": 1923}, {"lecturer_id": 14, "timeslot_id": 1924}, {"lecturer_id": 14, "timeslot_id": 1925}, {"lecturer_id": 14, "timeslot_id": 1926}, {"lecturer_id": 14, "timeslot_id": 1928}, {"lecturer_id": 14, "timeslot_id": 1929}, {"lecturer_id": 14, "timeslot_id": 1930}, {"lecturer_id": 14, "timeslot_id": 1931}, {"lecturer_id": 14, "timeslot_id": 1932}, {"lecturer_id": 14, "timeslot_id": 1933}, {"lecturer_id": 14, "timeslot_id": 1934}, {"lecturer_id": 14, "timeslot_id": 1935}, {"lecturer_id": 14, "timeslot_id": 1936}, {"lecturer_id": 14, "timeslot_id": 1938}, {"lecturer_id": 14, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1942}, {"lecturer_id": 14, "timeslot_id": 1943}, {"lecturer_id": 15, "timeslot_id": 1899}, {"lecturer_id": 15, "timeslot_id": 1900}, {"lecturer_id": 15, "timeslot_id": 1901}, {"lecturer_id": 15, "timeslot_id": 1902}, {"lecturer_id": 15, "timeslot_id": 1903}, {"lecturer_id": 15, "timeslot_id": 1904}, {"lecturer_id": 15, "timeslot_id": 1905}, {"lecturer_id": 15, "timeslot_id": 1906}, {"lecturer_id": 15, "timeslot_id": 1907}, {"lecturer_id": 15, "timeslot_id": 1908}, {"lecturer_id": 15, "timeslot_id": 1909}, {"lecturer_id": 15, "timeslot_id": 1910}, {"lecturer_id": 15, "timeslot_id": 1911}, {"lecturer_id": 15, "timeslot_id": 1912}, {"lecturer_id": 15, "timeslot_id": 1913}, {"lecturer_id": 15, "timeslot_id": 1914}, {"lecturer_id": 15, "timeslot_id": 1915}, {"lecturer_id": 15, "timeslot_id": 1916}, {"lecturer_id": 15, "timeslot_id": 1917}, {"lecturer_id": 15, "timeslot_id": 1918}, {"lecturer_id": 15, "timeslot_id": 1919}, {"lecturer_id": 15, "timeslot_id": 1920}, {"lecturer_id": 15, "timeslot_id": 1921}, {"lecturer_id": 15, "timeslot_id": 1922}, {"lecturer_id": 15, "timeslot_id": 1923}, {"lecturer_id": 15, "timeslot_id": 1924}, {"lecturer_id": 15, "timeslot_id": 1925}, {"lecturer_id": 15, "timeslot_id": 1926}, {"lecturer_id": 15, "timeslot_id": 1927}, {"lecturer_id": 15, "timeslot_id": 1928}, {"lecturer_id": 15, "timeslot_id": 1929}, {"lecturer_id": 15, "timeslot_id": 1930}, {"lecturer_id": 15, "timeslot_id": 1931}, {"lecturer_id": 15, "timeslot_id": 1932}, {"lecturer_id": 15, "timeslot_id": 1933}, {"lecturer_id": 15, "timeslot_id": 1934}, {"lecturer_id": 15, "timeslot_id": 1935}, {"lecturer_id": 15, "timeslot_id": 1936}, {"lecturer_id": 15, "timeslot_id": 1937}, {"lecturer_id": 15, "timeslot_id": 1938}, {"lecturer_id": 15, "timeslot_id": 1939}, {"lecturer_id": 15, "timeslot_id": 1940}, {"lecturer_id": 15, "timeslot_id": 1941}, {"lecturer_id": 15, "timeslot_id": 1942}, {"lecturer_id": 15, "timeslot_id": 1943}, {"lecturer_id": 16, "timeslot_id": 1900}, {"lecturer_id": 16, "timeslot_id": 1909}, {"lecturer_id": 16, "timeslot_id": 1910}, {"lecturer_id": 16, "timeslot_id": 1912}, {"lecturer_id": 16, "timeslot_id": 1914}, {"lecturer_id": 16, "timeslot_id": 1919}, {"lecturer_id": 16, "timeslot_id": 1921}, {"lecturer_id": 16, "timeslot_id": 1922}, {"lecturer_id": 16, "timeslot_id": 1924}, {"lecturer_id": 16, "timeslot_id": 1926}, {"lecturer_id": 16, "timeslot_id": 1929}, {"lecturer_id": 16, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1899}, {"lecturer_id": 17, "timeslot_id": 1900}, {"lecturer_id": 17, "timeslot_id": 1901}, {"lecturer_id": 17, "timeslot_id": 1902}, {"lecturer_id": 17, "timeslot_id": 1903}, {"lecturer_id": 17, "timeslot_id": 1904}, {"lecturer_id": 17, "timeslot_id": 1905}, {"lecturer_id": 17, "timeslot_id": 1910}, {"lecturer_id": 17, "timeslot_id": 1911}, {"lecturer_id": 17, "timeslot_id": 1912}, {"lecturer_id": 17, "timeslot_id": 1914}, {"lecturer_id": 17, "timeslot_id": 1915}, {"lecturer_id": 17, "timeslot_id": 1916}, {"lecturer_id": 17, "timeslot_id": 1917}, {"lecturer_id": 17, "timeslot_id": 1918}, {"lecturer_id": 17, "timeslot_id": 1919}, {"lecturer_id": 17, "timeslot_id": 1920}, {"lecturer_id": 17, "timeslot_id": 1921}, {"lecturer_id": 17, "timeslot_id": 1922}, {"lecturer_id": 17, "timeslot_id": 1923}, {"lecturer_id": 17, "timeslot_id": 1925}, {"lecturer_id": 17, "timeslot_id": 1926}, {"lecturer_id": 17, "timeslot_id": 1927}, {"lecturer_id": 17, "timeslot_id": 1928}, {"lecturer_id": 17, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1932}, {"lecturer_id": 17, "timeslot_id": 1933}, {"lecturer_id": 17, "timeslot_id": 1934}, {"lecturer_id": 17, "timeslot_id": 1935}, {"lecturer_id": 17, "timeslot_id": 1936}, {"lecturer_id": 17, "timeslot_id": 1938}, {"lecturer_id": 17, "timeslot_id": 1939}, {"lecturer_id": 17, "timeslot_id": 1940}, {"lecturer_id": 17, "timeslot_id": 1941}, {"lecturer_id": 17, "timeslot_id": 1942}, {"lecturer_id": 17, "timeslot_id": 1943}, {"lecturer_id": 18, "timeslot_id": 1900}, {"lecturer_id": 18, "timeslot_id": 1904}, {"lecturer_id": 18, "timeslot_id": 1916}, {"lecturer_id": 18, "timeslot_id": 1921}, {"lecturer_id": 18, "timeslot_id": 1927}, {"lecturer_id": 18, "timeslot_id": 1937}, {"lecturer_id": 18, "timeslot_id": 1938}, {"lecturer_id": 18, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1902}, {"lecturer_id": 19, "timeslot_id": 1903}, {"lecturer_id": 19, "timeslot_id": 1905}, {"lecturer_id": 19, "timeslot_id": 1909}, {"lecturer_id": 19, "timeslot_id": 1910}, {"lecturer_id": 19, "timeslot_id": 1911}, {"lecturer_id": 19, "timeslot_id": 1912}, {"lecturer_id": 19, "timeslot_id": 1915}, {"lecturer_id": 19, "timeslot_id": 1916}, {"lecturer_id": 19, "timeslot_id": 1918}, {"lecturer_id": 19, "timeslot_id": 1920}, {"lecturer_id": 19, "timeslot_id": 1922}, {"lecturer_id": 19, "timeslot_id": 1925}, {"lecturer_id": 19, "timeslot_id": 1926}, {"lecturer_id": 19, "timeslot_id": 1927}, {"lecturer_id": 19, "timeslot_id": 1930}, {"lecturer_id": 19, "timeslot_id": 1931}, {"lecturer_id": 19, "timeslot_id": 1935}, {"lecturer_id": 19, "timeslot_id": 1936}, {"lecturer_id": 19, "timeslot_id": 1937}, {"lecturer_id": 19, "timeslot_id": 1938}, {"lecturer_id": 19, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1940}, {"lecturer_id": 20, "timeslot_id": 1900}, {"lecturer_id": 20, "timeslot_id": 1903}, {"lecturer_id": 20, "timeslot_id": 1910}, {"lecturer_id": 20, "timeslot_id": 1918}, {"lecturer_id": 20, "timeslot_id": 1922}, {"lecturer_id": 20, "timeslot_id": 1923}, {"lecturer_id": 20, "timeslot_id": 1929}, {"lecturer_id": 20, "timeslot_id": 1936}, {"lecturer_id": 20, "timeslot_id": 1939}, {"lecturer_id": 20, "timeslot_id": 1942}, {"lecturer_id": 20, "timeslot_id": 1943}, {"lecturer_id": 21, "timeslot_id": 1899}, {"lecturer_id": 21, "timeslot_id": 1900}, {"lecturer_id": 21, "timeslot_id": 1901}, {"lecturer_id": 21, "timeslot_id": 1902}, {"lecturer_id": 21, "timeslot_id": 1903}, {"lecturer_id": 21, "timeslot_id": 1904}, {"lecturer_id": 21, "timeslot_id": 1905}, {"lecturer_id": 21, "timeslot_id": 1906}, {"lecturer_id": 21, "timeslot_id": 1907}, {"lecturer_id": 21, "timeslot_id": 1908}, {"lecturer_id": 21, "timeslot_id": 1909}, {"lecturer_id": 21, "timeslot_id": 1910}, {"lecturer_id": 21, "timeslot_id": 1911}, {"lecturer_id": 21, "timeslot_id": 1912}, {"lecturer_id": 21, "timeslot_id": 1913}, {"lecturer_id": 21, "timeslot_id": 1914}, {"lecturer_id": 21, "timeslot_id": 1915}, {"lecturer_id": 21, "timeslot_id": 1916}, {"lecturer_id": 21, "timeslot_id": 1917}, {"lecturer_id": 21, "timeslot_id": 1918}, {"lecturer_id": 21, "timeslot_id": 1919}, {"lecturer_id": 21, "timeslot_id": 1920}, {"lecturer_id": 21, "timeslot_id": 1921}, {"lecturer_id": 21, "timeslot_id": 1922}, {"lecturer_id": 21, "timeslot_id": 1923}, {"lecturer_id": 21, "timeslot_id": 1924}, {"lecturer_id": 21, "timeslot_id": 1925}, {"lecturer_id": 21, "timeslot_id": 1926}, {"lecturer_id": 21, "timeslot_id": 1927}, {"lecturer_id": 21, "timeslot_id": 1928}, {"lecturer_id": 21, "timeslot_id": 1929}, {"lecturer_id": 21, "timeslot_id": 1930}, {"lecturer_id": 21, "timeslot_id": 1931}, {"lecturer_id": 21, "timeslot_id": 1932}, {"lecturer_id": 21, "timeslot_id": 1933}, {"lecturer_id": 21, "timeslot_id": 1934}, {"lecturer_id": 21, "timeslot_id": 1935}, {"lecturer_id": 21, "timeslot_id": 1936}, {"lecturer_id": 21, "timeslot_id": 1937}, {"lecturer_id": 21, "timeslot_id": 1938}, {"lecturer_id": 21, "timeslot_id": 1939}, {"lecturer_id": 21, "timeslot_id": 1940}, {"lecturer_id": 21, "timeslot_id": 1941}, {"lecturer_id": 21, "timeslot_id": 1942}, {"lecturer_id": 21, "timeslot_id": 1943}, {"lecturer_id": 22, "timeslot_id": 1899}, {"lecturer_id": 22, "timeslot_id": 1901}, {"lecturer_id": 22, "timeslot_id": 1902}, {"lecturer_id": 22, "timeslot_id": 1903}, {"lecturer_id": 22, "timeslot_id": 1904}, {"lecturer_id": 22, "timeslot_id": 1905}, {"lecturer_id": 22, "timeslot_id": 1906}, {"lecturer_id": 22, "timeslot_id": 1907}, {"lecturer_id": 22, "timeslot_id": 1911}, {"lecturer_id": 22, "timeslot_id": 1912}, {"lecturer_id": 22, "timeslot_id": 1913}, {"lecturer_id": 22, "timeslot_id": 1914}, {"lecturer_id": 22, "timeslot_id": 1915}, {"lecturer_id": 22, "timeslot_id": 1916}, {"lecturer_id": 22, "timeslot_id": 1917}, {"lecturer_id": 22, "timeslot_id": 1918}, {"lecturer_id": 22, "timeslot_id": 1919}, {"lecturer_id": 22, "timeslot_id": 1920}, {"lecturer_id": 22, "timeslot_id": 1921}, {"lecturer_id": 22, "timeslot_id": 1923}, {"lecturer_id": 22, "timeslot_id": 1925}, {"lecturer_id": 22, "timeslot_id": 1926}, {"lecturer_id": 22, "timeslot_id": 1927}, {"lecturer_id": 22, "timeslot_id": 1928}, {"lecturer_id": 22, "timeslot_id": 1929}, {"lecturer_id": 22, "timeslot_id": 1931}, {"lecturer_id": 22, "timeslot_id": 1932}, {"lecturer_id": 22, "timeslot_id": 1933}, {"lecturer_id": 22, "timeslot_id": 1934}, {"lecturer_id": 22, "timeslot_id": 1935}, {"lecturer_id": 22, "timeslot_id": 1936}, {"lecturer_id": 22, "timeslot_id": 1937}, {"lecturer_id": 22, "timeslot_id": 1938}, {"lecturer_id": 22, "timeslot_id": 1939}, {"lecturer_id": 22, "timeslot_id": 1940}, {"lecturer_id": 22, "timeslot_id": 1942}, {"lecturer_id": 22, "timeslot_id": 1943}, {"lecturer_id": 23, "timeslot_id": 1899}, {"lecturer_id": 23, "timeslot_id": 1900}, {"lecturer_id": 23, "timeslot_id": 1901}, {"lecturer_id": 23, "timeslot_id": 1902}, {"lecturer_id": 23, "timeslot_id": 1903}, {"lecturer_id": 23, "timeslot_id": 1904}, {"lecturer_id": 23, "timeslot_id": 1905}, {"lecturer_id": 23, "timeslot_id": 1906}, {"lecturer_id": 23, "timeslot_id": 1907}, {"lecturer_id": 23, "timeslot_id": 1908}, {"lecturer_id": 23, "timeslot_id": 1909}, {"lecturer_id": 23, "timeslot_id": 1910}, {"lecturer_id": 23, "timeslot_id": 1911}, {"lecturer_id": 23, "timeslot_id": 1912}, {"lecturer_id": 23, "timeslot_id": 1913}, {"lecturer_id": 23, "timeslot_id": 1914}, {"lecturer_id": 23, "timeslot_id": 1915}, {"lecturer_id": 23, "timeslot_id": 1916}, {"lecturer_id": 23, "timeslot_id": 1917}, {"lecturer_id": 23, "timeslot_id": 1918}, {"lecturer_id": 23, "timeslot_id": 1919}, {"lecturer_id": 23, "timeslot_id": 1920}, {"lecturer_id": 23, "timeslot_id": 1921}, {"lecturer_id": 23, "timeslot_id": 1922}, {"lecturer_id": 23, "timeslot_id": 1923}, {"lecturer_id": 23, "timeslot_id": 1924}, {"lecturer_id": 23, "timeslot_id": 1925}, {"lecturer_id": 23, "timeslot_id": 1926}, {"lecturer_id": 23, "timeslot_id": 1927}, {"lecturer_id": 23, "timeslot_id": 1928}, {"lecturer_id": 23, "timeslot_id": 1929}, {"lecturer_id": 23, "timeslot_id": 1930}, {"lecturer_id": 23, "timeslot_id": 1931}, {"lecturer_id": 23, "timeslot_id": 1932}, {"lecturer_id": 23, "timeslot_id": 1933}, {"lecturer_id": 23, "timeslot_id": 1934}, {"lecturer_id": 23, "timeslot_id": 1935}, {"lecturer_id": 23, "timeslot_id": 1936}, {"lecturer_id": 23, "timeslot_id": 1937}, {"lecturer_id": 23, "timeslot_id": 1938}, {"lecturer_id": 23, "timeslot_id": 1939}, {"lecturer_id": 23, "timeslot_id": 1940}, {"lecturer_id": 23, "timeslot_id": 1941}, {"lecturer_id": 23, "timeslot_id": 1942}, {"lecturer_id": 23, "timeslot_id": 1943}, {"lecturer_id": 24, "timeslot_id": 1902}, {"lecturer_id": 24, "timeslot_id": 1904}, {"lecturer_id": 24, "timeslot_id": 1905}, {"lecturer_id": 24, "timeslot_id": 1907}, {"lecturer_id": 24, "timeslot_id": 1909}, {"lecturer_id": 24, "timeslot_id": 1911}, {"lecturer_id": 24, "timeslot_id": 1912}, {"lecturer_id": 24, "timeslot_id": 1913}, {"lecturer_id": 24, "timeslot_id": 1916}, {"lecturer_id": 24, "timeslot_id": 1919}, {"lecturer_id": 24, "timeslot_id": 1931}, {"lecturer_id": 24, "timeslot_id": 1932}, {"lecturer_id": 24, "timeslot_id": 1933}, {"lecturer_id": 24, "timeslot_id": 1938}, {"lecturer_id": 25, "timeslot_id": 1914}, {"lecturer_id": 25, "timeslot_id": 1915}, {"lecturer_id": 25, "timeslot_id": 1919}, {"lecturer_id": 25, "timeslot_id": 1921}, {"lecturer_id": 25, "timeslot_id": 1925}, {"lecturer_id": 25, "timeslot_id": 1931}, {"lecturer_id": 25, "timeslot_id": 1937}, {"lecturer_id": 25, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1899}, {"lecturer_id": 26, "timeslot_id": 1900}, {"lecturer_id": 26, "timeslot_id": 1901}, {"lecturer_id": 26, "timeslot_id": 1902}, {"lecturer_id": 26, "timeslot_id": 1903}, {"lecturer_id": 26, "timeslot_id": 1904}, {"lecturer_id": 26, "timeslot_id": 1905}, {"lecturer_id": 26, "timeslot_id": 1906}, {"lecturer_id": 26, "timeslot_id": 1907}, {"lecturer_id": 26, "timeslot_id": 1908}, {"lecturer_id": 26, "timeslot_id": 1909}, {"lecturer_id": 26, "timeslot_id": 1910}, {"lecturer_id": 26, "timeslot_id": 1911}, {"lecturer_id": 26, "timeslot_id": 1912}, {"lecturer_id": 26, "timeslot_id": 1913}, {"lecturer_id": 26, "timeslot_id": 1914}, {"lecturer_id": 26, "timeslot_id": 1915}, {"lecturer_id": 26, "timeslot_id": 1916}, {"lecturer_id": 26, "timeslot_id": 1917}, {"lecturer_id": 26, "timeslot_id": 1918}, {"lecturer_id": 26, "timeslot_id": 1919}, {"lecturer_id": 26, "timeslot_id": 1920}, {"lecturer_id": 26, "timeslot_id": 1921}, {"lecturer_id": 26, "timeslot_id": 1922}, {"lecturer_id": 26, "timeslot_id": 1923}, {"lecturer_id": 26, "timeslot_id": 1924}, {"lecturer_id": 26, "timeslot_id": 1925}, {"lecturer_id": 26, "timeslot_id": 1926}, {"lecturer_id": 26, "timeslot_id": 1927}, {"lecturer_id": 26, "timeslot_id": 1928}, {"lecturer_id": 26, "timeslot_id": 1929}, {"lecturer_id": 26, "timeslot_id": 1930}, {"lecturer_id": 26, "timeslot_id": 1931}, {"lecturer_id": 26, "timeslot_id": 1932}, {"lecturer_id": 26, "timeslot_id": 1933}, {"lecturer_id": 26, "timeslot_id": 1934}, {"lecturer_id": 26, "timeslot_id": 1935}, {"lecturer_id": 26, "timeslot_id": 1936}, {"lecturer_id": 26, "timeslot_id": 1937}, {"lecturer_id": 26, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1939}, {"lecturer_id": 26, "timeslot_id": 1940}, {"lecturer_id": 26, "timeslot_id": 1941}, {"lecturer_id": 26, "timeslot_id": 1942}, {"lecturer_id": 26, "timeslot_id": 1943}, {"lecturer_id": 1090, "timeslot_id": 1899}, {"lecturer_id": 1090, "timeslot_id": 1900}, {"lecturer_id": 1090, "timeslot_id": 1903}, {"lecturer_id": 1090, "timeslot_id": 1904}, {"lecturer_id": 1090, "timeslot_id": 1905}, {"lecturer_id": 1090, "timeslot_id": 1906}, {"lecturer_id": 1090, "timeslot_id": 1908}, {"lecturer_id": 1090, "timeslot_id": 1909}, {"lecturer_id": 1090, "timeslot_id": 1910}, {"lecturer_id": 1090, "timeslot_id": 1912}, {"lecturer_id": 1090, "timeslot_id": 1913}, {"lecturer_id": 1090, "timeslot_id": 1916}, {"lecturer_id": 1090, "timeslot_id": 1917}, {"lecturer_id": 1090, "timeslot_id": 1918}, {"lecturer_id": 1090, "timeslot_id": 1921}, {"lecturer_id": 1090, "timeslot_id": 1922}, {"lecturer_id": 1090, "timeslot_id": 1923}, {"lecturer_id": 1090, "timeslot_id": 1924}, {"lecturer_id": 1090, "timeslot_id": 1925}, {"lecturer_id": 1090, "timeslot_id": 1926}, {"lecturer_id": 1090, "timeslot_id": 1929}, {"lecturer_id": 1090, "timeslot_id": 1931}, {"lecturer_id": 1090, "timeslot_id": 1933}, {"lecturer_id": 1090, "timeslot_id": 1934}, {"lecturer_id": 1090, "timeslot_id": 1935}, {"lecturer_id": 1090, "timeslot_id": 1938}, {"lecturer_id": 1090, "timeslot_id": 1939}, {"lecturer_id": 1090, "timeslot_id": 1940}, {"lecturer_id": 1090, "timeslot_id": 1942}, {"lecturer_id": 1090, "timeslot_id": 1943}], "group_status": {"42": "ELIGIBLE_D12", "44": "ELIGIBLE_D12", "45": "ELIGIBLE_D12", "46": "ELIGIBLE_D12", "48": "ELIGIBLE_D12", "49": "ELIGIBLE_D12", "52": "ELIGIBLE_D12", "55": "ELIGIBLE_D12", "57": "ELIGIBLE_D12", "58": "ELIGIBLE_D12", "59": "ELIGIBLE_D12", "61": "ELIGIBLE_D12", "62": "ELIGIBLE_D12", "65": "ELIGIBLE_D12", "68": "ELIGIBLE_D12", "69": "ELIGIBLE_D12"}, "soft_weights": {}, "group_project": {"42": 43, "44": 51, "45": 38, "46": 54, "48": 48, "49": 57, "52": 35, "55": 44, "57": 61, "58": 63, "59": 66, "61": 64, "62": 59, "65": 65, "68": 40, "69": 71}, "result_owner_mode": false, "project_supervisors": {"35": [4], "38": [7], "40": [4], "43": [9], "44": [4], "48": [1], "51": [7], "54": [12], "57": [15], "59": [17], "61": [4], "63": [4], "64": [19], "65": [4], "66": [20], "71": [22]}, "group_selected_slots": {"42": [1901, 1907, 1923, 1927, 1933, 1936, 1941, 1943], "44": [1904, 1905, 1907, 1911, 1918, 1922, 1925, 1929, 1937], "45": [1901, 1902, 1905, 1935], "46": [1899, 1900, 1906, 1910, 1913, 1930, 1931, 1941], "48": [1901, 1902, 1906, 1914, 1917, 1919, 1928, 1933, 1943], "49": [1904, 1908, 1910, 1924, 1927, 1934, 1938, 1941], "52": [1902, 1906, 1916, 1917, 1928, 1935, 1939, 1943], "55": [1899, 1916, 1928, 1938], "57": [1907, 1924, 1925, 1938, 1943], "58": [1902, 1906, 1936, 1938], "59": [1900, 1906, 1927], "61": [1902, 1905, 1910, 1923, 1924, 1929, 1935, 1943], "62": [1906, 1921, 1922, 1925, 1933], "65": [1921, 1923, 1929, 1930], "68": [1902, 1933, 1936], "69": [1903, 1909, 1911, 1912, 1915, 1918, 1921, 1925, 1938]}, "group_selection_mode": true, "reviewer_assignments": {}, "committee_constraints": [], "expected_reviewer_count": 5, "lecturer_load_preferences": {}, "prior_reviewer_continuity": {}, "committee_constraints_active": false}	{"random_seed": 0, "time_limit_seconds": 10}	0	12	\N	2026-08-22 17:44:54.346494+00	\N	\N
-4	164	PARTIAL	1	\N	{"groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "h_rules": {"H11": {"waiver_actors": {"42": "MANAGER", "44": "MANAGER", "45": "MANAGER", "46": "MANAGER", "48": "MANAGER", "49": "MANAGER", "52": "MANAGER", "55": "MANAGER", "57": "MANAGER", "58": "MANAGER", "59": "MANAGER", "61": "MANAGER", "62": "MANAGER", "65": "MANAGER", "68": "MANAGER", "69": "MANAGER"}, "waiver_groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "waiver_reasons": {"42": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "44": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "45": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "46": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "48": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "49": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "52": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "55": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "57": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "58": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "59": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "61": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "62": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "65": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "68": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "69": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round."}}, "H12": {"semester_quota": null, "sessions_per_day": 8, "sessions_per_part": 4}}, "round_id": 164, "conflicts": [], "timeslots": [1899, 1900, 1901, 1902, 1903, 1904, 1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1937, 1938, 1939, 1940, 1941, 1942, 1943], "round_type": "DEFENSE_1_2", "unscheduled": [{"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "H1_CONFLICT", "explanation": "Available Reviewers include the project's Supervisor, which is forbidden by H1.", "remediation_hint": "Choose a Reviewer outside the project supervision team."}, {"code": "NO_TIMESLOT", "explanation": "No combination of hard constraints produced a candidate session.", "remediation_hint": "Add availability or timeslots, then run the scheduler again."}], "availability": [{"lecturer_id": 1, "timeslot_id": 1899}, {"lecturer_id": 1, "timeslot_id": 1901}, {"lecturer_id": 1, "timeslot_id": 1902}, {"lecturer_id": 1, "timeslot_id": 1903}, {"lecturer_id": 1, "timeslot_id": 1904}, {"lecturer_id": 1, "timeslot_id": 1905}, {"lecturer_id": 1, "timeslot_id": 1906}, {"lecturer_id": 1, "timeslot_id": 1907}, {"lecturer_id": 1, "timeslot_id": 1908}, {"lecturer_id": 1, "timeslot_id": 1910}, {"lecturer_id": 1, "timeslot_id": 1911}, {"lecturer_id": 1, "timeslot_id": 1912}, {"lecturer_id": 1, "timeslot_id": 1913}, {"lecturer_id": 1, "timeslot_id": 1914}, {"lecturer_id": 1, "timeslot_id": 1916}, {"lecturer_id": 1, "timeslot_id": 1917}, {"lecturer_id": 1, "timeslot_id": 1918}, {"lecturer_id": 1, "timeslot_id": 1919}, {"lecturer_id": 1, "timeslot_id": 1920}, {"lecturer_id": 1, "timeslot_id": 1922}, {"lecturer_id": 1, "timeslot_id": 1923}, {"lecturer_id": 1, "timeslot_id": 1924}, {"lecturer_id": 1, "timeslot_id": 1925}, {"lecturer_id": 1, "timeslot_id": 1926}, {"lecturer_id": 1, "timeslot_id": 1927}, {"lecturer_id": 1, "timeslot_id": 1928}, {"lecturer_id": 1, "timeslot_id": 1929}, {"lecturer_id": 1, "timeslot_id": 1930}, {"lecturer_id": 1, "timeslot_id": 1931}, {"lecturer_id": 1, "timeslot_id": 1932}, {"lecturer_id": 1, "timeslot_id": 1933}, {"lecturer_id": 1, "timeslot_id": 1934}, {"lecturer_id": 1, "timeslot_id": 1935}, {"lecturer_id": 1, "timeslot_id": 1937}, {"lecturer_id": 1, "timeslot_id": 1938}, {"lecturer_id": 1, "timeslot_id": 1939}, {"lecturer_id": 1, "timeslot_id": 1941}, {"lecturer_id": 1, "timeslot_id": 1943}, {"lecturer_id": 2, "timeslot_id": 1899}, {"lecturer_id": 2, "timeslot_id": 1900}, {"lecturer_id": 2, "timeslot_id": 1904}, {"lecturer_id": 2, "timeslot_id": 1905}, {"lecturer_id": 2, "timeslot_id": 1907}, {"lecturer_id": 2, "timeslot_id": 1908}, {"lecturer_id": 2, "timeslot_id": 1914}, {"lecturer_id": 2, "timeslot_id": 1916}, {"lecturer_id": 2, "timeslot_id": 1917}, {"lecturer_id": 2, "timeslot_id": 1918}, {"lecturer_id": 2, "timeslot_id": 1920}, {"lecturer_id": 2, "timeslot_id": 1921}, {"lecturer_id": 2, "timeslot_id": 1924}, {"lecturer_id": 2, "timeslot_id": 1925}, {"lecturer_id": 2, "timeslot_id": 1928}, {"lecturer_id": 2, "timeslot_id": 1932}, {"lecturer_id": 2, "timeslot_id": 1933}, {"lecturer_id": 2, "timeslot_id": 1935}, {"lecturer_id": 2, "timeslot_id": 1936}, {"lecturer_id": 2, "timeslot_id": 1938}, {"lecturer_id": 2, "timeslot_id": 1940}, {"lecturer_id": 2, "timeslot_id": 1941}, {"lecturer_id": 2, "timeslot_id": 1942}, {"lecturer_id": 2, "timeslot_id": 1943}, {"lecturer_id": 3, "timeslot_id": 1900}, {"lecturer_id": 3, "timeslot_id": 1901}, {"lecturer_id": 3, "timeslot_id": 1902}, {"lecturer_id": 3, "timeslot_id": 1906}, {"lecturer_id": 3, "timeslot_id": 1912}, {"lecturer_id": 3, "timeslot_id": 1915}, {"lecturer_id": 3, "timeslot_id": 1923}, {"lecturer_id": 3, "timeslot_id": 1925}, {"lecturer_id": 3, "timeslot_id": 1928}, {"lecturer_id": 3, "timeslot_id": 1938}, {"lecturer_id": 3, "timeslot_id": 1941}, {"lecturer_id": 3, "timeslot_id": 1942}, {"lecturer_id": 3, "timeslot_id": 1943}, {"lecturer_id": 4, "timeslot_id": 1902}, {"lecturer_id": 4, "timeslot_id": 1910}, {"lecturer_id": 4, "timeslot_id": 1912}, {"lecturer_id": 4, "timeslot_id": 1913}, {"lecturer_id": 4, "timeslot_id": 1923}, {"lecturer_id": 4, "timeslot_id": 1931}, {"lecturer_id": 4, "timeslot_id": 1941}, {"lecturer_id": 4, "timeslot_id": 1943}, {"lecturer_id": 5, "timeslot_id": 1899}, {"lecturer_id": 5, "timeslot_id": 1900}, {"lecturer_id": 5, "timeslot_id": 1902}, {"lecturer_id": 5, "timeslot_id": 1904}, {"lecturer_id": 5, "timeslot_id": 1906}, {"lecturer_id": 5, "timeslot_id": 1907}, {"lecturer_id": 5, "timeslot_id": 1922}, {"lecturer_id": 5, "timeslot_id": 1939}, {"lecturer_id": 5, "timeslot_id": 1942}, {"lecturer_id": 5, "timeslot_id": 1943}, {"lecturer_id": 6, "timeslot_id": 1900}, {"lecturer_id": 6, "timeslot_id": 1902}, {"lecturer_id": 6, "timeslot_id": 1903}, {"lecturer_id": 6, "timeslot_id": 1906}, {"lecturer_id": 6, "timeslot_id": 1908}, {"lecturer_id": 6, "timeslot_id": 1911}, {"lecturer_id": 6, "timeslot_id": 1912}, {"lecturer_id": 6, "timeslot_id": 1917}, {"lecturer_id": 6, "timeslot_id": 1918}, {"lecturer_id": 6, "timeslot_id": 1919}, {"lecturer_id": 6, "timeslot_id": 1920}, {"lecturer_id": 6, "timeslot_id": 1923}, {"lecturer_id": 6, "timeslot_id": 1924}, {"lecturer_id": 6, "timeslot_id": 1925}, {"lecturer_id": 6, "timeslot_id": 1926}, {"lecturer_id": 6, "timeslot_id": 1927}, {"lecturer_id": 6, "timeslot_id": 1928}, {"lecturer_id": 6, "timeslot_id": 1929}, {"lecturer_id": 6, "timeslot_id": 1932}, {"lecturer_id": 6, "timeslot_id": 1936}, {"lecturer_id": 6, "timeslot_id": 1937}, {"lecturer_id": 6, "timeslot_id": 1938}, {"lecturer_id": 6, "timeslot_id": 1939}, {"lecturer_id": 6, "timeslot_id": 1940}, {"lecturer_id": 6, "timeslot_id": 1941}, {"lecturer_id": 7, "timeslot_id": 1901}, {"lecturer_id": 7, "timeslot_id": 1902}, {"lecturer_id": 7, "timeslot_id": 1904}, {"lecturer_id": 7, "timeslot_id": 1911}, {"lecturer_id": 7, "timeslot_id": 1912}, {"lecturer_id": 7, "timeslot_id": 1915}, {"lecturer_id": 7, "timeslot_id": 1916}, {"lecturer_id": 7, "timeslot_id": 1918}, {"lecturer_id": 7, "timeslot_id": 1920}, {"lecturer_id": 7, "timeslot_id": 1921}, {"lecturer_id": 7, "timeslot_id": 1922}, {"lecturer_id": 7, "timeslot_id": 1923}, {"lecturer_id": 7, "timeslot_id": 1924}, {"lecturer_id": 7, "timeslot_id": 1925}, {"lecturer_id": 7, "timeslot_id": 1928}, {"lecturer_id": 7, "timeslot_id": 1930}, {"lecturer_id": 7, "timeslot_id": 1931}, {"lecturer_id": 7, "timeslot_id": 1932}, {"lecturer_id": 7, "timeslot_id": 1933}, {"lecturer_id": 7, "timeslot_id": 1934}, {"lecturer_id": 7, "timeslot_id": 1937}, {"lecturer_id": 7, "timeslot_id": 1939}, {"lecturer_id": 7, "timeslot_id": 1940}, {"lecturer_id": 7, "timeslot_id": 1942}, {"lecturer_id": 8, "timeslot_id": 1900}, {"lecturer_id": 8, "timeslot_id": 1903}, {"lecturer_id": 8, "timeslot_id": 1905}, {"lecturer_id": 8, "timeslot_id": 1906}, {"lecturer_id": 8, "timeslot_id": 1908}, {"lecturer_id": 8, "timeslot_id": 1911}, {"lecturer_id": 8, "timeslot_id": 1913}, {"lecturer_id": 8, "timeslot_id": 1915}, {"lecturer_id": 8, "timeslot_id": 1919}, {"lecturer_id": 8, "timeslot_id": 1927}, {"lecturer_id": 8, "timeslot_id": 1934}, {"lecturer_id": 8, "timeslot_id": 1936}, {"lecturer_id": 8, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1899}, {"lecturer_id": 9, "timeslot_id": 1900}, {"lecturer_id": 9, "timeslot_id": 1901}, {"lecturer_id": 9, "timeslot_id": 1902}, {"lecturer_id": 9, "timeslot_id": 1903}, {"lecturer_id": 9, "timeslot_id": 1904}, {"lecturer_id": 9, "timeslot_id": 1905}, {"lecturer_id": 9, "timeslot_id": 1906}, {"lecturer_id": 9, "timeslot_id": 1907}, {"lecturer_id": 9, "timeslot_id": 1908}, {"lecturer_id": 9, "timeslot_id": 1909}, {"lecturer_id": 9, "timeslot_id": 1910}, {"lecturer_id": 9, "timeslot_id": 1911}, {"lecturer_id": 9, "timeslot_id": 1912}, {"lecturer_id": 9, "timeslot_id": 1913}, {"lecturer_id": 9, "timeslot_id": 1914}, {"lecturer_id": 9, "timeslot_id": 1915}, {"lecturer_id": 9, "timeslot_id": 1916}, {"lecturer_id": 9, "timeslot_id": 1917}, {"lecturer_id": 9, "timeslot_id": 1918}, {"lecturer_id": 9, "timeslot_id": 1919}, {"lecturer_id": 9, "timeslot_id": 1920}, {"lecturer_id": 9, "timeslot_id": 1921}, {"lecturer_id": 9, "timeslot_id": 1922}, {"lecturer_id": 9, "timeslot_id": 1923}, {"lecturer_id": 9, "timeslot_id": 1924}, {"lecturer_id": 9, "timeslot_id": 1925}, {"lecturer_id": 9, "timeslot_id": 1926}, {"lecturer_id": 9, "timeslot_id": 1927}, {"lecturer_id": 9, "timeslot_id": 1928}, {"lecturer_id": 9, "timeslot_id": 1929}, {"lecturer_id": 9, "timeslot_id": 1930}, {"lecturer_id": 9, "timeslot_id": 1931}, {"lecturer_id": 9, "timeslot_id": 1932}, {"lecturer_id": 9, "timeslot_id": 1933}, {"lecturer_id": 9, "timeslot_id": 1934}, {"lecturer_id": 9, "timeslot_id": 1935}, {"lecturer_id": 9, "timeslot_id": 1936}, {"lecturer_id": 9, "timeslot_id": 1937}, {"lecturer_id": 9, "timeslot_id": 1938}, {"lecturer_id": 9, "timeslot_id": 1939}, {"lecturer_id": 9, "timeslot_id": 1940}, {"lecturer_id": 9, "timeslot_id": 1941}, {"lecturer_id": 9, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1943}, {"lecturer_id": 10, "timeslot_id": 1899}, {"lecturer_id": 10, "timeslot_id": 1900}, {"lecturer_id": 10, "timeslot_id": 1901}, {"lecturer_id": 10, "timeslot_id": 1904}, {"lecturer_id": 10, "timeslot_id": 1906}, {"lecturer_id": 10, "timeslot_id": 1907}, {"lecturer_id": 10, "timeslot_id": 1909}, {"lecturer_id": 10, "timeslot_id": 1910}, {"lecturer_id": 10, "timeslot_id": 1912}, {"lecturer_id": 10, "timeslot_id": 1914}, {"lecturer_id": 10, "timeslot_id": 1915}, {"lecturer_id": 10, "timeslot_id": 1917}, {"lecturer_id": 10, "timeslot_id": 1918}, {"lecturer_id": 10, "timeslot_id": 1919}, {"lecturer_id": 10, "timeslot_id": 1920}, {"lecturer_id": 10, "timeslot_id": 1921}, {"lecturer_id": 10, "timeslot_id": 1924}, {"lecturer_id": 10, "timeslot_id": 1925}, {"lecturer_id": 10, "timeslot_id": 1926}, {"lecturer_id": 10, "timeslot_id": 1927}, {"lecturer_id": 10, "timeslot_id": 1929}, {"lecturer_id": 10, "timeslot_id": 1930}, {"lecturer_id": 10, "timeslot_id": 1932}, {"lecturer_id": 10, "timeslot_id": 1935}, {"lecturer_id": 10, "timeslot_id": 1937}, {"lecturer_id": 10, "timeslot_id": 1940}, {"lecturer_id": 10, "timeslot_id": 1941}, {"lecturer_id": 11, "timeslot_id": 1900}, {"lecturer_id": 11, "timeslot_id": 1901}, {"lecturer_id": 11, "timeslot_id": 1902}, {"lecturer_id": 11, "timeslot_id": 1904}, {"lecturer_id": 11, "timeslot_id": 1906}, {"lecturer_id": 11, "timeslot_id": 1907}, {"lecturer_id": 11, "timeslot_id": 1909}, {"lecturer_id": 11, "timeslot_id": 1910}, {"lecturer_id": 11, "timeslot_id": 1912}, {"lecturer_id": 11, "timeslot_id": 1913}, {"lecturer_id": 11, "timeslot_id": 1915}, {"lecturer_id": 11, "timeslot_id": 1919}, {"lecturer_id": 11, "timeslot_id": 1920}, {"lecturer_id": 11, "timeslot_id": 1921}, {"lecturer_id": 11, "timeslot_id": 1922}, {"lecturer_id": 11, "timeslot_id": 1923}, {"lecturer_id": 11, "timeslot_id": 1924}, {"lecturer_id": 11, "timeslot_id": 1926}, {"lecturer_id": 11, "timeslot_id": 1927}, {"lecturer_id": 11, "timeslot_id": 1929}, {"lecturer_id": 11, "timeslot_id": 1930}, {"lecturer_id": 11, "timeslot_id": 1932}, {"lecturer_id": 11, "timeslot_id": 1935}, {"lecturer_id": 11, "timeslot_id": 1936}, {"lecturer_id": 11, "timeslot_id": 1937}, {"lecturer_id": 11, "timeslot_id": 1938}, {"lecturer_id": 11, "timeslot_id": 1940}, {"lecturer_id": 11, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1900}, {"lecturer_id": 12, "timeslot_id": 1907}, {"lecturer_id": 12, "timeslot_id": 1909}, {"lecturer_id": 12, "timeslot_id": 1915}, {"lecturer_id": 12, "timeslot_id": 1917}, {"lecturer_id": 12, "timeslot_id": 1919}, {"lecturer_id": 12, "timeslot_id": 1920}, {"lecturer_id": 12, "timeslot_id": 1922}, {"lecturer_id": 12, "timeslot_id": 1925}, {"lecturer_id": 12, "timeslot_id": 1926}, {"lecturer_id": 12, "timeslot_id": 1928}, {"lecturer_id": 12, "timeslot_id": 1929}, {"lecturer_id": 12, "timeslot_id": 1933}, {"lecturer_id": 12, "timeslot_id": 1938}, {"lecturer_id": 12, "timeslot_id": 1939}, {"lecturer_id": 12, "timeslot_id": 1940}, {"lecturer_id": 12, "timeslot_id": 1941}, {"lecturer_id": 12, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1943}, {"lecturer_id": 13, "timeslot_id": 1900}, {"lecturer_id": 13, "timeslot_id": 1903}, {"lecturer_id": 13, "timeslot_id": 1905}, {"lecturer_id": 13, "timeslot_id": 1908}, {"lecturer_id": 13, "timeslot_id": 1910}, {"lecturer_id": 13, "timeslot_id": 1911}, {"lecturer_id": 13, "timeslot_id": 1914}, {"lecturer_id": 13, "timeslot_id": 1916}, {"lecturer_id": 13, "timeslot_id": 1918}, {"lecturer_id": 13, "timeslot_id": 1925}, {"lecturer_id": 13, "timeslot_id": 1927}, {"lecturer_id": 13, "timeslot_id": 1928}, {"lecturer_id": 13, "timeslot_id": 1929}, {"lecturer_id": 13, "timeslot_id": 1931}, {"lecturer_id": 13, "timeslot_id": 1932}, {"lecturer_id": 13, "timeslot_id": 1935}, {"lecturer_id": 13, "timeslot_id": 1936}, {"lecturer_id": 13, "timeslot_id": 1937}, {"lecturer_id": 13, "timeslot_id": 1938}, {"lecturer_id": 13, "timeslot_id": 1939}, {"lecturer_id": 13, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1899}, {"lecturer_id": 14, "timeslot_id": 1900}, {"lecturer_id": 14, "timeslot_id": 1901}, {"lecturer_id": 14, "timeslot_id": 1902}, {"lecturer_id": 14, "timeslot_id": 1903}, {"lecturer_id": 14, "timeslot_id": 1905}, {"lecturer_id": 14, "timeslot_id": 1906}, {"lecturer_id": 14, "timeslot_id": 1908}, {"lecturer_id": 14, "timeslot_id": 1909}, {"lecturer_id": 14, "timeslot_id": 1910}, {"lecturer_id": 14, "timeslot_id": 1911}, {"lecturer_id": 14, "timeslot_id": 1912}, {"lecturer_id": 14, "timeslot_id": 1913}, {"lecturer_id": 14, "timeslot_id": 1914}, {"lecturer_id": 14, "timeslot_id": 1915}, {"lecturer_id": 14, "timeslot_id": 1917}, {"lecturer_id": 14, "timeslot_id": 1918}, {"lecturer_id": 14, "timeslot_id": 1920}, {"lecturer_id": 14, "timeslot_id": 1921}, {"lecturer_id": 14, "timeslot_id": 1922}, {"lecturer_id": 14, "timeslot_id": 1923}, {"lecturer_id": 14, "timeslot_id": 1924}, {"lecturer_id": 14, "timeslot_id": 1925}, {"lecturer_id": 14, "timeslot_id": 1926}, {"lecturer_id": 14, "timeslot_id": 1928}, {"lecturer_id": 14, "timeslot_id": 1929}, {"lecturer_id": 14, "timeslot_id": 1930}, {"lecturer_id": 14, "timeslot_id": 1931}, {"lecturer_id": 14, "timeslot_id": 1932}, {"lecturer_id": 14, "timeslot_id": 1933}, {"lecturer_id": 14, "timeslot_id": 1934}, {"lecturer_id": 14, "timeslot_id": 1935}, {"lecturer_id": 14, "timeslot_id": 1936}, {"lecturer_id": 14, "timeslot_id": 1938}, {"lecturer_id": 14, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1942}, {"lecturer_id": 14, "timeslot_id": 1943}, {"lecturer_id": 15, "timeslot_id": 1899}, {"lecturer_id": 15, "timeslot_id": 1900}, {"lecturer_id": 15, "timeslot_id": 1901}, {"lecturer_id": 15, "timeslot_id": 1902}, {"lecturer_id": 15, "timeslot_id": 1903}, {"lecturer_id": 15, "timeslot_id": 1904}, {"lecturer_id": 15, "timeslot_id": 1905}, {"lecturer_id": 15, "timeslot_id": 1906}, {"lecturer_id": 15, "timeslot_id": 1907}, {"lecturer_id": 15, "timeslot_id": 1908}, {"lecturer_id": 15, "timeslot_id": 1909}, {"lecturer_id": 15, "timeslot_id": 1910}, {"lecturer_id": 15, "timeslot_id": 1911}, {"lecturer_id": 15, "timeslot_id": 1912}, {"lecturer_id": 15, "timeslot_id": 1913}, {"lecturer_id": 15, "timeslot_id": 1914}, {"lecturer_id": 15, "timeslot_id": 1915}, {"lecturer_id": 15, "timeslot_id": 1916}, {"lecturer_id": 15, "timeslot_id": 1917}, {"lecturer_id": 15, "timeslot_id": 1918}, {"lecturer_id": 15, "timeslot_id": 1919}, {"lecturer_id": 15, "timeslot_id": 1920}, {"lecturer_id": 15, "timeslot_id": 1921}, {"lecturer_id": 15, "timeslot_id": 1922}, {"lecturer_id": 15, "timeslot_id": 1923}, {"lecturer_id": 15, "timeslot_id": 1924}, {"lecturer_id": 15, "timeslot_id": 1925}, {"lecturer_id": 15, "timeslot_id": 1926}, {"lecturer_id": 15, "timeslot_id": 1927}, {"lecturer_id": 15, "timeslot_id": 1928}, {"lecturer_id": 15, "timeslot_id": 1929}, {"lecturer_id": 15, "timeslot_id": 1930}, {"lecturer_id": 15, "timeslot_id": 1931}, {"lecturer_id": 15, "timeslot_id": 1932}, {"lecturer_id": 15, "timeslot_id": 1933}, {"lecturer_id": 15, "timeslot_id": 1934}, {"lecturer_id": 15, "timeslot_id": 1935}, {"lecturer_id": 15, "timeslot_id": 1936}, {"lecturer_id": 15, "timeslot_id": 1937}, {"lecturer_id": 15, "timeslot_id": 1938}, {"lecturer_id": 15, "timeslot_id": 1939}, {"lecturer_id": 15, "timeslot_id": 1940}, {"lecturer_id": 15, "timeslot_id": 1941}, {"lecturer_id": 15, "timeslot_id": 1942}, {"lecturer_id": 15, "timeslot_id": 1943}, {"lecturer_id": 16, "timeslot_id": 1900}, {"lecturer_id": 16, "timeslot_id": 1909}, {"lecturer_id": 16, "timeslot_id": 1910}, {"lecturer_id": 16, "timeslot_id": 1912}, {"lecturer_id": 16, "timeslot_id": 1914}, {"lecturer_id": 16, "timeslot_id": 1919}, {"lecturer_id": 16, "timeslot_id": 1921}, {"lecturer_id": 16, "timeslot_id": 1922}, {"lecturer_id": 16, "timeslot_id": 1924}, {"lecturer_id": 16, "timeslot_id": 1926}, {"lecturer_id": 16, "timeslot_id": 1929}, {"lecturer_id": 16, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1899}, {"lecturer_id": 17, "timeslot_id": 1900}, {"lecturer_id": 17, "timeslot_id": 1901}, {"lecturer_id": 17, "timeslot_id": 1902}, {"lecturer_id": 17, "timeslot_id": 1903}, {"lecturer_id": 17, "timeslot_id": 1904}, {"lecturer_id": 17, "timeslot_id": 1905}, {"lecturer_id": 17, "timeslot_id": 1910}, {"lecturer_id": 17, "timeslot_id": 1911}, {"lecturer_id": 17, "timeslot_id": 1912}, {"lecturer_id": 17, "timeslot_id": 1914}, {"lecturer_id": 17, "timeslot_id": 1915}, {"lecturer_id": 17, "timeslot_id": 1916}, {"lecturer_id": 17, "timeslot_id": 1917}, {"lecturer_id": 17, "timeslot_id": 1918}, {"lecturer_id": 17, "timeslot_id": 1919}, {"lecturer_id": 17, "timeslot_id": 1920}, {"lecturer_id": 17, "timeslot_id": 1921}, {"lecturer_id": 17, "timeslot_id": 1922}, {"lecturer_id": 17, "timeslot_id": 1923}, {"lecturer_id": 17, "timeslot_id": 1925}, {"lecturer_id": 17, "timeslot_id": 1926}, {"lecturer_id": 17, "timeslot_id": 1927}, {"lecturer_id": 17, "timeslot_id": 1928}, {"lecturer_id": 17, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1932}, {"lecturer_id": 17, "timeslot_id": 1933}, {"lecturer_id": 17, "timeslot_id": 1934}, {"lecturer_id": 17, "timeslot_id": 1935}, {"lecturer_id": 17, "timeslot_id": 1936}, {"lecturer_id": 17, "timeslot_id": 1938}, {"lecturer_id": 17, "timeslot_id": 1939}, {"lecturer_id": 17, "timeslot_id": 1940}, {"lecturer_id": 17, "timeslot_id": 1941}, {"lecturer_id": 17, "timeslot_id": 1942}, {"lecturer_id": 17, "timeslot_id": 1943}, {"lecturer_id": 18, "timeslot_id": 1900}, {"lecturer_id": 18, "timeslot_id": 1904}, {"lecturer_id": 18, "timeslot_id": 1916}, {"lecturer_id": 18, "timeslot_id": 1921}, {"lecturer_id": 18, "timeslot_id": 1927}, {"lecturer_id": 18, "timeslot_id": 1937}, {"lecturer_id": 18, "timeslot_id": 1938}, {"lecturer_id": 18, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1902}, {"lecturer_id": 19, "timeslot_id": 1903}, {"lecturer_id": 19, "timeslot_id": 1905}, {"lecturer_id": 19, "timeslot_id": 1909}, {"lecturer_id": 19, "timeslot_id": 1910}, {"lecturer_id": 19, "timeslot_id": 1911}, {"lecturer_id": 19, "timeslot_id": 1912}, {"lecturer_id": 19, "timeslot_id": 1915}, {"lecturer_id": 19, "timeslot_id": 1916}, {"lecturer_id": 19, "timeslot_id": 1918}, {"lecturer_id": 19, "timeslot_id": 1920}, {"lecturer_id": 19, "timeslot_id": 1922}, {"lecturer_id": 19, "timeslot_id": 1925}, {"lecturer_id": 19, "timeslot_id": 1926}, {"lecturer_id": 19, "timeslot_id": 1927}, {"lecturer_id": 19, "timeslot_id": 1930}, {"lecturer_id": 19, "timeslot_id": 1931}, {"lecturer_id": 19, "timeslot_id": 1935}, {"lecturer_id": 19, "timeslot_id": 1936}, {"lecturer_id": 19, "timeslot_id": 1937}, {"lecturer_id": 19, "timeslot_id": 1938}, {"lecturer_id": 19, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1940}, {"lecturer_id": 20, "timeslot_id": 1900}, {"lecturer_id": 20, "timeslot_id": 1903}, {"lecturer_id": 20, "timeslot_id": 1910}, {"lecturer_id": 20, "timeslot_id": 1918}, {"lecturer_id": 20, "timeslot_id": 1922}, {"lecturer_id": 20, "timeslot_id": 1923}, {"lecturer_id": 20, "timeslot_id": 1929}, {"lecturer_id": 20, "timeslot_id": 1936}, {"lecturer_id": 20, "timeslot_id": 1939}, {"lecturer_id": 20, "timeslot_id": 1942}, {"lecturer_id": 20, "timeslot_id": 1943}, {"lecturer_id": 21, "timeslot_id": 1899}, {"lecturer_id": 21, "timeslot_id": 1900}, {"lecturer_id": 21, "timeslot_id": 1901}, {"lecturer_id": 21, "timeslot_id": 1902}, {"lecturer_id": 21, "timeslot_id": 1903}, {"lecturer_id": 21, "timeslot_id": 1904}, {"lecturer_id": 21, "timeslot_id": 1905}, {"lecturer_id": 21, "timeslot_id": 1906}, {"lecturer_id": 21, "timeslot_id": 1907}, {"lecturer_id": 21, "timeslot_id": 1908}, {"lecturer_id": 21, "timeslot_id": 1909}, {"lecturer_id": 21, "timeslot_id": 1910}, {"lecturer_id": 21, "timeslot_id": 1911}, {"lecturer_id": 21, "timeslot_id": 1912}, {"lecturer_id": 21, "timeslot_id": 1913}, {"lecturer_id": 21, "timeslot_id": 1914}, {"lecturer_id": 21, "timeslot_id": 1915}, {"lecturer_id": 21, "timeslot_id": 1916}, {"lecturer_id": 21, "timeslot_id": 1917}, {"lecturer_id": 21, "timeslot_id": 1918}, {"lecturer_id": 21, "timeslot_id": 1919}, {"lecturer_id": 21, "timeslot_id": 1920}, {"lecturer_id": 21, "timeslot_id": 1921}, {"lecturer_id": 21, "timeslot_id": 1922}, {"lecturer_id": 21, "timeslot_id": 1923}, {"lecturer_id": 21, "timeslot_id": 1924}, {"lecturer_id": 21, "timeslot_id": 1925}, {"lecturer_id": 21, "timeslot_id": 1926}, {"lecturer_id": 21, "timeslot_id": 1927}, {"lecturer_id": 21, "timeslot_id": 1928}, {"lecturer_id": 21, "timeslot_id": 1929}, {"lecturer_id": 21, "timeslot_id": 1930}, {"lecturer_id": 21, "timeslot_id": 1931}, {"lecturer_id": 21, "timeslot_id": 1932}, {"lecturer_id": 21, "timeslot_id": 1933}, {"lecturer_id": 21, "timeslot_id": 1934}, {"lecturer_id": 21, "timeslot_id": 1935}, {"lecturer_id": 21, "timeslot_id": 1936}, {"lecturer_id": 21, "timeslot_id": 1937}, {"lecturer_id": 21, "timeslot_id": 1938}, {"lecturer_id": 21, "timeslot_id": 1939}, {"lecturer_id": 21, "timeslot_id": 1940}, {"lecturer_id": 21, "timeslot_id": 1941}, {"lecturer_id": 21, "timeslot_id": 1942}, {"lecturer_id": 21, "timeslot_id": 1943}, {"lecturer_id": 22, "timeslot_id": 1899}, {"lecturer_id": 22, "timeslot_id": 1901}, {"lecturer_id": 22, "timeslot_id": 1902}, {"lecturer_id": 22, "timeslot_id": 1903}, {"lecturer_id": 22, "timeslot_id": 1904}, {"lecturer_id": 22, "timeslot_id": 1905}, {"lecturer_id": 22, "timeslot_id": 1906}, {"lecturer_id": 22, "timeslot_id": 1907}, {"lecturer_id": 22, "timeslot_id": 1911}, {"lecturer_id": 22, "timeslot_id": 1912}, {"lecturer_id": 22, "timeslot_id": 1913}, {"lecturer_id": 22, "timeslot_id": 1914}, {"lecturer_id": 22, "timeslot_id": 1915}, {"lecturer_id": 22, "timeslot_id": 1916}, {"lecturer_id": 22, "timeslot_id": 1917}, {"lecturer_id": 22, "timeslot_id": 1918}, {"lecturer_id": 22, "timeslot_id": 1919}, {"lecturer_id": 22, "timeslot_id": 1920}, {"lecturer_id": 22, "timeslot_id": 1921}, {"lecturer_id": 22, "timeslot_id": 1923}, {"lecturer_id": 22, "timeslot_id": 1925}, {"lecturer_id": 22, "timeslot_id": 1926}, {"lecturer_id": 22, "timeslot_id": 1927}, {"lecturer_id": 22, "timeslot_id": 1928}, {"lecturer_id": 22, "timeslot_id": 1929}, {"lecturer_id": 22, "timeslot_id": 1931}, {"lecturer_id": 22, "timeslot_id": 1932}, {"lecturer_id": 22, "timeslot_id": 1933}, {"lecturer_id": 22, "timeslot_id": 1934}, {"lecturer_id": 22, "timeslot_id": 1935}, {"lecturer_id": 22, "timeslot_id": 1936}, {"lecturer_id": 22, "timeslot_id": 1937}, {"lecturer_id": 22, "timeslot_id": 1938}, {"lecturer_id": 22, "timeslot_id": 1939}, {"lecturer_id": 22, "timeslot_id": 1940}, {"lecturer_id": 22, "timeslot_id": 1942}, {"lecturer_id": 22, "timeslot_id": 1943}, {"lecturer_id": 23, "timeslot_id": 1899}, {"lecturer_id": 23, "timeslot_id": 1900}, {"lecturer_id": 23, "timeslot_id": 1901}, {"lecturer_id": 23, "timeslot_id": 1902}, {"lecturer_id": 23, "timeslot_id": 1903}, {"lecturer_id": 23, "timeslot_id": 1904}, {"lecturer_id": 23, "timeslot_id": 1905}, {"lecturer_id": 23, "timeslot_id": 1906}, {"lecturer_id": 23, "timeslot_id": 1907}, {"lecturer_id": 23, "timeslot_id": 1908}, {"lecturer_id": 23, "timeslot_id": 1909}, {"lecturer_id": 23, "timeslot_id": 1910}, {"lecturer_id": 23, "timeslot_id": 1911}, {"lecturer_id": 23, "timeslot_id": 1912}, {"lecturer_id": 23, "timeslot_id": 1913}, {"lecturer_id": 23, "timeslot_id": 1914}, {"lecturer_id": 23, "timeslot_id": 1915}, {"lecturer_id": 23, "timeslot_id": 1916}, {"lecturer_id": 23, "timeslot_id": 1917}, {"lecturer_id": 23, "timeslot_id": 1918}, {"lecturer_id": 23, "timeslot_id": 1919}, {"lecturer_id": 23, "timeslot_id": 1920}, {"lecturer_id": 23, "timeslot_id": 1921}, {"lecturer_id": 23, "timeslot_id": 1922}, {"lecturer_id": 23, "timeslot_id": 1923}, {"lecturer_id": 23, "timeslot_id": 1924}, {"lecturer_id": 23, "timeslot_id": 1925}, {"lecturer_id": 23, "timeslot_id": 1926}, {"lecturer_id": 23, "timeslot_id": 1927}, {"lecturer_id": 23, "timeslot_id": 1928}, {"lecturer_id": 23, "timeslot_id": 1929}, {"lecturer_id": 23, "timeslot_id": 1930}, {"lecturer_id": 23, "timeslot_id": 1931}, {"lecturer_id": 23, "timeslot_id": 1932}, {"lecturer_id": 23, "timeslot_id": 1933}, {"lecturer_id": 23, "timeslot_id": 1934}, {"lecturer_id": 23, "timeslot_id": 1935}, {"lecturer_id": 23, "timeslot_id": 1936}, {"lecturer_id": 23, "timeslot_id": 1937}, {"lecturer_id": 23, "timeslot_id": 1938}, {"lecturer_id": 23, "timeslot_id": 1939}, {"lecturer_id": 23, "timeslot_id": 1940}, {"lecturer_id": 23, "timeslot_id": 1941}, {"lecturer_id": 23, "timeslot_id": 1942}, {"lecturer_id": 23, "timeslot_id": 1943}, {"lecturer_id": 24, "timeslot_id": 1902}, {"lecturer_id": 24, "timeslot_id": 1904}, {"lecturer_id": 24, "timeslot_id": 1905}, {"lecturer_id": 24, "timeslot_id": 1907}, {"lecturer_id": 24, "timeslot_id": 1909}, {"lecturer_id": 24, "timeslot_id": 1911}, {"lecturer_id": 24, "timeslot_id": 1912}, {"lecturer_id": 24, "timeslot_id": 1913}, {"lecturer_id": 24, "timeslot_id": 1916}, {"lecturer_id": 24, "timeslot_id": 1919}, {"lecturer_id": 24, "timeslot_id": 1931}, {"lecturer_id": 24, "timeslot_id": 1932}, {"lecturer_id": 24, "timeslot_id": 1933}, {"lecturer_id": 24, "timeslot_id": 1938}, {"lecturer_id": 25, "timeslot_id": 1914}, {"lecturer_id": 25, "timeslot_id": 1915}, {"lecturer_id": 25, "timeslot_id": 1919}, {"lecturer_id": 25, "timeslot_id": 1921}, {"lecturer_id": 25, "timeslot_id": 1925}, {"lecturer_id": 25, "timeslot_id": 1931}, {"lecturer_id": 25, "timeslot_id": 1937}, {"lecturer_id": 25, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1899}, {"lecturer_id": 26, "timeslot_id": 1900}, {"lecturer_id": 26, "timeslot_id": 1901}, {"lecturer_id": 26, "timeslot_id": 1902}, {"lecturer_id": 26, "timeslot_id": 1903}, {"lecturer_id": 26, "timeslot_id": 1904}, {"lecturer_id": 26, "timeslot_id": 1905}, {"lecturer_id": 26, "timeslot_id": 1906}, {"lecturer_id": 26, "timeslot_id": 1907}, {"lecturer_id": 26, "timeslot_id": 1908}, {"lecturer_id": 26, "timeslot_id": 1909}, {"lecturer_id": 26, "timeslot_id": 1910}, {"lecturer_id": 26, "timeslot_id": 1911}, {"lecturer_id": 26, "timeslot_id": 1912}, {"lecturer_id": 26, "timeslot_id": 1913}, {"lecturer_id": 26, "timeslot_id": 1914}, {"lecturer_id": 26, "timeslot_id": 1915}, {"lecturer_id": 26, "timeslot_id": 1916}, {"lecturer_id": 26, "timeslot_id": 1917}, {"lecturer_id": 26, "timeslot_id": 1918}, {"lecturer_id": 26, "timeslot_id": 1919}, {"lecturer_id": 26, "timeslot_id": 1920}, {"lecturer_id": 26, "timeslot_id": 1921}, {"lecturer_id": 26, "timeslot_id": 1922}, {"lecturer_id": 26, "timeslot_id": 1923}, {"lecturer_id": 26, "timeslot_id": 1924}, {"lecturer_id": 26, "timeslot_id": 1925}, {"lecturer_id": 26, "timeslot_id": 1926}, {"lecturer_id": 26, "timeslot_id": 1927}, {"lecturer_id": 26, "timeslot_id": 1928}, {"lecturer_id": 26, "timeslot_id": 1929}, {"lecturer_id": 26, "timeslot_id": 1930}, {"lecturer_id": 26, "timeslot_id": 1931}, {"lecturer_id": 26, "timeslot_id": 1932}, {"lecturer_id": 26, "timeslot_id": 1933}, {"lecturer_id": 26, "timeslot_id": 1934}, {"lecturer_id": 26, "timeslot_id": 1935}, {"lecturer_id": 26, "timeslot_id": 1936}, {"lecturer_id": 26, "timeslot_id": 1937}, {"lecturer_id": 26, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1939}, {"lecturer_id": 26, "timeslot_id": 1940}, {"lecturer_id": 26, "timeslot_id": 1941}, {"lecturer_id": 26, "timeslot_id": 1942}, {"lecturer_id": 26, "timeslot_id": 1943}, {"lecturer_id": 1090, "timeslot_id": 1899}, {"lecturer_id": 1090, "timeslot_id": 1900}, {"lecturer_id": 1090, "timeslot_id": 1903}, {"lecturer_id": 1090, "timeslot_id": 1904}, {"lecturer_id": 1090, "timeslot_id": 1905}, {"lecturer_id": 1090, "timeslot_id": 1906}, {"lecturer_id": 1090, "timeslot_id": 1908}, {"lecturer_id": 1090, "timeslot_id": 1909}, {"lecturer_id": 1090, "timeslot_id": 1910}, {"lecturer_id": 1090, "timeslot_id": 1912}, {"lecturer_id": 1090, "timeslot_id": 1913}, {"lecturer_id": 1090, "timeslot_id": 1916}, {"lecturer_id": 1090, "timeslot_id": 1917}, {"lecturer_id": 1090, "timeslot_id": 1918}, {"lecturer_id": 1090, "timeslot_id": 1921}, {"lecturer_id": 1090, "timeslot_id": 1922}, {"lecturer_id": 1090, "timeslot_id": 1923}, {"lecturer_id": 1090, "timeslot_id": 1924}, {"lecturer_id": 1090, "timeslot_id": 1925}, {"lecturer_id": 1090, "timeslot_id": 1926}, {"lecturer_id": 1090, "timeslot_id": 1929}, {"lecturer_id": 1090, "timeslot_id": 1931}, {"lecturer_id": 1090, "timeslot_id": 1933}, {"lecturer_id": 1090, "timeslot_id": 1934}, {"lecturer_id": 1090, "timeslot_id": 1935}, {"lecturer_id": 1090, "timeslot_id": 1938}, {"lecturer_id": 1090, "timeslot_id": 1939}, {"lecturer_id": 1090, "timeslot_id": 1940}, {"lecturer_id": 1090, "timeslot_id": 1942}, {"lecturer_id": 1090, "timeslot_id": 1943}], "group_status": {"42": "ELIGIBLE_D12", "44": "ELIGIBLE_D12", "45": "ELIGIBLE_D12", "46": "ELIGIBLE_D12", "48": "ELIGIBLE_D12", "49": "ELIGIBLE_D12", "52": "ELIGIBLE_D12", "55": "ELIGIBLE_D12", "57": "ELIGIBLE_D12", "58": "ELIGIBLE_D12", "59": "ELIGIBLE_D12", "61": "ELIGIBLE_D12", "62": "ELIGIBLE_D12", "65": "ELIGIBLE_D12", "68": "ELIGIBLE_D12", "69": "ELIGIBLE_D12"}, "soft_weights": {}, "group_project": {"42": 43, "44": 51, "45": 38, "46": 54, "48": 48, "49": 57, "52": 35, "55": 44, "57": 61, "58": 63, "59": 66, "61": 64, "62": 59, "65": 65, "68": 40, "69": 71}, "result_owner_mode": false, "project_supervisors": {"35": [4], "38": [7], "40": [4], "43": [9], "44": [4], "48": [1], "51": [7], "54": [12], "57": [15], "59": [17], "61": [4], "63": [4], "64": [19], "65": [4], "66": [20], "71": [22]}, "group_selected_slots": {"42": [1901, 1907, 1923, 1927, 1933, 1936, 1941, 1943], "44": [1904, 1905, 1907, 1911, 1918, 1922, 1925, 1929, 1937], "45": [1901, 1902, 1905, 1935], "46": [1899, 1900, 1906, 1910, 1913, 1930, 1931, 1941], "48": [1901, 1902, 1906, 1914, 1917, 1919, 1928, 1933, 1943], "49": [1904, 1908, 1910, 1924, 1927, 1934, 1938, 1941], "52": [1902, 1906, 1916, 1917, 1928, 1935, 1939, 1943], "55": [1899, 1916, 1928, 1938], "57": [1907, 1924, 1925, 1938, 1943], "58": [1902, 1906, 1936, 1938], "59": [1900, 1906, 1927], "61": [1902, 1905, 1910, 1923, 1924, 1929, 1935, 1943], "62": [1906, 1921, 1922, 1925, 1933], "65": [1921, 1923, 1929, 1930], "68": [1902, 1933, 1936], "69": [1903, 1909, 1911, 1912, 1915, 1918, 1921, 1925, 1938]}, "group_selection_mode": true, "reviewer_assignments": {"42": [1, 2, 3, 4, 6], "45": [1, 3, 4, 5, 6], "61": [1, 2, 3, 4, 5]}, "committee_constraints": [], "expected_reviewer_count": 5, "lecturer_load_preferences": {}, "prior_reviewer_continuity": {}, "committee_constraints_active": false}	{"random_seed": 1642026, "time_limit_seconds": 15.0}	1642026	13	\N	2026-08-22 18:02:13.457866+00	\N	\N
-5	164	COMPLETED	1	\N	{"groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "h_rules": {"H11": {"waiver_actors": {"42": "MANAGER", "44": "MANAGER", "45": "MANAGER", "46": "MANAGER", "48": "MANAGER", "49": "MANAGER", "52": "MANAGER", "55": "MANAGER", "57": "MANAGER", "58": "MANAGER", "59": "MANAGER", "61": "MANAGER", "62": "MANAGER", "65": "MANAGER", "68": "MANAGER", "69": "MANAGER"}, "waiver_groups": [42, 44, 45, 46, 48, 49, 52, 55, 57, 58, 59, 61, 62, 65, 68, 69], "waiver_reasons": {"42": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "44": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "45": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "46": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "48": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "49": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "52": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "55": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "57": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "58": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "59": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "61": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "62": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "65": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "68": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round.", "69": "Manager-approved bootstrap waiver: no ACTIVE/PUBLISHED Defense 1.1 or Review 3 schedule exists for this demo round."}}, "H12": {"semester_quota": null, "sessions_per_day": 8, "sessions_per_part": 4}}, "round_id": 164, "conflicts": [], "timeslots": [1899, 1900, 1901, 1902, 1903, 1904, 1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1937, 1938, 1939, 1940, 1941, 1942, 1943], "round_type": "DEFENSE_1_2", "unscheduled": [], "availability": [{"lecturer_id": 1, "timeslot_id": 1899}, {"lecturer_id": 1, "timeslot_id": 1901}, {"lecturer_id": 1, "timeslot_id": 1902}, {"lecturer_id": 1, "timeslot_id": 1903}, {"lecturer_id": 1, "timeslot_id": 1904}, {"lecturer_id": 1, "timeslot_id": 1905}, {"lecturer_id": 1, "timeslot_id": 1906}, {"lecturer_id": 1, "timeslot_id": 1907}, {"lecturer_id": 1, "timeslot_id": 1908}, {"lecturer_id": 1, "timeslot_id": 1910}, {"lecturer_id": 1, "timeslot_id": 1911}, {"lecturer_id": 1, "timeslot_id": 1912}, {"lecturer_id": 1, "timeslot_id": 1913}, {"lecturer_id": 1, "timeslot_id": 1914}, {"lecturer_id": 1, "timeslot_id": 1916}, {"lecturer_id": 1, "timeslot_id": 1917}, {"lecturer_id": 1, "timeslot_id": 1918}, {"lecturer_id": 1, "timeslot_id": 1919}, {"lecturer_id": 1, "timeslot_id": 1920}, {"lecturer_id": 1, "timeslot_id": 1922}, {"lecturer_id": 1, "timeslot_id": 1923}, {"lecturer_id": 1, "timeslot_id": 1924}, {"lecturer_id": 1, "timeslot_id": 1925}, {"lecturer_id": 1, "timeslot_id": 1926}, {"lecturer_id": 1, "timeslot_id": 1927}, {"lecturer_id": 1, "timeslot_id": 1928}, {"lecturer_id": 1, "timeslot_id": 1929}, {"lecturer_id": 1, "timeslot_id": 1930}, {"lecturer_id": 1, "timeslot_id": 1931}, {"lecturer_id": 1, "timeslot_id": 1932}, {"lecturer_id": 1, "timeslot_id": 1933}, {"lecturer_id": 1, "timeslot_id": 1934}, {"lecturer_id": 1, "timeslot_id": 1935}, {"lecturer_id": 1, "timeslot_id": 1937}, {"lecturer_id": 1, "timeslot_id": 1938}, {"lecturer_id": 1, "timeslot_id": 1939}, {"lecturer_id": 1, "timeslot_id": 1941}, {"lecturer_id": 1, "timeslot_id": 1943}, {"lecturer_id": 2, "timeslot_id": 1899}, {"lecturer_id": 2, "timeslot_id": 1900}, {"lecturer_id": 2, "timeslot_id": 1904}, {"lecturer_id": 2, "timeslot_id": 1905}, {"lecturer_id": 2, "timeslot_id": 1907}, {"lecturer_id": 2, "timeslot_id": 1908}, {"lecturer_id": 2, "timeslot_id": 1914}, {"lecturer_id": 2, "timeslot_id": 1916}, {"lecturer_id": 2, "timeslot_id": 1917}, {"lecturer_id": 2, "timeslot_id": 1918}, {"lecturer_id": 2, "timeslot_id": 1920}, {"lecturer_id": 2, "timeslot_id": 1921}, {"lecturer_id": 2, "timeslot_id": 1924}, {"lecturer_id": 2, "timeslot_id": 1925}, {"lecturer_id": 2, "timeslot_id": 1928}, {"lecturer_id": 2, "timeslot_id": 1932}, {"lecturer_id": 2, "timeslot_id": 1933}, {"lecturer_id": 2, "timeslot_id": 1935}, {"lecturer_id": 2, "timeslot_id": 1936}, {"lecturer_id": 2, "timeslot_id": 1938}, {"lecturer_id": 2, "timeslot_id": 1940}, {"lecturer_id": 2, "timeslot_id": 1941}, {"lecturer_id": 2, "timeslot_id": 1942}, {"lecturer_id": 2, "timeslot_id": 1943}, {"lecturer_id": 3, "timeslot_id": 1900}, {"lecturer_id": 3, "timeslot_id": 1901}, {"lecturer_id": 3, "timeslot_id": 1902}, {"lecturer_id": 3, "timeslot_id": 1906}, {"lecturer_id": 3, "timeslot_id": 1912}, {"lecturer_id": 3, "timeslot_id": 1915}, {"lecturer_id": 3, "timeslot_id": 1923}, {"lecturer_id": 3, "timeslot_id": 1925}, {"lecturer_id": 3, "timeslot_id": 1928}, {"lecturer_id": 3, "timeslot_id": 1938}, {"lecturer_id": 3, "timeslot_id": 1941}, {"lecturer_id": 3, "timeslot_id": 1942}, {"lecturer_id": 3, "timeslot_id": 1943}, {"lecturer_id": 4, "timeslot_id": 1902}, {"lecturer_id": 4, "timeslot_id": 1910}, {"lecturer_id": 4, "timeslot_id": 1912}, {"lecturer_id": 4, "timeslot_id": 1913}, {"lecturer_id": 4, "timeslot_id": 1923}, {"lecturer_id": 4, "timeslot_id": 1931}, {"lecturer_id": 4, "timeslot_id": 1941}, {"lecturer_id": 4, "timeslot_id": 1943}, {"lecturer_id": 5, "timeslot_id": 1899}, {"lecturer_id": 5, "timeslot_id": 1900}, {"lecturer_id": 5, "timeslot_id": 1902}, {"lecturer_id": 5, "timeslot_id": 1904}, {"lecturer_id": 5, "timeslot_id": 1906}, {"lecturer_id": 5, "timeslot_id": 1907}, {"lecturer_id": 5, "timeslot_id": 1922}, {"lecturer_id": 5, "timeslot_id": 1939}, {"lecturer_id": 5, "timeslot_id": 1942}, {"lecturer_id": 5, "timeslot_id": 1943}, {"lecturer_id": 6, "timeslot_id": 1900}, {"lecturer_id": 6, "timeslot_id": 1902}, {"lecturer_id": 6, "timeslot_id": 1903}, {"lecturer_id": 6, "timeslot_id": 1906}, {"lecturer_id": 6, "timeslot_id": 1908}, {"lecturer_id": 6, "timeslot_id": 1911}, {"lecturer_id": 6, "timeslot_id": 1912}, {"lecturer_id": 6, "timeslot_id": 1917}, {"lecturer_id": 6, "timeslot_id": 1918}, {"lecturer_id": 6, "timeslot_id": 1919}, {"lecturer_id": 6, "timeslot_id": 1920}, {"lecturer_id": 6, "timeslot_id": 1923}, {"lecturer_id": 6, "timeslot_id": 1924}, {"lecturer_id": 6, "timeslot_id": 1925}, {"lecturer_id": 6, "timeslot_id": 1926}, {"lecturer_id": 6, "timeslot_id": 1927}, {"lecturer_id": 6, "timeslot_id": 1928}, {"lecturer_id": 6, "timeslot_id": 1929}, {"lecturer_id": 6, "timeslot_id": 1932}, {"lecturer_id": 6, "timeslot_id": 1936}, {"lecturer_id": 6, "timeslot_id": 1937}, {"lecturer_id": 6, "timeslot_id": 1938}, {"lecturer_id": 6, "timeslot_id": 1939}, {"lecturer_id": 6, "timeslot_id": 1940}, {"lecturer_id": 6, "timeslot_id": 1941}, {"lecturer_id": 7, "timeslot_id": 1901}, {"lecturer_id": 7, "timeslot_id": 1902}, {"lecturer_id": 7, "timeslot_id": 1904}, {"lecturer_id": 7, "timeslot_id": 1911}, {"lecturer_id": 7, "timeslot_id": 1912}, {"lecturer_id": 7, "timeslot_id": 1915}, {"lecturer_id": 7, "timeslot_id": 1916}, {"lecturer_id": 7, "timeslot_id": 1918}, {"lecturer_id": 7, "timeslot_id": 1920}, {"lecturer_id": 7, "timeslot_id": 1921}, {"lecturer_id": 7, "timeslot_id": 1922}, {"lecturer_id": 7, "timeslot_id": 1923}, {"lecturer_id": 7, "timeslot_id": 1924}, {"lecturer_id": 7, "timeslot_id": 1925}, {"lecturer_id": 7, "timeslot_id": 1928}, {"lecturer_id": 7, "timeslot_id": 1930}, {"lecturer_id": 7, "timeslot_id": 1931}, {"lecturer_id": 7, "timeslot_id": 1932}, {"lecturer_id": 7, "timeslot_id": 1933}, {"lecturer_id": 7, "timeslot_id": 1934}, {"lecturer_id": 7, "timeslot_id": 1937}, {"lecturer_id": 7, "timeslot_id": 1939}, {"lecturer_id": 7, "timeslot_id": 1940}, {"lecturer_id": 7, "timeslot_id": 1942}, {"lecturer_id": 8, "timeslot_id": 1900}, {"lecturer_id": 8, "timeslot_id": 1903}, {"lecturer_id": 8, "timeslot_id": 1905}, {"lecturer_id": 8, "timeslot_id": 1906}, {"lecturer_id": 8, "timeslot_id": 1908}, {"lecturer_id": 8, "timeslot_id": 1911}, {"lecturer_id": 8, "timeslot_id": 1913}, {"lecturer_id": 8, "timeslot_id": 1915}, {"lecturer_id": 8, "timeslot_id": 1919}, {"lecturer_id": 8, "timeslot_id": 1927}, {"lecturer_id": 8, "timeslot_id": 1934}, {"lecturer_id": 8, "timeslot_id": 1936}, {"lecturer_id": 8, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1899}, {"lecturer_id": 9, "timeslot_id": 1900}, {"lecturer_id": 9, "timeslot_id": 1901}, {"lecturer_id": 9, "timeslot_id": 1902}, {"lecturer_id": 9, "timeslot_id": 1903}, {"lecturer_id": 9, "timeslot_id": 1904}, {"lecturer_id": 9, "timeslot_id": 1905}, {"lecturer_id": 9, "timeslot_id": 1906}, {"lecturer_id": 9, "timeslot_id": 1907}, {"lecturer_id": 9, "timeslot_id": 1908}, {"lecturer_id": 9, "timeslot_id": 1909}, {"lecturer_id": 9, "timeslot_id": 1910}, {"lecturer_id": 9, "timeslot_id": 1911}, {"lecturer_id": 9, "timeslot_id": 1912}, {"lecturer_id": 9, "timeslot_id": 1913}, {"lecturer_id": 9, "timeslot_id": 1914}, {"lecturer_id": 9, "timeslot_id": 1915}, {"lecturer_id": 9, "timeslot_id": 1916}, {"lecturer_id": 9, "timeslot_id": 1917}, {"lecturer_id": 9, "timeslot_id": 1918}, {"lecturer_id": 9, "timeslot_id": 1919}, {"lecturer_id": 9, "timeslot_id": 1920}, {"lecturer_id": 9, "timeslot_id": 1921}, {"lecturer_id": 9, "timeslot_id": 1922}, {"lecturer_id": 9, "timeslot_id": 1923}, {"lecturer_id": 9, "timeslot_id": 1924}, {"lecturer_id": 9, "timeslot_id": 1925}, {"lecturer_id": 9, "timeslot_id": 1926}, {"lecturer_id": 9, "timeslot_id": 1927}, {"lecturer_id": 9, "timeslot_id": 1928}, {"lecturer_id": 9, "timeslot_id": 1929}, {"lecturer_id": 9, "timeslot_id": 1930}, {"lecturer_id": 9, "timeslot_id": 1931}, {"lecturer_id": 9, "timeslot_id": 1932}, {"lecturer_id": 9, "timeslot_id": 1933}, {"lecturer_id": 9, "timeslot_id": 1934}, {"lecturer_id": 9, "timeslot_id": 1935}, {"lecturer_id": 9, "timeslot_id": 1936}, {"lecturer_id": 9, "timeslot_id": 1937}, {"lecturer_id": 9, "timeslot_id": 1938}, {"lecturer_id": 9, "timeslot_id": 1939}, {"lecturer_id": 9, "timeslot_id": 1940}, {"lecturer_id": 9, "timeslot_id": 1941}, {"lecturer_id": 9, "timeslot_id": 1942}, {"lecturer_id": 9, "timeslot_id": 1943}, {"lecturer_id": 10, "timeslot_id": 1899}, {"lecturer_id": 10, "timeslot_id": 1900}, {"lecturer_id": 10, "timeslot_id": 1901}, {"lecturer_id": 10, "timeslot_id": 1904}, {"lecturer_id": 10, "timeslot_id": 1906}, {"lecturer_id": 10, "timeslot_id": 1907}, {"lecturer_id": 10, "timeslot_id": 1909}, {"lecturer_id": 10, "timeslot_id": 1910}, {"lecturer_id": 10, "timeslot_id": 1912}, {"lecturer_id": 10, "timeslot_id": 1914}, {"lecturer_id": 10, "timeslot_id": 1915}, {"lecturer_id": 10, "timeslot_id": 1917}, {"lecturer_id": 10, "timeslot_id": 1918}, {"lecturer_id": 10, "timeslot_id": 1919}, {"lecturer_id": 10, "timeslot_id": 1920}, {"lecturer_id": 10, "timeslot_id": 1921}, {"lecturer_id": 10, "timeslot_id": 1924}, {"lecturer_id": 10, "timeslot_id": 1925}, {"lecturer_id": 10, "timeslot_id": 1926}, {"lecturer_id": 10, "timeslot_id": 1927}, {"lecturer_id": 10, "timeslot_id": 1929}, {"lecturer_id": 10, "timeslot_id": 1930}, {"lecturer_id": 10, "timeslot_id": 1932}, {"lecturer_id": 10, "timeslot_id": 1935}, {"lecturer_id": 10, "timeslot_id": 1937}, {"lecturer_id": 10, "timeslot_id": 1940}, {"lecturer_id": 10, "timeslot_id": 1941}, {"lecturer_id": 11, "timeslot_id": 1900}, {"lecturer_id": 11, "timeslot_id": 1901}, {"lecturer_id": 11, "timeslot_id": 1902}, {"lecturer_id": 11, "timeslot_id": 1904}, {"lecturer_id": 11, "timeslot_id": 1906}, {"lecturer_id": 11, "timeslot_id": 1907}, {"lecturer_id": 11, "timeslot_id": 1909}, {"lecturer_id": 11, "timeslot_id": 1910}, {"lecturer_id": 11, "timeslot_id": 1912}, {"lecturer_id": 11, "timeslot_id": 1913}, {"lecturer_id": 11, "timeslot_id": 1915}, {"lecturer_id": 11, "timeslot_id": 1919}, {"lecturer_id": 11, "timeslot_id": 1920}, {"lecturer_id": 11, "timeslot_id": 1921}, {"lecturer_id": 11, "timeslot_id": 1922}, {"lecturer_id": 11, "timeslot_id": 1923}, {"lecturer_id": 11, "timeslot_id": 1924}, {"lecturer_id": 11, "timeslot_id": 1926}, {"lecturer_id": 11, "timeslot_id": 1927}, {"lecturer_id": 11, "timeslot_id": 1929}, {"lecturer_id": 11, "timeslot_id": 1930}, {"lecturer_id": 11, "timeslot_id": 1932}, {"lecturer_id": 11, "timeslot_id": 1935}, {"lecturer_id": 11, "timeslot_id": 1936}, {"lecturer_id": 11, "timeslot_id": 1937}, {"lecturer_id": 11, "timeslot_id": 1938}, {"lecturer_id": 11, "timeslot_id": 1940}, {"lecturer_id": 11, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1900}, {"lecturer_id": 12, "timeslot_id": 1907}, {"lecturer_id": 12, "timeslot_id": 1909}, {"lecturer_id": 12, "timeslot_id": 1915}, {"lecturer_id": 12, "timeslot_id": 1917}, {"lecturer_id": 12, "timeslot_id": 1919}, {"lecturer_id": 12, "timeslot_id": 1920}, {"lecturer_id": 12, "timeslot_id": 1922}, {"lecturer_id": 12, "timeslot_id": 1925}, {"lecturer_id": 12, "timeslot_id": 1926}, {"lecturer_id": 12, "timeslot_id": 1928}, {"lecturer_id": 12, "timeslot_id": 1929}, {"lecturer_id": 12, "timeslot_id": 1933}, {"lecturer_id": 12, "timeslot_id": 1938}, {"lecturer_id": 12, "timeslot_id": 1939}, {"lecturer_id": 12, "timeslot_id": 1940}, {"lecturer_id": 12, "timeslot_id": 1941}, {"lecturer_id": 12, "timeslot_id": 1942}, {"lecturer_id": 12, "timeslot_id": 1943}, {"lecturer_id": 13, "timeslot_id": 1900}, {"lecturer_id": 13, "timeslot_id": 1903}, {"lecturer_id": 13, "timeslot_id": 1905}, {"lecturer_id": 13, "timeslot_id": 1908}, {"lecturer_id": 13, "timeslot_id": 1910}, {"lecturer_id": 13, "timeslot_id": 1911}, {"lecturer_id": 13, "timeslot_id": 1914}, {"lecturer_id": 13, "timeslot_id": 1916}, {"lecturer_id": 13, "timeslot_id": 1918}, {"lecturer_id": 13, "timeslot_id": 1925}, {"lecturer_id": 13, "timeslot_id": 1927}, {"lecturer_id": 13, "timeslot_id": 1928}, {"lecturer_id": 13, "timeslot_id": 1929}, {"lecturer_id": 13, "timeslot_id": 1931}, {"lecturer_id": 13, "timeslot_id": 1932}, {"lecturer_id": 13, "timeslot_id": 1935}, {"lecturer_id": 13, "timeslot_id": 1936}, {"lecturer_id": 13, "timeslot_id": 1937}, {"lecturer_id": 13, "timeslot_id": 1938}, {"lecturer_id": 13, "timeslot_id": 1939}, {"lecturer_id": 13, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1899}, {"lecturer_id": 14, "timeslot_id": 1900}, {"lecturer_id": 14, "timeslot_id": 1901}, {"lecturer_id": 14, "timeslot_id": 1902}, {"lecturer_id": 14, "timeslot_id": 1903}, {"lecturer_id": 14, "timeslot_id": 1905}, {"lecturer_id": 14, "timeslot_id": 1906}, {"lecturer_id": 14, "timeslot_id": 1908}, {"lecturer_id": 14, "timeslot_id": 1909}, {"lecturer_id": 14, "timeslot_id": 1910}, {"lecturer_id": 14, "timeslot_id": 1911}, {"lecturer_id": 14, "timeslot_id": 1912}, {"lecturer_id": 14, "timeslot_id": 1913}, {"lecturer_id": 14, "timeslot_id": 1914}, {"lecturer_id": 14, "timeslot_id": 1915}, {"lecturer_id": 14, "timeslot_id": 1917}, {"lecturer_id": 14, "timeslot_id": 1918}, {"lecturer_id": 14, "timeslot_id": 1920}, {"lecturer_id": 14, "timeslot_id": 1921}, {"lecturer_id": 14, "timeslot_id": 1922}, {"lecturer_id": 14, "timeslot_id": 1923}, {"lecturer_id": 14, "timeslot_id": 1924}, {"lecturer_id": 14, "timeslot_id": 1925}, {"lecturer_id": 14, "timeslot_id": 1926}, {"lecturer_id": 14, "timeslot_id": 1928}, {"lecturer_id": 14, "timeslot_id": 1929}, {"lecturer_id": 14, "timeslot_id": 1930}, {"lecturer_id": 14, "timeslot_id": 1931}, {"lecturer_id": 14, "timeslot_id": 1932}, {"lecturer_id": 14, "timeslot_id": 1933}, {"lecturer_id": 14, "timeslot_id": 1934}, {"lecturer_id": 14, "timeslot_id": 1935}, {"lecturer_id": 14, "timeslot_id": 1936}, {"lecturer_id": 14, "timeslot_id": 1938}, {"lecturer_id": 14, "timeslot_id": 1941}, {"lecturer_id": 14, "timeslot_id": 1942}, {"lecturer_id": 14, "timeslot_id": 1943}, {"lecturer_id": 15, "timeslot_id": 1899}, {"lecturer_id": 15, "timeslot_id": 1900}, {"lecturer_id": 15, "timeslot_id": 1901}, {"lecturer_id": 15, "timeslot_id": 1902}, {"lecturer_id": 15, "timeslot_id": 1903}, {"lecturer_id": 15, "timeslot_id": 1904}, {"lecturer_id": 15, "timeslot_id": 1905}, {"lecturer_id": 15, "timeslot_id": 1906}, {"lecturer_id": 15, "timeslot_id": 1907}, {"lecturer_id": 15, "timeslot_id": 1908}, {"lecturer_id": 15, "timeslot_id": 1909}, {"lecturer_id": 15, "timeslot_id": 1910}, {"lecturer_id": 15, "timeslot_id": 1911}, {"lecturer_id": 15, "timeslot_id": 1912}, {"lecturer_id": 15, "timeslot_id": 1913}, {"lecturer_id": 15, "timeslot_id": 1914}, {"lecturer_id": 15, "timeslot_id": 1915}, {"lecturer_id": 15, "timeslot_id": 1916}, {"lecturer_id": 15, "timeslot_id": 1917}, {"lecturer_id": 15, "timeslot_id": 1918}, {"lecturer_id": 15, "timeslot_id": 1919}, {"lecturer_id": 15, "timeslot_id": 1920}, {"lecturer_id": 15, "timeslot_id": 1921}, {"lecturer_id": 15, "timeslot_id": 1922}, {"lecturer_id": 15, "timeslot_id": 1923}, {"lecturer_id": 15, "timeslot_id": 1924}, {"lecturer_id": 15, "timeslot_id": 1925}, {"lecturer_id": 15, "timeslot_id": 1926}, {"lecturer_id": 15, "timeslot_id": 1927}, {"lecturer_id": 15, "timeslot_id": 1928}, {"lecturer_id": 15, "timeslot_id": 1929}, {"lecturer_id": 15, "timeslot_id": 1930}, {"lecturer_id": 15, "timeslot_id": 1931}, {"lecturer_id": 15, "timeslot_id": 1932}, {"lecturer_id": 15, "timeslot_id": 1933}, {"lecturer_id": 15, "timeslot_id": 1934}, {"lecturer_id": 15, "timeslot_id": 1935}, {"lecturer_id": 15, "timeslot_id": 1936}, {"lecturer_id": 15, "timeslot_id": 1937}, {"lecturer_id": 15, "timeslot_id": 1938}, {"lecturer_id": 15, "timeslot_id": 1939}, {"lecturer_id": 15, "timeslot_id": 1940}, {"lecturer_id": 15, "timeslot_id": 1941}, {"lecturer_id": 15, "timeslot_id": 1942}, {"lecturer_id": 15, "timeslot_id": 1943}, {"lecturer_id": 16, "timeslot_id": 1900}, {"lecturer_id": 16, "timeslot_id": 1909}, {"lecturer_id": 16, "timeslot_id": 1910}, {"lecturer_id": 16, "timeslot_id": 1912}, {"lecturer_id": 16, "timeslot_id": 1914}, {"lecturer_id": 16, "timeslot_id": 1919}, {"lecturer_id": 16, "timeslot_id": 1921}, {"lecturer_id": 16, "timeslot_id": 1922}, {"lecturer_id": 16, "timeslot_id": 1924}, {"lecturer_id": 16, "timeslot_id": 1926}, {"lecturer_id": 16, "timeslot_id": 1929}, {"lecturer_id": 16, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1899}, {"lecturer_id": 17, "timeslot_id": 1900}, {"lecturer_id": 17, "timeslot_id": 1901}, {"lecturer_id": 17, "timeslot_id": 1902}, {"lecturer_id": 17, "timeslot_id": 1903}, {"lecturer_id": 17, "timeslot_id": 1904}, {"lecturer_id": 17, "timeslot_id": 1905}, {"lecturer_id": 17, "timeslot_id": 1910}, {"lecturer_id": 17, "timeslot_id": 1911}, {"lecturer_id": 17, "timeslot_id": 1912}, {"lecturer_id": 17, "timeslot_id": 1914}, {"lecturer_id": 17, "timeslot_id": 1915}, {"lecturer_id": 17, "timeslot_id": 1916}, {"lecturer_id": 17, "timeslot_id": 1917}, {"lecturer_id": 17, "timeslot_id": 1918}, {"lecturer_id": 17, "timeslot_id": 1919}, {"lecturer_id": 17, "timeslot_id": 1920}, {"lecturer_id": 17, "timeslot_id": 1921}, {"lecturer_id": 17, "timeslot_id": 1922}, {"lecturer_id": 17, "timeslot_id": 1923}, {"lecturer_id": 17, "timeslot_id": 1925}, {"lecturer_id": 17, "timeslot_id": 1926}, {"lecturer_id": 17, "timeslot_id": 1927}, {"lecturer_id": 17, "timeslot_id": 1928}, {"lecturer_id": 17, "timeslot_id": 1931}, {"lecturer_id": 17, "timeslot_id": 1932}, {"lecturer_id": 17, "timeslot_id": 1933}, {"lecturer_id": 17, "timeslot_id": 1934}, {"lecturer_id": 17, "timeslot_id": 1935}, {"lecturer_id": 17, "timeslot_id": 1936}, {"lecturer_id": 17, "timeslot_id": 1938}, {"lecturer_id": 17, "timeslot_id": 1939}, {"lecturer_id": 17, "timeslot_id": 1940}, {"lecturer_id": 17, "timeslot_id": 1941}, {"lecturer_id": 17, "timeslot_id": 1942}, {"lecturer_id": 17, "timeslot_id": 1943}, {"lecturer_id": 18, "timeslot_id": 1900}, {"lecturer_id": 18, "timeslot_id": 1904}, {"lecturer_id": 18, "timeslot_id": 1916}, {"lecturer_id": 18, "timeslot_id": 1921}, {"lecturer_id": 18, "timeslot_id": 1927}, {"lecturer_id": 18, "timeslot_id": 1937}, {"lecturer_id": 18, "timeslot_id": 1938}, {"lecturer_id": 18, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1902}, {"lecturer_id": 19, "timeslot_id": 1903}, {"lecturer_id": 19, "timeslot_id": 1905}, {"lecturer_id": 19, "timeslot_id": 1909}, {"lecturer_id": 19, "timeslot_id": 1910}, {"lecturer_id": 19, "timeslot_id": 1911}, {"lecturer_id": 19, "timeslot_id": 1912}, {"lecturer_id": 19, "timeslot_id": 1915}, {"lecturer_id": 19, "timeslot_id": 1916}, {"lecturer_id": 19, "timeslot_id": 1918}, {"lecturer_id": 19, "timeslot_id": 1920}, {"lecturer_id": 19, "timeslot_id": 1922}, {"lecturer_id": 19, "timeslot_id": 1925}, {"lecturer_id": 19, "timeslot_id": 1926}, {"lecturer_id": 19, "timeslot_id": 1927}, {"lecturer_id": 19, "timeslot_id": 1930}, {"lecturer_id": 19, "timeslot_id": 1931}, {"lecturer_id": 19, "timeslot_id": 1935}, {"lecturer_id": 19, "timeslot_id": 1936}, {"lecturer_id": 19, "timeslot_id": 1937}, {"lecturer_id": 19, "timeslot_id": 1938}, {"lecturer_id": 19, "timeslot_id": 1939}, {"lecturer_id": 19, "timeslot_id": 1940}, {"lecturer_id": 20, "timeslot_id": 1900}, {"lecturer_id": 20, "timeslot_id": 1903}, {"lecturer_id": 20, "timeslot_id": 1910}, {"lecturer_id": 20, "timeslot_id": 1918}, {"lecturer_id": 20, "timeslot_id": 1922}, {"lecturer_id": 20, "timeslot_id": 1923}, {"lecturer_id": 20, "timeslot_id": 1929}, {"lecturer_id": 20, "timeslot_id": 1936}, {"lecturer_id": 20, "timeslot_id": 1939}, {"lecturer_id": 20, "timeslot_id": 1942}, {"lecturer_id": 20, "timeslot_id": 1943}, {"lecturer_id": 21, "timeslot_id": 1899}, {"lecturer_id": 21, "timeslot_id": 1900}, {"lecturer_id": 21, "timeslot_id": 1901}, {"lecturer_id": 21, "timeslot_id": 1902}, {"lecturer_id": 21, "timeslot_id": 1903}, {"lecturer_id": 21, "timeslot_id": 1904}, {"lecturer_id": 21, "timeslot_id": 1905}, {"lecturer_id": 21, "timeslot_id": 1906}, {"lecturer_id": 21, "timeslot_id": 1907}, {"lecturer_id": 21, "timeslot_id": 1908}, {"lecturer_id": 21, "timeslot_id": 1909}, {"lecturer_id": 21, "timeslot_id": 1910}, {"lecturer_id": 21, "timeslot_id": 1911}, {"lecturer_id": 21, "timeslot_id": 1912}, {"lecturer_id": 21, "timeslot_id": 1913}, {"lecturer_id": 21, "timeslot_id": 1914}, {"lecturer_id": 21, "timeslot_id": 1915}, {"lecturer_id": 21, "timeslot_id": 1916}, {"lecturer_id": 21, "timeslot_id": 1917}, {"lecturer_id": 21, "timeslot_id": 1918}, {"lecturer_id": 21, "timeslot_id": 1919}, {"lecturer_id": 21, "timeslot_id": 1920}, {"lecturer_id": 21, "timeslot_id": 1921}, {"lecturer_id": 21, "timeslot_id": 1922}, {"lecturer_id": 21, "timeslot_id": 1923}, {"lecturer_id": 21, "timeslot_id": 1924}, {"lecturer_id": 21, "timeslot_id": 1925}, {"lecturer_id": 21, "timeslot_id": 1926}, {"lecturer_id": 21, "timeslot_id": 1927}, {"lecturer_id": 21, "timeslot_id": 1928}, {"lecturer_id": 21, "timeslot_id": 1929}, {"lecturer_id": 21, "timeslot_id": 1930}, {"lecturer_id": 21, "timeslot_id": 1931}, {"lecturer_id": 21, "timeslot_id": 1932}, {"lecturer_id": 21, "timeslot_id": 1933}, {"lecturer_id": 21, "timeslot_id": 1934}, {"lecturer_id": 21, "timeslot_id": 1935}, {"lecturer_id": 21, "timeslot_id": 1936}, {"lecturer_id": 21, "timeslot_id": 1937}, {"lecturer_id": 21, "timeslot_id": 1938}, {"lecturer_id": 21, "timeslot_id": 1939}, {"lecturer_id": 21, "timeslot_id": 1940}, {"lecturer_id": 21, "timeslot_id": 1941}, {"lecturer_id": 21, "timeslot_id": 1942}, {"lecturer_id": 21, "timeslot_id": 1943}, {"lecturer_id": 22, "timeslot_id": 1899}, {"lecturer_id": 22, "timeslot_id": 1901}, {"lecturer_id": 22, "timeslot_id": 1902}, {"lecturer_id": 22, "timeslot_id": 1903}, {"lecturer_id": 22, "timeslot_id": 1904}, {"lecturer_id": 22, "timeslot_id": 1905}, {"lecturer_id": 22, "timeslot_id": 1906}, {"lecturer_id": 22, "timeslot_id": 1907}, {"lecturer_id": 22, "timeslot_id": 1911}, {"lecturer_id": 22, "timeslot_id": 1912}, {"lecturer_id": 22, "timeslot_id": 1913}, {"lecturer_id": 22, "timeslot_id": 1914}, {"lecturer_id": 22, "timeslot_id": 1915}, {"lecturer_id": 22, "timeslot_id": 1916}, {"lecturer_id": 22, "timeslot_id": 1917}, {"lecturer_id": 22, "timeslot_id": 1918}, {"lecturer_id": 22, "timeslot_id": 1919}, {"lecturer_id": 22, "timeslot_id": 1920}, {"lecturer_id": 22, "timeslot_id": 1921}, {"lecturer_id": 22, "timeslot_id": 1923}, {"lecturer_id": 22, "timeslot_id": 1925}, {"lecturer_id": 22, "timeslot_id": 1926}, {"lecturer_id": 22, "timeslot_id": 1927}, {"lecturer_id": 22, "timeslot_id": 1928}, {"lecturer_id": 22, "timeslot_id": 1929}, {"lecturer_id": 22, "timeslot_id": 1931}, {"lecturer_id": 22, "timeslot_id": 1932}, {"lecturer_id": 22, "timeslot_id": 1933}, {"lecturer_id": 22, "timeslot_id": 1934}, {"lecturer_id": 22, "timeslot_id": 1935}, {"lecturer_id": 22, "timeslot_id": 1936}, {"lecturer_id": 22, "timeslot_id": 1937}, {"lecturer_id": 22, "timeslot_id": 1938}, {"lecturer_id": 22, "timeslot_id": 1939}, {"lecturer_id": 22, "timeslot_id": 1940}, {"lecturer_id": 22, "timeslot_id": 1942}, {"lecturer_id": 22, "timeslot_id": 1943}, {"lecturer_id": 23, "timeslot_id": 1899}, {"lecturer_id": 23, "timeslot_id": 1900}, {"lecturer_id": 23, "timeslot_id": 1901}, {"lecturer_id": 23, "timeslot_id": 1902}, {"lecturer_id": 23, "timeslot_id": 1903}, {"lecturer_id": 23, "timeslot_id": 1904}, {"lecturer_id": 23, "timeslot_id": 1905}, {"lecturer_id": 23, "timeslot_id": 1906}, {"lecturer_id": 23, "timeslot_id": 1907}, {"lecturer_id": 23, "timeslot_id": 1908}, {"lecturer_id": 23, "timeslot_id": 1909}, {"lecturer_id": 23, "timeslot_id": 1910}, {"lecturer_id": 23, "timeslot_id": 1911}, {"lecturer_id": 23, "timeslot_id": 1912}, {"lecturer_id": 23, "timeslot_id": 1913}, {"lecturer_id": 23, "timeslot_id": 1914}, {"lecturer_id": 23, "timeslot_id": 1915}, {"lecturer_id": 23, "timeslot_id": 1916}, {"lecturer_id": 23, "timeslot_id": 1917}, {"lecturer_id": 23, "timeslot_id": 1918}, {"lecturer_id": 23, "timeslot_id": 1919}, {"lecturer_id": 23, "timeslot_id": 1920}, {"lecturer_id": 23, "timeslot_id": 1921}, {"lecturer_id": 23, "timeslot_id": 1922}, {"lecturer_id": 23, "timeslot_id": 1923}, {"lecturer_id": 23, "timeslot_id": 1924}, {"lecturer_id": 23, "timeslot_id": 1925}, {"lecturer_id": 23, "timeslot_id": 1926}, {"lecturer_id": 23, "timeslot_id": 1927}, {"lecturer_id": 23, "timeslot_id": 1928}, {"lecturer_id": 23, "timeslot_id": 1929}, {"lecturer_id": 23, "timeslot_id": 1930}, {"lecturer_id": 23, "timeslot_id": 1931}, {"lecturer_id": 23, "timeslot_id": 1932}, {"lecturer_id": 23, "timeslot_id": 1933}, {"lecturer_id": 23, "timeslot_id": 1934}, {"lecturer_id": 23, "timeslot_id": 1935}, {"lecturer_id": 23, "timeslot_id": 1936}, {"lecturer_id": 23, "timeslot_id": 1937}, {"lecturer_id": 23, "timeslot_id": 1938}, {"lecturer_id": 23, "timeslot_id": 1939}, {"lecturer_id": 23, "timeslot_id": 1940}, {"lecturer_id": 23, "timeslot_id": 1941}, {"lecturer_id": 23, "timeslot_id": 1942}, {"lecturer_id": 23, "timeslot_id": 1943}, {"lecturer_id": 24, "timeslot_id": 1902}, {"lecturer_id": 24, "timeslot_id": 1904}, {"lecturer_id": 24, "timeslot_id": 1905}, {"lecturer_id": 24, "timeslot_id": 1907}, {"lecturer_id": 24, "timeslot_id": 1909}, {"lecturer_id": 24, "timeslot_id": 1911}, {"lecturer_id": 24, "timeslot_id": 1912}, {"lecturer_id": 24, "timeslot_id": 1913}, {"lecturer_id": 24, "timeslot_id": 1916}, {"lecturer_id": 24, "timeslot_id": 1919}, {"lecturer_id": 24, "timeslot_id": 1931}, {"lecturer_id": 24, "timeslot_id": 1932}, {"lecturer_id": 24, "timeslot_id": 1933}, {"lecturer_id": 24, "timeslot_id": 1938}, {"lecturer_id": 25, "timeslot_id": 1914}, {"lecturer_id": 25, "timeslot_id": 1915}, {"lecturer_id": 25, "timeslot_id": 1919}, {"lecturer_id": 25, "timeslot_id": 1921}, {"lecturer_id": 25, "timeslot_id": 1925}, {"lecturer_id": 25, "timeslot_id": 1931}, {"lecturer_id": 25, "timeslot_id": 1937}, {"lecturer_id": 25, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1899}, {"lecturer_id": 26, "timeslot_id": 1900}, {"lecturer_id": 26, "timeslot_id": 1901}, {"lecturer_id": 26, "timeslot_id": 1902}, {"lecturer_id": 26, "timeslot_id": 1903}, {"lecturer_id": 26, "timeslot_id": 1904}, {"lecturer_id": 26, "timeslot_id": 1905}, {"lecturer_id": 26, "timeslot_id": 1906}, {"lecturer_id": 26, "timeslot_id": 1907}, {"lecturer_id": 26, "timeslot_id": 1908}, {"lecturer_id": 26, "timeslot_id": 1909}, {"lecturer_id": 26, "timeslot_id": 1910}, {"lecturer_id": 26, "timeslot_id": 1911}, {"lecturer_id": 26, "timeslot_id": 1912}, {"lecturer_id": 26, "timeslot_id": 1913}, {"lecturer_id": 26, "timeslot_id": 1914}, {"lecturer_id": 26, "timeslot_id": 1915}, {"lecturer_id": 26, "timeslot_id": 1916}, {"lecturer_id": 26, "timeslot_id": 1917}, {"lecturer_id": 26, "timeslot_id": 1918}, {"lecturer_id": 26, "timeslot_id": 1919}, {"lecturer_id": 26, "timeslot_id": 1920}, {"lecturer_id": 26, "timeslot_id": 1921}, {"lecturer_id": 26, "timeslot_id": 1922}, {"lecturer_id": 26, "timeslot_id": 1923}, {"lecturer_id": 26, "timeslot_id": 1924}, {"lecturer_id": 26, "timeslot_id": 1925}, {"lecturer_id": 26, "timeslot_id": 1926}, {"lecturer_id": 26, "timeslot_id": 1927}, {"lecturer_id": 26, "timeslot_id": 1928}, {"lecturer_id": 26, "timeslot_id": 1929}, {"lecturer_id": 26, "timeslot_id": 1930}, {"lecturer_id": 26, "timeslot_id": 1931}, {"lecturer_id": 26, "timeslot_id": 1932}, {"lecturer_id": 26, "timeslot_id": 1933}, {"lecturer_id": 26, "timeslot_id": 1934}, {"lecturer_id": 26, "timeslot_id": 1935}, {"lecturer_id": 26, "timeslot_id": 1936}, {"lecturer_id": 26, "timeslot_id": 1937}, {"lecturer_id": 26, "timeslot_id": 1938}, {"lecturer_id": 26, "timeslot_id": 1939}, {"lecturer_id": 26, "timeslot_id": 1940}, {"lecturer_id": 26, "timeslot_id": 1941}, {"lecturer_id": 26, "timeslot_id": 1942}, {"lecturer_id": 26, "timeslot_id": 1943}, {"lecturer_id": 1090, "timeslot_id": 1899}, {"lecturer_id": 1090, "timeslot_id": 1900}, {"lecturer_id": 1090, "timeslot_id": 1903}, {"lecturer_id": 1090, "timeslot_id": 1904}, {"lecturer_id": 1090, "timeslot_id": 1905}, {"lecturer_id": 1090, "timeslot_id": 1906}, {"lecturer_id": 1090, "timeslot_id": 1908}, {"lecturer_id": 1090, "timeslot_id": 1909}, {"lecturer_id": 1090, "timeslot_id": 1910}, {"lecturer_id": 1090, "timeslot_id": 1912}, {"lecturer_id": 1090, "timeslot_id": 1913}, {"lecturer_id": 1090, "timeslot_id": 1916}, {"lecturer_id": 1090, "timeslot_id": 1917}, {"lecturer_id": 1090, "timeslot_id": 1918}, {"lecturer_id": 1090, "timeslot_id": 1921}, {"lecturer_id": 1090, "timeslot_id": 1922}, {"lecturer_id": 1090, "timeslot_id": 1923}, {"lecturer_id": 1090, "timeslot_id": 1924}, {"lecturer_id": 1090, "timeslot_id": 1925}, {"lecturer_id": 1090, "timeslot_id": 1926}, {"lecturer_id": 1090, "timeslot_id": 1929}, {"lecturer_id": 1090, "timeslot_id": 1931}, {"lecturer_id": 1090, "timeslot_id": 1933}, {"lecturer_id": 1090, "timeslot_id": 1934}, {"lecturer_id": 1090, "timeslot_id": 1935}, {"lecturer_id": 1090, "timeslot_id": 1938}, {"lecturer_id": 1090, "timeslot_id": 1939}, {"lecturer_id": 1090, "timeslot_id": 1940}, {"lecturer_id": 1090, "timeslot_id": 1942}, {"lecturer_id": 1090, "timeslot_id": 1943}], "group_status": {"42": "ELIGIBLE_D12", "44": "ELIGIBLE_D12", "45": "ELIGIBLE_D12", "46": "ELIGIBLE_D12", "48": "ELIGIBLE_D12", "49": "ELIGIBLE_D12", "52": "ELIGIBLE_D12", "55": "ELIGIBLE_D12", "57": "ELIGIBLE_D12", "58": "ELIGIBLE_D12", "59": "ELIGIBLE_D12", "61": "ELIGIBLE_D12", "62": "ELIGIBLE_D12", "65": "ELIGIBLE_D12", "68": "ELIGIBLE_D12", "69": "ELIGIBLE_D12"}, "soft_weights": {}, "group_project": {"42": 43, "44": 51, "45": 38, "46": 54, "48": 48, "49": 57, "52": 35, "55": 44, "57": 61, "58": 63, "59": 66, "61": 64, "62": 59, "65": 65, "68": 40, "69": 71}, "result_owner_mode": false, "project_supervisors": {"35": [4], "38": [7], "40": [4], "43": [9], "44": [4], "48": [1], "51": [7], "54": [12], "57": [15], "59": [17], "61": [4], "63": [4], "64": [19], "65": [4], "66": [20], "71": [22]}, "group_selected_slots": {"42": [1901, 1907, 1923, 1927, 1933, 1936, 1941, 1943], "44": [1904, 1905, 1907, 1911, 1918, 1922, 1925, 1929, 1937], "45": [1901, 1902, 1905, 1935], "46": [1899, 1900, 1906, 1910, 1913, 1930, 1931, 1941], "48": [1901, 1902, 1906, 1914, 1917, 1919, 1928, 1933, 1943], "49": [1904, 1908, 1910, 1924, 1927, 1934, 1938, 1941], "52": [1902, 1906, 1916, 1917, 1928, 1935, 1939, 1943], "55": [1899, 1916, 1928, 1938], "57": [1907, 1924, 1925, 1938, 1943], "58": [1902, 1906, 1936, 1938], "59": [1900, 1906, 1927], "61": [1902, 1905, 1910, 1923, 1924, 1929, 1935, 1943], "62": [1906, 1921, 1922, 1925, 1933], "65": [1921, 1923, 1929, 1930], "68": [1902, 1933, 1936], "69": [1903, 1909, 1911, 1912, 1915, 1918, 1921, 1925, 1938]}, "group_selection_mode": true, "reviewer_assignments": {"42": [2, 3, 4, 6, 10], "44": [1, 2, 6, 9, 10], "45": [1, 2, 9, 10, 11], "46": [1, 4, 8, 9, 11], "48": [6, 8, 9, 10, 11], "49": [2, 5, 7, 10, 11], "52": [2, 6, 9, 10, 12], "55": [2, 3, 7, 9, 12], "57": [1, 2, 3, 5, 12], "58": [1, 2, 3, 6, 11], "59": [6, 8, 10, 11, 12], "61": [1, 4, 9, 10, 11], "62": [6, 8, 9, 10, 11], "65": [1, 6, 10, 11, 12], "68": [3, 5, 6, 7, 11], "69": [3, 4, 6, 7, 10]}, "committee_constraints": [], "expected_reviewer_count": 5, "lecturer_load_preferences": {}, "prior_reviewer_continuity": {}, "committee_constraints_active": false}	{"random_seed": 1642027, "time_limit_seconds": 20.0}	1642027	14	\N	2026-08-22 18:02:39.049961+00	\N	\N
 \.
 
 
 --
--- Data for Name: schema_meta; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: schema_meta; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.schema_meta (key, value) FROM stdin;
@@ -9028,7 +8783,7 @@ product	capstone-defense-scheduler
 
 
 --
--- Data for Name: semester_lecturer_quotas; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: semester_lecturer_quotas; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.semester_lecturer_quotas (semester_id, lecturer_id, quota, updated_by, updated_at) FROM stdin;
@@ -9036,7 +8791,7 @@ COPY public.semester_lecturer_quotas (semester_id, lecturer_id, quota, updated_b
 
 
 --
--- Data for Name: semesters; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: semesters; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.semesters (id, code, name, status, created_at, start_date, end_date, note, academic_year, created_by, updated_by, updated_at) FROM stdin;
@@ -9045,7 +8800,15 @@ COPY public.semesters (id, code, name, status, created_at, start_date, end_date,
 
 
 --
--- Data for Name: session_results; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: session_groups; Type: TABLE DATA; Schema: public; Owner: scheduler
+--
+
+COPY public.session_groups (session_id, group_id, "position") FROM stdin;
+\.
+
+
+--
+-- Data for Name: session_results; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.session_results (id, session_id, outcome, note, entered_by, entered_at, correction_reason, before_json, after_json, remediation_due_at, verifier_lecturer_id, verify_status, before_group_status, after_group_status) FROM stdin;
@@ -9053,31 +8816,15 @@ COPY public.session_results (id, session_id, outcome, note, entered_by, entered_
 
 
 --
--- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.sessions (id, schedule_version_id, group_id, timeslot_id, room_id, start_at, end_at, status, makeup_of_session_id, council_id) FROM stdin;
-20	14	59	1900	19	2026-09-04 00:45:00+00	2026-09-04 01:30:00+00	PLANNED	\N	11
-24	14	68	1902	13	2026-09-04 02:30:00+00	2026-09-04 03:15:00+00	PLANNED	\N	15
-15	14	49	1904	14	2026-09-04 04:00:00+00	2026-09-04 04:45:00+00	PLANNED	\N	6
-22	14	62	1906	9	2026-09-04 06:15:00+00	2026-09-04 07:00:00+00	PLANNED	\N	13
-21	14	61	1910	10	2026-09-04 09:30:00+00	2026-09-04 10:15:00+00	PLANNED	\N	12
-25	14	69	1912	11	2026-09-04 11:15:00+00	2026-09-04 12:00:00+00	PLANNED	\N	16
-13	14	46	1913	12	2026-09-04 12:00:00+00	2026-09-04 12:45:00+00	PLANNED	\N	4
-16	14	52	1917	15	2026-09-05 02:30:00+00	2026-09-05 03:15:00+00	PLANNED	\N	7
-11	14	44	1918	16	2026-09-05 03:15:00+00	2026-09-05 04:00:00+00	PLANNED	\N	2
-14	14	48	1919	17	2026-09-05 04:00:00+00	2026-09-05 04:45:00+00	PLANNED	\N	5
-17	14	55	1928	18	2026-09-05 12:00:00+00	2026-09-05 12:45:00+00	PLANNED	\N	8
-23	14	65	1929	19	2026-09-06 00:00:00+00	2026-09-06 00:45:00+00	PLANNED	\N	14
-12	14	45	1935	13	2026-09-06 05:30:00+00	2026-09-06 06:15:00+00	PLANNED	\N	3
-19	14	58	1938	14	2026-09-06 08:00:00+00	2026-09-06 08:45:00+00	PLANNED	\N	10
-10	14	42	1941	9	2026-09-06 10:30:00+00	2026-09-06 11:15:00+00	PLANNED	\N	1
-18	14	57	1943	10	2026-09-06 12:00:00+00	2026-09-06 12:45:00+00	PLANNED	\N	9
 \.
 
 
 --
--- Data for Name: students; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: students; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.students (id, account_id, student_code) FROM stdin;
@@ -9188,7 +8935,7 @@ COPY public.students (id, account_id, student_code) FROM stdin;
 
 
 --
--- Data for Name: timeframe_break_windows; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: timeframe_break_windows; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.timeframe_break_windows (id, timeframe_version_id, sequence_number, name, start_time, end_time) FROM stdin;
@@ -9198,7 +8945,7 @@ COPY public.timeframe_break_windows (id, timeframe_version_id, sequence_number, 
 
 
 --
--- Data for Name: timeframe_versions; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: timeframe_versions; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.timeframe_versions (id, timeframe_id, version_number, status, start_time, end_time, block_duration_minutes, group_duration_minutes, change_reason, created_by, created_at, break_between_blocks_minutes, manual_timelines) FROM stdin;
@@ -9208,7 +8955,7 @@ COPY public.timeframe_versions (id, timeframe_id, version_number, status, start_
 
 
 --
--- Data for Name: timeframes; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: timeframes; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.timeframes (id, name, kind, archived_at, created_by, created_at, updated_at) FROM stdin;
@@ -9217,7 +8964,7 @@ COPY public.timeframes (id, name, kind, archived_at, created_by, created_at, upd
 
 
 --
--- Data for Name: timeslots; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: timeslots; Type: TABLE DATA; Schema: public; Owner: scheduler
 --
 
 COPY public.timeslots (id, round_day_id, start_at, end_at, active, part) FROM stdin;
@@ -9270,280 +9017,287 @@ COPY public.timeslots (id, round_day_id, start_at, end_at, active, part) FROM st
 
 
 --
--- Name: accounts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: accounts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.accounts_id_seq', 6723, true);
 
 
 --
--- Name: audit_events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: audit_events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
-SELECT pg_catalog.setval('public.audit_events_id_seq', 2527, true);
-
-
---
--- Name: auth_sessions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.auth_sessions_id_seq', 63, true);
+SELECT pg_catalog.setval('public.audit_events_id_seq', 2541, true);
 
 
 --
--- Name: committees_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: auth_sessions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
+--
+
+SELECT pg_catalog.setval('public.auth_sessions_id_seq', 66, true);
+
+
+--
+-- Name: committees_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.committees_id_seq', 931, true);
 
 
 --
--- Name: conflict_declarations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: conflict_declarations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.conflict_declarations_id_seq', 1, false);
 
 
 --
--- Name: councils_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: councils_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.councils_id_seq', 16, true);
 
 
 --
--- Name: db_cleanup_backup_20260822_160826_backup_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: db_cleanup_backup_20260822_160826_backup_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.db_cleanup_backup_20260822_160826_backup_id_seq', 1072, true);
 
 
 --
--- Name: excel_defense_councils_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: excel_defense_councils_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.excel_defense_councils_id_seq', 1, false);
 
 
 --
--- Name: excel_import_batches_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: excel_import_batches_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.excel_import_batches_id_seq', 1, false);
 
 
 --
--- Name: excel_projects_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: excel_projects_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.excel_projects_id_seq', 1, false);
 
 
 --
--- Name: excel_review_schedule_rows_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.excel_review_schedule_rows_id_seq', 1, false);
 
 
 --
--- Name: excel_sheet_rows_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: excel_sheet_rows_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.excel_sheet_rows_id_seq', 1, false);
 
 
 --
--- Name: excel_summary_workloads_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: excel_summary_workloads_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.excel_summary_workloads_id_seq', 1, false);
 
 
 --
--- Name: group_memberships_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: group_memberships_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.group_memberships_id_seq', 185, true);
 
 
 --
--- Name: groups_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: groups_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.groups_id_seq', 166, true);
 
 
 --
--- Name: h11_waivers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: h11_waivers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.h11_waivers_id_seq', 16, true);
 
 
 --
--- Name: lecturers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: lecturers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.lecturers_id_seq', 3471, true);
 
 
 --
--- Name: majors_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: majors_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.majors_id_seq', 1032, true);
 
 
 --
--- Name: notifications_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: manual_schedule_sessions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
+--
+
+SELECT pg_catalog.setval('public.manual_schedule_sessions_id_seq', 1, false);
+
+
+--
+-- Name: notifications_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.notifications_id_seq', 40, true);
 
 
 --
--- Name: outbox_jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: outbox_jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.outbox_jobs_id_seq', 40, true);
 
 
 --
--- Name: projects_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: projects_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.projects_id_seq', 258, true);
 
 
 --
--- Name: remediation_cases_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: remediation_cases_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.remediation_cases_id_seq', 1, false);
 
 
 --
--- Name: reschedule_requests_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: reschedule_requests_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.reschedule_requests_id_seq', 1, false);
 
 
 --
--- Name: rooms_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: rooms_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.rooms_id_seq', 39, true);
 
 
 --
--- Name: round_days_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: round_days_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.round_days_id_seq', 372, true);
 
 
 --
--- Name: round_operation_records_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: round_operation_records_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.round_operation_records_id_seq', 1, false);
 
 
 --
--- Name: rounds_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: rounds_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.rounds_id_seq', 562, true);
 
 
 --
--- Name: schedule_assignments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: schedule_assignments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.schedule_assignments_id_seq', 19, true);
 
 
 --
--- Name: schedule_change_records_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: schedule_change_records_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.schedule_change_records_id_seq', 1, false);
 
 
 --
--- Name: schedule_versions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: schedule_versions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.schedule_versions_id_seq', 33, true);
 
 
 --
--- Name: scheduler_jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: scheduler_jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.scheduler_jobs_id_seq', 5, true);
 
 
 --
--- Name: semesters_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: semesters_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.semesters_id_seq', 1120, true);
 
 
 --
--- Name: session_results_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: session_results_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.session_results_id_seq', 1, false);
 
 
 --
--- Name: sessions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: sessions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.sessions_id_seq', 44, true);
 
 
 --
--- Name: students_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: students_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.students_id_seq', 1160, true);
 
 
 --
--- Name: timeframe_break_windows_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: timeframe_break_windows_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.timeframe_break_windows_id_seq', 234, true);
 
 
 --
--- Name: timeframe_versions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: timeframe_versions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.timeframe_versions_id_seq', 203, true);
 
 
 --
--- Name: timeframes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: timeframes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.timeframes_id_seq', 117, true);
 
 
 --
--- Name: timeslots_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: timeslots_id_seq; Type: SEQUENCE SET; Schema: public; Owner: scheduler
 --
 
 SELECT pg_catalog.setval('public.timeslots_id_seq', 2646, true);
 
 
 --
--- Name: account_roles account_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_roles account_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.account_roles
@@ -9551,7 +9305,7 @@ ALTER TABLE ONLY public.account_roles
 
 
 --
--- Name: accounts accounts_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: accounts accounts_email_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.accounts
@@ -9559,7 +9313,7 @@ ALTER TABLE ONLY public.accounts
 
 
 --
--- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.accounts
@@ -9567,7 +9321,7 @@ ALTER TABLE ONLY public.accounts
 
 
 --
--- Name: alembic_version alembic_version_pkc; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: alembic_version alembic_version_pkc; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.alembic_version
@@ -9575,7 +9329,7 @@ ALTER TABLE ONLY public.alembic_version
 
 
 --
--- Name: audit_events audit_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: audit_events audit_events_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.audit_events
@@ -9583,7 +9337,7 @@ ALTER TABLE ONLY public.audit_events
 
 
 --
--- Name: auth_login_throttles auth_login_throttles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: auth_login_throttles auth_login_throttles_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.auth_login_throttles
@@ -9591,7 +9345,7 @@ ALTER TABLE ONLY public.auth_login_throttles
 
 
 --
--- Name: auth_sessions auth_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: auth_sessions auth_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.auth_sessions
@@ -9599,7 +9353,7 @@ ALTER TABLE ONLY public.auth_sessions
 
 
 --
--- Name: auth_sessions auth_sessions_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: auth_sessions auth_sessions_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.auth_sessions
@@ -9607,7 +9361,7 @@ ALTER TABLE ONLY public.auth_sessions
 
 
 --
--- Name: committee_members committee_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: committee_members committee_members_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.committee_members
@@ -9615,7 +9369,7 @@ ALTER TABLE ONLY public.committee_members
 
 
 --
--- Name: committees committees_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: committees committees_code_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.committees
@@ -9623,7 +9377,7 @@ ALTER TABLE ONLY public.committees
 
 
 --
--- Name: committees committees_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: committees committees_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.committees
@@ -9631,7 +9385,7 @@ ALTER TABLE ONLY public.committees
 
 
 --
--- Name: conflict_declarations conflict_declarations_lecturer_id_project_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: conflict_declarations conflict_declarations_lecturer_id_project_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.conflict_declarations
@@ -9639,7 +9393,7 @@ ALTER TABLE ONLY public.conflict_declarations
 
 
 --
--- Name: conflict_declarations conflict_declarations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: conflict_declarations conflict_declarations_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.conflict_declarations
@@ -9647,7 +9401,7 @@ ALTER TABLE ONLY public.conflict_declarations
 
 
 --
--- Name: council_members council_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: council_members council_members_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.council_members
@@ -9655,7 +9409,7 @@ ALTER TABLE ONLY public.council_members
 
 
 --
--- Name: councils councils_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: councils councils_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.councils
@@ -9663,7 +9417,7 @@ ALTER TABLE ONLY public.councils
 
 
 --
--- Name: db_cleanup_backup_20260822_160826 db_cleanup_backup_20260822_160826_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: db_cleanup_backup_20260822_160826 db_cleanup_backup_20260822_160826_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.db_cleanup_backup_20260822_160826
@@ -9671,7 +9425,7 @@ ALTER TABLE ONLY public.db_cleanup_backup_20260822_160826
 
 
 --
--- Name: excel_council_groups excel_council_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_council_groups excel_council_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_council_groups
@@ -9679,7 +9433,7 @@ ALTER TABLE ONLY public.excel_council_groups
 
 
 --
--- Name: excel_defense_councils excel_defense_councils_batch_id_defense_type_excel_row_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_defense_councils excel_defense_councils_batch_id_defense_type_excel_row_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_defense_councils
@@ -9687,7 +9441,7 @@ ALTER TABLE ONLY public.excel_defense_councils
 
 
 --
--- Name: excel_defense_councils excel_defense_councils_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_defense_councils excel_defense_councils_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_defense_councils
@@ -9695,7 +9449,7 @@ ALTER TABLE ONLY public.excel_defense_councils
 
 
 --
--- Name: excel_import_batches excel_import_batches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_import_batches excel_import_batches_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_import_batches
@@ -9703,7 +9457,7 @@ ALTER TABLE ONLY public.excel_import_batches
 
 
 --
--- Name: excel_projects excel_projects_batch_id_excel_row_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_projects excel_projects_batch_id_excel_row_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_projects
@@ -9711,7 +9465,7 @@ ALTER TABLE ONLY public.excel_projects
 
 
 --
--- Name: excel_projects excel_projects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_projects excel_projects_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_projects
@@ -9719,7 +9473,7 @@ ALTER TABLE ONLY public.excel_projects
 
 
 --
--- Name: excel_review_schedule_rows excel_review_schedule_rows_batch_id_review_type_excel_row_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows excel_review_schedule_rows_batch_id_review_type_excel_row_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_review_schedule_rows
@@ -9727,7 +9481,7 @@ ALTER TABLE ONLY public.excel_review_schedule_rows
 
 
 --
--- Name: excel_review_schedule_rows excel_review_schedule_rows_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows excel_review_schedule_rows_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_review_schedule_rows
@@ -9735,7 +9489,7 @@ ALTER TABLE ONLY public.excel_review_schedule_rows
 
 
 --
--- Name: excel_sheet_rows excel_sheet_rows_batch_id_sheet_name_row_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_sheet_rows excel_sheet_rows_batch_id_sheet_name_row_number_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_sheet_rows
@@ -9743,7 +9497,7 @@ ALTER TABLE ONLY public.excel_sheet_rows
 
 
 --
--- Name: excel_sheet_rows excel_sheet_rows_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_sheet_rows excel_sheet_rows_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_sheet_rows
@@ -9751,7 +9505,7 @@ ALTER TABLE ONLY public.excel_sheet_rows
 
 
 --
--- Name: excel_summary_workloads excel_summary_workloads_batch_id_excel_row_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_summary_workloads excel_summary_workloads_batch_id_excel_row_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_summary_workloads
@@ -9759,7 +9513,7 @@ ALTER TABLE ONLY public.excel_summary_workloads
 
 
 --
--- Name: excel_summary_workloads excel_summary_workloads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_summary_workloads excel_summary_workloads_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_summary_workloads
@@ -9767,7 +9521,7 @@ ALTER TABLE ONLY public.excel_summary_workloads
 
 
 --
--- Name: group_memberships group_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: group_memberships group_memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_memberships
@@ -9775,7 +9529,7 @@ ALTER TABLE ONLY public.group_memberships
 
 
 --
--- Name: group_slot_preferences group_slot_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: group_slot_preferences group_slot_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_slot_preferences
@@ -9783,7 +9537,7 @@ ALTER TABLE ONLY public.group_slot_preferences
 
 
 --
--- Name: groups groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: groups groups_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.groups
@@ -9791,7 +9545,7 @@ ALTER TABLE ONLY public.groups
 
 
 --
--- Name: groups groups_project_id_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: groups groups_project_id_code_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.groups
@@ -9799,7 +9553,7 @@ ALTER TABLE ONLY public.groups
 
 
 --
--- Name: groups groups_project_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: groups groups_project_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.groups
@@ -9807,7 +9561,7 @@ ALTER TABLE ONLY public.groups
 
 
 --
--- Name: h11_waivers h11_waivers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: h11_waivers h11_waivers_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.h11_waivers
@@ -9815,7 +9569,7 @@ ALTER TABLE ONLY public.h11_waivers
 
 
 --
--- Name: h11_waivers h11_waivers_round_id_group_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: h11_waivers h11_waivers_round_id_group_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.h11_waivers
@@ -9823,7 +9577,7 @@ ALTER TABLE ONLY public.h11_waivers
 
 
 --
--- Name: lecturer_availabilities lecturer_availabilities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturer_availabilities lecturer_availabilities_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturer_availabilities
@@ -9831,7 +9585,7 @@ ALTER TABLE ONLY public.lecturer_availabilities
 
 
 --
--- Name: lecturers lecturers_account_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturers lecturers_account_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturers
@@ -9839,7 +9593,7 @@ ALTER TABLE ONLY public.lecturers
 
 
 --
--- Name: lecturers lecturers_lecturer_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturers lecturers_lecturer_code_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturers
@@ -9847,7 +9601,7 @@ ALTER TABLE ONLY public.lecturers
 
 
 --
--- Name: lecturers lecturers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturers lecturers_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturers
@@ -9855,7 +9609,7 @@ ALTER TABLE ONLY public.lecturers
 
 
 --
--- Name: majors majors_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: majors majors_code_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.majors
@@ -9863,7 +9617,7 @@ ALTER TABLE ONLY public.majors
 
 
 --
--- Name: majors majors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: majors majors_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.majors
@@ -9871,7 +9625,39 @@ ALTER TABLE ONLY public.majors
 
 
 --
--- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: manual_schedule_drafts manual_schedule_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_drafts
+    ADD CONSTRAINT manual_schedule_drafts_pkey PRIMARY KEY (round_id);
+
+
+--
+-- Name: manual_schedule_session_groups manual_schedule_session_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_groups
+    ADD CONSTRAINT manual_schedule_session_groups_pkey PRIMARY KEY (session_id, group_id);
+
+
+--
+-- Name: manual_schedule_session_reviewers manual_schedule_session_reviewers_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_reviewers
+    ADD CONSTRAINT manual_schedule_session_reviewers_pkey PRIMARY KEY (session_id, lecturer_id);
+
+
+--
+-- Name: manual_schedule_sessions manual_schedule_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_sessions
+    ADD CONSTRAINT manual_schedule_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.notifications
@@ -9879,7 +9665,7 @@ ALTER TABLE ONLY public.notifications
 
 
 --
--- Name: outbox_jobs outbox_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: outbox_jobs outbox_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.outbox_jobs
@@ -9887,7 +9673,7 @@ ALTER TABLE ONLY public.outbox_jobs
 
 
 --
--- Name: schedule_assignment_reviewers pk_schedule_assignment_reviewers; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_assignment_reviewers pk_schedule_assignment_reviewers; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignment_reviewers
@@ -9895,7 +9681,7 @@ ALTER TABLE ONLY public.schedule_assignment_reviewers
 
 
 --
--- Name: project_supervisors project_supervisors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: project_supervisors project_supervisors_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.project_supervisors
@@ -9903,7 +9689,7 @@ ALTER TABLE ONLY public.project_supervisors
 
 
 --
--- Name: projects projects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: projects projects_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.projects
@@ -9911,7 +9697,7 @@ ALTER TABLE ONLY public.projects
 
 
 --
--- Name: projects projects_semester_id_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: projects projects_semester_id_code_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.projects
@@ -9919,7 +9705,7 @@ ALTER TABLE ONLY public.projects
 
 
 --
--- Name: remediation_cases remediation_cases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: remediation_cases remediation_cases_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.remediation_cases
@@ -9927,7 +9713,7 @@ ALTER TABLE ONLY public.remediation_cases
 
 
 --
--- Name: remediation_cases remediation_cases_session_result_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: remediation_cases remediation_cases_session_result_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.remediation_cases
@@ -9935,7 +9721,7 @@ ALTER TABLE ONLY public.remediation_cases
 
 
 --
--- Name: reschedule_requests reschedule_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: reschedule_requests reschedule_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.reschedule_requests
@@ -9943,7 +9729,7 @@ ALTER TABLE ONLY public.reschedule_requests
 
 
 --
--- Name: rooms rooms_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rooms rooms_code_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rooms
@@ -9951,7 +9737,7 @@ ALTER TABLE ONLY public.rooms
 
 
 --
--- Name: rooms rooms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rooms rooms_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rooms
@@ -9959,7 +9745,7 @@ ALTER TABLE ONLY public.rooms
 
 
 --
--- Name: round_committees round_committees_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: round_committees round_committees_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_committees
@@ -9967,7 +9753,7 @@ ALTER TABLE ONLY public.round_committees
 
 
 --
--- Name: round_days round_days_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: round_days round_days_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_days
@@ -9975,7 +9761,7 @@ ALTER TABLE ONLY public.round_days
 
 
 --
--- Name: round_days round_days_round_id_day_date_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: round_days round_days_round_id_day_date_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_days
@@ -9983,7 +9769,7 @@ ALTER TABLE ONLY public.round_days
 
 
 --
--- Name: round_groups round_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: round_groups round_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_groups
@@ -9991,7 +9777,7 @@ ALTER TABLE ONLY public.round_groups
 
 
 --
--- Name: round_invitations round_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: round_invitations round_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_invitations
@@ -9999,7 +9785,7 @@ ALTER TABLE ONLY public.round_invitations
 
 
 --
--- Name: round_operation_records round_operation_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: round_operation_records round_operation_records_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_operation_records
@@ -10007,7 +9793,7 @@ ALTER TABLE ONLY public.round_operation_records
 
 
 --
--- Name: round_room_types round_room_types_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: round_room_types round_room_types_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_room_types
@@ -10015,7 +9801,7 @@ ALTER TABLE ONLY public.round_room_types
 
 
 --
--- Name: rounds rounds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rounds rounds_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rounds
@@ -10023,7 +9809,7 @@ ALTER TABLE ONLY public.rounds
 
 
 --
--- Name: schedule_assignments schedule_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_assignments schedule_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignments
@@ -10031,7 +9817,7 @@ ALTER TABLE ONLY public.schedule_assignments
 
 
 --
--- Name: schedule_change_records schedule_change_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_change_records schedule_change_records_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_change_records
@@ -10039,7 +9825,7 @@ ALTER TABLE ONLY public.schedule_change_records
 
 
 --
--- Name: schedule_versions schedule_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_versions schedule_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_versions
@@ -10047,7 +9833,7 @@ ALTER TABLE ONLY public.schedule_versions
 
 
 --
--- Name: schedule_versions schedule_versions_round_id_version_no_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_versions schedule_versions_round_id_version_no_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_versions
@@ -10055,7 +9841,7 @@ ALTER TABLE ONLY public.schedule_versions
 
 
 --
--- Name: scheduler_jobs scheduler_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: scheduler_jobs scheduler_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.scheduler_jobs
@@ -10063,7 +9849,7 @@ ALTER TABLE ONLY public.scheduler_jobs
 
 
 --
--- Name: scheduler_jobs scheduler_jobs_schedule_version_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: scheduler_jobs scheduler_jobs_schedule_version_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.scheduler_jobs
@@ -10071,7 +9857,7 @@ ALTER TABLE ONLY public.scheduler_jobs
 
 
 --
--- Name: schema_meta schema_meta_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schema_meta schema_meta_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schema_meta
@@ -10079,7 +9865,7 @@ ALTER TABLE ONLY public.schema_meta
 
 
 --
--- Name: semester_lecturer_quotas semester_lecturer_quotas_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: semester_lecturer_quotas semester_lecturer_quotas_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semester_lecturer_quotas
@@ -10087,7 +9873,7 @@ ALTER TABLE ONLY public.semester_lecturer_quotas
 
 
 --
--- Name: semesters semesters_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: semesters semesters_code_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semesters
@@ -10095,7 +9881,7 @@ ALTER TABLE ONLY public.semesters
 
 
 --
--- Name: semesters semesters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: semesters semesters_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semesters
@@ -10103,7 +9889,15 @@ ALTER TABLE ONLY public.semesters
 
 
 --
--- Name: session_results session_results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: session_groups session_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.session_groups
+    ADD CONSTRAINT session_groups_pkey PRIMARY KEY (session_id, group_id);
+
+
+--
+-- Name: session_results session_results_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.session_results
@@ -10111,7 +9905,7 @@ ALTER TABLE ONLY public.session_results
 
 
 --
--- Name: session_results session_results_session_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: session_results session_results_session_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.session_results
@@ -10119,7 +9913,7 @@ ALTER TABLE ONLY public.session_results
 
 
 --
--- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -10127,7 +9921,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: sessions sessions_schedule_version_id_group_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_schedule_version_id_group_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -10135,7 +9929,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: sessions sessions_schedule_version_id_room_id_time_range_excl; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_schedule_version_id_room_id_time_range_excl; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -10143,7 +9937,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: students students_account_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: students students_account_id_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.students
@@ -10151,7 +9945,7 @@ ALTER TABLE ONLY public.students
 
 
 --
--- Name: students students_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: students students_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.students
@@ -10159,7 +9953,7 @@ ALTER TABLE ONLY public.students
 
 
 --
--- Name: students students_student_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: students students_student_code_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.students
@@ -10167,7 +9961,7 @@ ALTER TABLE ONLY public.students
 
 
 --
--- Name: timeframe_break_windows timeframe_break_windows_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: timeframe_break_windows timeframe_break_windows_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframe_break_windows
@@ -10175,7 +9969,7 @@ ALTER TABLE ONLY public.timeframe_break_windows
 
 
 --
--- Name: timeframe_versions timeframe_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: timeframe_versions timeframe_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframe_versions
@@ -10183,7 +9977,7 @@ ALTER TABLE ONLY public.timeframe_versions
 
 
 --
--- Name: timeframes timeframes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: timeframes timeframes_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframes
@@ -10191,7 +9985,7 @@ ALTER TABLE ONLY public.timeframes
 
 
 --
--- Name: timeslots timeslots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: timeslots timeslots_pkey; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeslots
@@ -10199,7 +9993,7 @@ ALTER TABLE ONLY public.timeslots
 
 
 --
--- Name: timeslots timeslots_round_day_id_start_at_end_at_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: timeslots timeslots_round_day_id_start_at_end_at_key; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeslots
@@ -10207,7 +10001,7 @@ ALTER TABLE ONLY public.timeslots
 
 
 --
--- Name: committee_members uq_committee_members_sequence; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: committee_members uq_committee_members_sequence; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.committee_members
@@ -10215,7 +10009,31 @@ ALTER TABLE ONLY public.committee_members
 
 
 --
--- Name: schedule_assignments uq_schedule_assignments_version_group; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: manual_schedule_session_groups uq_manual_schedule_group_position; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_groups
+    ADD CONSTRAINT uq_manual_schedule_group_position UNIQUE (session_id, "position");
+
+
+--
+-- Name: manual_schedule_session_reviewers uq_manual_schedule_reviewer_order; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_reviewers
+    ADD CONSTRAINT uq_manual_schedule_reviewer_order UNIQUE (session_id, role_order);
+
+
+--
+-- Name: manual_schedule_session_reviewers uq_manual_schedule_reviewer_role; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_reviewers
+    ADD CONSTRAINT uq_manual_schedule_reviewer_role UNIQUE (session_id, role_key);
+
+
+--
+-- Name: schedule_assignments uq_schedule_assignments_version_group; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignments
@@ -10223,7 +10041,15 @@ ALTER TABLE ONLY public.schedule_assignments
 
 
 --
--- Name: timeframe_break_windows uq_timeframe_break_windows_sequence; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: session_groups uq_session_groups_position; Type: CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.session_groups
+    ADD CONSTRAINT uq_session_groups_position UNIQUE (session_id, "position");
+
+
+--
+-- Name: timeframe_break_windows uq_timeframe_break_windows_sequence; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframe_break_windows
@@ -10231,7 +10057,7 @@ ALTER TABLE ONLY public.timeframe_break_windows
 
 
 --
--- Name: timeframe_versions uq_timeframe_versions_number; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: timeframe_versions uq_timeframe_versions_number; Type: CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframe_versions
@@ -10239,203 +10065,231 @@ ALTER TABLE ONLY public.timeframe_versions
 
 
 --
--- Name: auth_sessions_active_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: auth_sessions_active_idx; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX auth_sessions_active_idx ON public.auth_sessions USING btree (token_hash, expires_at) WHERE (revoked_at IS NULL);
 
 
 --
--- Name: ix_excel_defense_councils_batch_type; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_excel_defense_councils_batch_type; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_excel_defense_councils_batch_type ON public.excel_defense_councils USING btree (batch_id, defense_type, council_date);
 
 
 --
--- Name: ix_excel_projects_batch_codes; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_excel_projects_batch_codes; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_excel_projects_batch_codes ON public.excel_projects USING btree (batch_id, project_code, group_code);
 
 
 --
--- Name: ix_excel_review_schedule_batch_type; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_excel_review_schedule_batch_type; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_excel_review_schedule_batch_type ON public.excel_review_schedule_rows USING btree (batch_id, review_type, schedule_date);
 
 
 --
--- Name: ix_excel_sheet_rows_batch_sheet; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_excel_sheet_rows_batch_sheet; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_excel_sheet_rows_batch_sheet ON public.excel_sheet_rows USING btree (batch_id, sheet_name);
 
 
 --
--- Name: ix_round_committees_committee_id; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_manual_schedule_session_groups_group; Type: INDEX; Schema: public; Owner: scheduler
+--
+
+CREATE INDEX ix_manual_schedule_session_groups_group ON public.manual_schedule_session_groups USING btree (group_id);
+
+
+--
+-- Name: ix_manual_schedule_session_reviewers_lecturer; Type: INDEX; Schema: public; Owner: scheduler
+--
+
+CREATE INDEX ix_manual_schedule_session_reviewers_lecturer ON public.manual_schedule_session_reviewers USING btree (lecturer_id);
+
+
+--
+-- Name: ix_manual_schedule_sessions_round_timeslot; Type: INDEX; Schema: public; Owner: scheduler
+--
+
+CREATE INDEX ix_manual_schedule_sessions_round_timeslot ON public.manual_schedule_sessions USING btree (round_id, timeslot_id);
+
+
+--
+-- Name: ix_round_committees_committee_id; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_round_committees_committee_id ON public.round_committees USING btree (committee_id);
 
 
 --
--- Name: ix_rounds_semester_id; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_rounds_semester_id; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_rounds_semester_id ON public.rounds USING btree (semester_id);
 
 
 --
--- Name: ix_rounds_timeframe_id; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_rounds_timeframe_id; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_rounds_timeframe_id ON public.rounds USING btree (timeframe_id);
 
 
 --
--- Name: ix_semesters_academic_year; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_semesters_academic_year; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_semesters_academic_year ON public.semesters USING btree (academic_year);
 
 
 --
--- Name: ix_timeframe_break_windows_version; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_session_groups_group; Type: INDEX; Schema: public; Owner: scheduler
+--
+
+CREATE INDEX ix_session_groups_group ON public.session_groups USING btree (group_id);
+
+
+--
+-- Name: ix_timeframe_break_windows_version; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX ix_timeframe_break_windows_version ON public.timeframe_break_windows USING btree (timeframe_version_id, start_time);
 
 
 --
--- Name: notifications_dedupe_key_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: notifications_dedupe_key_idx; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX notifications_dedupe_key_idx ON public.notifications USING btree (dedupe_key) WHERE (dedupe_key IS NOT NULL);
 
 
 --
--- Name: outbox_jobs_dedupe_key_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: outbox_jobs_dedupe_key_idx; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX outbox_jobs_dedupe_key_idx ON public.outbox_jobs USING btree (dedupe_key) WHERE (dedupe_key IS NOT NULL);
 
 
 --
--- Name: round_operation_records_round_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: round_operation_records_round_idx; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX round_operation_records_round_idx ON public.round_operation_records USING btree (round_id, created_at);
 
 
 --
--- Name: schedule_change_records_session_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: schedule_change_records_session_idx; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX schedule_change_records_session_idx ON public.schedule_change_records USING btree (session_id, created_at);
 
 
 --
--- Name: scheduler_jobs_idempotency_key_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: scheduler_jobs_idempotency_key_idx; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX scheduler_jobs_idempotency_key_idx ON public.scheduler_jobs USING btree (round_id, idempotency_key) WHERE (idempotency_key IS NOT NULL);
 
 
 --
--- Name: scheduler_jobs_queue_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: scheduler_jobs_queue_idx; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX scheduler_jobs_queue_idx ON public.scheduler_jobs USING btree (status, queued_at);
 
 
 --
--- Name: session_results_entered_at_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: session_results_entered_at_idx; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE INDEX session_results_entered_at_idx ON public.session_results USING btree (entered_at);
 
 
 --
--- Name: uq_active_group_leader; Type: INDEX; Schema: public; Owner: -
+-- Name: uq_active_group_leader; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX uq_active_group_leader ON public.group_memberships USING btree (group_id) WHERE ((status = 'ACTIVE'::public.membership_status) AND (membership_role = 'LEADER'::public.membership_role));
 
 
 --
--- Name: uq_active_group_student; Type: INDEX; Schema: public; Owner: -
+-- Name: uq_active_group_student; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX uq_active_group_student ON public.group_memberships USING btree (group_id, student_id) WHERE (status = 'ACTIVE'::public.membership_status);
 
 
 --
--- Name: uq_active_semester; Type: INDEX; Schema: public; Owner: -
+-- Name: uq_active_semester; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX uq_active_semester ON public.semesters USING btree (status) WHERE (status = 'ACTIVE'::public.semester_status);
 
 
 --
--- Name: uq_schedule_versions_active_per_round; Type: INDEX; Schema: public; Owner: -
+-- Name: uq_schedule_versions_active_per_round; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX uq_schedule_versions_active_per_round ON public.schedule_versions USING btree (round_id) WHERE (status = 'ACTIVE'::public.schedule_version_status);
 
 
 --
--- Name: uq_timeframe_versions_active; Type: INDEX; Schema: public; Owner: -
+-- Name: uq_timeframe_versions_active; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX uq_timeframe_versions_active ON public.timeframe_versions USING btree (timeframe_id) WHERE ((status)::text = 'ACTIVE'::text);
 
 
 --
--- Name: uq_timeframes_active_name; Type: INDEX; Schema: public; Owner: -
+-- Name: uq_timeframes_active_name; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX uq_timeframes_active_name ON public.timeframes USING btree (lower((name)::text)) WHERE (archived_at IS NULL);
 
 
 --
--- Name: ux_sessions_makeup_of_session_id; Type: INDEX; Schema: public; Owner: -
+-- Name: ux_sessions_makeup_of_session_id; Type: INDEX; Schema: public; Owner: scheduler
 --
 
 CREATE UNIQUE INDEX ux_sessions_makeup_of_session_id ON public.sessions USING btree (makeup_of_session_id) WHERE (makeup_of_session_id IS NOT NULL);
 
 
 --
--- Name: audit_events audit_events_append_only; Type: TRIGGER; Schema: public; Owner: -
+-- Name: audit_events audit_events_append_only; Type: TRIGGER; Schema: public; Owner: scheduler
 --
 
 CREATE TRIGGER audit_events_append_only BEFORE DELETE OR UPDATE ON public.audit_events FOR EACH ROW EXECUTE FUNCTION public.reject_audit_mutation();
 
 
 --
--- Name: council_members council_members_immutable; Type: TRIGGER; Schema: public; Owner: -
+-- Name: council_members council_members_immutable; Type: TRIGGER; Schema: public; Owner: scheduler
 --
 
 CREATE TRIGGER council_members_immutable BEFORE INSERT OR DELETE OR UPDATE ON public.council_members FOR EACH ROW EXECUTE FUNCTION public.prevent_council_member_mutation();
 
 
 --
--- Name: councils councils_immutable; Type: TRIGGER; Schema: public; Owner: -
+-- Name: councils councils_immutable; Type: TRIGGER; Schema: public; Owner: scheduler
 --
 
 CREATE TRIGGER councils_immutable BEFORE DELETE OR UPDATE ON public.councils FOR EACH ROW EXECUTE FUNCTION public.prevent_council_mutation();
 
 
 --
--- Name: sessions sessions_council_valid; Type: TRIGGER; Schema: public; Owner: -
+-- Name: sessions sessions_council_valid; Type: TRIGGER; Schema: public; Owner: scheduler
 --
 
 CREATE CONSTRAINT TRIGGER sessions_council_valid AFTER INSERT OR UPDATE OF council_id ON public.sessions DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION public.validate_session_council();
 
 
 --
--- Name: account_roles account_roles_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: account_roles account_roles_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.account_roles
@@ -10443,7 +10297,7 @@ ALTER TABLE ONLY public.account_roles
 
 
 --
--- Name: audit_events audit_events_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: audit_events audit_events_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.audit_events
@@ -10451,7 +10305,7 @@ ALTER TABLE ONLY public.audit_events
 
 
 --
--- Name: auth_sessions auth_sessions_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: auth_sessions auth_sessions_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.auth_sessions
@@ -10459,7 +10313,7 @@ ALTER TABLE ONLY public.auth_sessions
 
 
 --
--- Name: committee_members committee_members_committee_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: committee_members committee_members_committee_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.committee_members
@@ -10467,7 +10321,7 @@ ALTER TABLE ONLY public.committee_members
 
 
 --
--- Name: committee_members committee_members_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: committee_members committee_members_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.committee_members
@@ -10475,7 +10329,7 @@ ALTER TABLE ONLY public.committee_members
 
 
 --
--- Name: committees committees_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: committees committees_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.committees
@@ -10483,7 +10337,7 @@ ALTER TABLE ONLY public.committees
 
 
 --
--- Name: conflict_declarations conflict_declarations_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: conflict_declarations conflict_declarations_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.conflict_declarations
@@ -10491,7 +10345,7 @@ ALTER TABLE ONLY public.conflict_declarations
 
 
 --
--- Name: conflict_declarations conflict_declarations_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: conflict_declarations conflict_declarations_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.conflict_declarations
@@ -10499,7 +10353,7 @@ ALTER TABLE ONLY public.conflict_declarations
 
 
 --
--- Name: conflict_declarations conflict_declarations_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: conflict_declarations conflict_declarations_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.conflict_declarations
@@ -10507,7 +10361,7 @@ ALTER TABLE ONLY public.conflict_declarations
 
 
 --
--- Name: council_members council_members_council_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: council_members council_members_council_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.council_members
@@ -10515,7 +10369,7 @@ ALTER TABLE ONLY public.council_members
 
 
 --
--- Name: council_members council_members_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: council_members council_members_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.council_members
@@ -10523,7 +10377,7 @@ ALTER TABLE ONLY public.council_members
 
 
 --
--- Name: councils councils_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: councils councils_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.councils
@@ -10531,7 +10385,7 @@ ALTER TABLE ONLY public.councils
 
 
 --
--- Name: councils councils_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: councils councils_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.councils
@@ -10539,7 +10393,7 @@ ALTER TABLE ONLY public.councils
 
 
 --
--- Name: councils councils_supersedes_council_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: councils councils_supersedes_council_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.councils
@@ -10547,7 +10401,7 @@ ALTER TABLE ONLY public.councils
 
 
 --
--- Name: excel_council_groups excel_council_groups_council_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_council_groups excel_council_groups_council_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_council_groups
@@ -10555,7 +10409,7 @@ ALTER TABLE ONLY public.excel_council_groups
 
 
 --
--- Name: excel_council_groups excel_council_groups_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_council_groups excel_council_groups_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_council_groups
@@ -10563,7 +10417,7 @@ ALTER TABLE ONLY public.excel_council_groups
 
 
 --
--- Name: excel_council_groups excel_council_groups_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_council_groups excel_council_groups_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_council_groups
@@ -10571,7 +10425,7 @@ ALTER TABLE ONLY public.excel_council_groups
 
 
 --
--- Name: excel_defense_councils excel_defense_councils_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_defense_councils excel_defense_councils_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_defense_councils
@@ -10579,7 +10433,7 @@ ALTER TABLE ONLY public.excel_defense_councils
 
 
 --
--- Name: excel_defense_councils excel_defense_councils_canonical_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_defense_councils excel_defense_councils_canonical_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_defense_councils
@@ -10587,7 +10441,7 @@ ALTER TABLE ONLY public.excel_defense_councils
 
 
 --
--- Name: excel_projects excel_projects_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_projects excel_projects_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_projects
@@ -10595,7 +10449,7 @@ ALTER TABLE ONLY public.excel_projects
 
 
 --
--- Name: excel_projects excel_projects_canonical_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_projects excel_projects_canonical_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_projects
@@ -10603,7 +10457,7 @@ ALTER TABLE ONLY public.excel_projects
 
 
 --
--- Name: excel_projects excel_projects_canonical_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_projects excel_projects_canonical_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_projects
@@ -10611,7 +10465,7 @@ ALTER TABLE ONLY public.excel_projects
 
 
 --
--- Name: excel_review_schedule_rows excel_review_schedule_rows_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows excel_review_schedule_rows_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_review_schedule_rows
@@ -10619,7 +10473,7 @@ ALTER TABLE ONLY public.excel_review_schedule_rows
 
 
 --
--- Name: excel_review_schedule_rows excel_review_schedule_rows_canonical_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows excel_review_schedule_rows_canonical_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_review_schedule_rows
@@ -10627,7 +10481,7 @@ ALTER TABLE ONLY public.excel_review_schedule_rows
 
 
 --
--- Name: excel_review_schedule_rows excel_review_schedule_rows_canonical_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_review_schedule_rows excel_review_schedule_rows_canonical_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_review_schedule_rows
@@ -10635,7 +10489,7 @@ ALTER TABLE ONLY public.excel_review_schedule_rows
 
 
 --
--- Name: excel_sheet_rows excel_sheet_rows_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_sheet_rows excel_sheet_rows_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_sheet_rows
@@ -10643,7 +10497,7 @@ ALTER TABLE ONLY public.excel_sheet_rows
 
 
 --
--- Name: excel_summary_workloads excel_summary_workloads_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: excel_summary_workloads excel_summary_workloads_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.excel_summary_workloads
@@ -10651,7 +10505,7 @@ ALTER TABLE ONLY public.excel_summary_workloads
 
 
 --
--- Name: round_committees fk_round_committees_committee_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_committees fk_round_committees_committee_id; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_committees
@@ -10659,7 +10513,7 @@ ALTER TABLE ONLY public.round_committees
 
 
 --
--- Name: round_committees fk_round_committees_round_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_committees fk_round_committees_round_id; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_committees
@@ -10667,7 +10521,7 @@ ALTER TABLE ONLY public.round_committees
 
 
 --
--- Name: group_memberships group_memberships_drop_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: group_memberships group_memberships_drop_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_memberships
@@ -10675,7 +10529,7 @@ ALTER TABLE ONLY public.group_memberships
 
 
 --
--- Name: group_memberships group_memberships_drop_requested_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: group_memberships group_memberships_drop_requested_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_memberships
@@ -10683,7 +10537,7 @@ ALTER TABLE ONLY public.group_memberships
 
 
 --
--- Name: group_memberships group_memberships_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: group_memberships group_memberships_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_memberships
@@ -10691,7 +10545,7 @@ ALTER TABLE ONLY public.group_memberships
 
 
 --
--- Name: group_memberships group_memberships_student_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: group_memberships group_memberships_student_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_memberships
@@ -10699,7 +10553,7 @@ ALTER TABLE ONLY public.group_memberships
 
 
 --
--- Name: group_slot_preferences group_slot_preferences_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: group_slot_preferences group_slot_preferences_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_slot_preferences
@@ -10707,7 +10561,7 @@ ALTER TABLE ONLY public.group_slot_preferences
 
 
 --
--- Name: group_slot_preferences group_slot_preferences_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: group_slot_preferences group_slot_preferences_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_slot_preferences
@@ -10715,7 +10569,7 @@ ALTER TABLE ONLY public.group_slot_preferences
 
 
 --
--- Name: group_slot_preferences group_slot_preferences_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: group_slot_preferences group_slot_preferences_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_slot_preferences
@@ -10723,7 +10577,7 @@ ALTER TABLE ONLY public.group_slot_preferences
 
 
 --
--- Name: group_slot_preferences group_slot_preferences_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: group_slot_preferences group_slot_preferences_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.group_slot_preferences
@@ -10731,7 +10585,7 @@ ALTER TABLE ONLY public.group_slot_preferences
 
 
 --
--- Name: groups groups_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: groups groups_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.groups
@@ -10739,7 +10593,7 @@ ALTER TABLE ONLY public.groups
 
 
 --
--- Name: h11_waivers h11_waivers_granted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: h11_waivers h11_waivers_granted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.h11_waivers
@@ -10747,7 +10601,7 @@ ALTER TABLE ONLY public.h11_waivers
 
 
 --
--- Name: h11_waivers h11_waivers_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: h11_waivers h11_waivers_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.h11_waivers
@@ -10755,7 +10609,7 @@ ALTER TABLE ONLY public.h11_waivers
 
 
 --
--- Name: h11_waivers h11_waivers_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: h11_waivers h11_waivers_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.h11_waivers
@@ -10763,7 +10617,7 @@ ALTER TABLE ONLY public.h11_waivers
 
 
 --
--- Name: lecturer_availabilities lecturer_availabilities_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturer_availabilities lecturer_availabilities_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturer_availabilities
@@ -10771,7 +10625,7 @@ ALTER TABLE ONLY public.lecturer_availabilities
 
 
 --
--- Name: lecturer_availabilities lecturer_availabilities_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturer_availabilities lecturer_availabilities_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturer_availabilities
@@ -10779,7 +10633,7 @@ ALTER TABLE ONLY public.lecturer_availabilities
 
 
 --
--- Name: lecturer_availabilities lecturer_availabilities_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturer_availabilities lecturer_availabilities_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturer_availabilities
@@ -10787,7 +10641,7 @@ ALTER TABLE ONLY public.lecturer_availabilities
 
 
 --
--- Name: lecturer_availabilities lecturer_availabilities_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturer_availabilities lecturer_availabilities_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturer_availabilities
@@ -10795,7 +10649,7 @@ ALTER TABLE ONLY public.lecturer_availabilities
 
 
 --
--- Name: lecturers lecturers_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: lecturers lecturers_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.lecturers
@@ -10803,7 +10657,119 @@ ALTER TABLE ONLY public.lecturers
 
 
 --
--- Name: notifications notifications_recipient_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: manual_schedule_drafts manual_schedule_drafts_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_drafts
+    ADD CONSTRAINT manual_schedule_drafts_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.accounts(id);
+
+
+--
+-- Name: manual_schedule_drafts manual_schedule_drafts_published_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_drafts
+    ADD CONSTRAINT manual_schedule_drafts_published_schedule_version_id_fkey FOREIGN KEY (published_schedule_version_id) REFERENCES public.schedule_versions(id);
+
+
+--
+-- Name: manual_schedule_drafts manual_schedule_drafts_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_drafts
+    ADD CONSTRAINT manual_schedule_drafts_round_id_fkey FOREIGN KEY (round_id) REFERENCES public.rounds(id) ON DELETE CASCADE;
+
+
+--
+-- Name: manual_schedule_drafts manual_schedule_drafts_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_drafts
+    ADD CONSTRAINT manual_schedule_drafts_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.accounts(id);
+
+
+--
+-- Name: manual_schedule_session_groups manual_schedule_session_groups_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_groups
+    ADD CONSTRAINT manual_schedule_session_groups_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.groups(id);
+
+
+--
+-- Name: manual_schedule_session_groups manual_schedule_session_groups_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_groups
+    ADD CONSTRAINT manual_schedule_session_groups_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.manual_schedule_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: manual_schedule_session_reviewers manual_schedule_session_reviewers_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_reviewers
+    ADD CONSTRAINT manual_schedule_session_reviewers_lecturer_id_fkey FOREIGN KEY (lecturer_id) REFERENCES public.lecturers(id);
+
+
+--
+-- Name: manual_schedule_session_reviewers manual_schedule_session_reviewers_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_session_reviewers
+    ADD CONSTRAINT manual_schedule_session_reviewers_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.manual_schedule_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: manual_schedule_sessions manual_schedule_sessions_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_sessions
+    ADD CONSTRAINT manual_schedule_sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.accounts(id);
+
+
+--
+-- Name: manual_schedule_sessions manual_schedule_sessions_published_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_sessions
+    ADD CONSTRAINT manual_schedule_sessions_published_session_id_fkey FOREIGN KEY (published_session_id) REFERENCES public.sessions(id);
+
+
+--
+-- Name: manual_schedule_sessions manual_schedule_sessions_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_sessions
+    ADD CONSTRAINT manual_schedule_sessions_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id);
+
+
+--
+-- Name: manual_schedule_sessions manual_schedule_sessions_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_sessions
+    ADD CONSTRAINT manual_schedule_sessions_round_id_fkey FOREIGN KEY (round_id) REFERENCES public.manual_schedule_drafts(round_id) ON DELETE CASCADE;
+
+
+--
+-- Name: manual_schedule_sessions manual_schedule_sessions_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_sessions
+    ADD CONSTRAINT manual_schedule_sessions_timeslot_id_fkey FOREIGN KEY (timeslot_id) REFERENCES public.timeslots(id);
+
+
+--
+-- Name: manual_schedule_sessions manual_schedule_sessions_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.manual_schedule_sessions
+    ADD CONSTRAINT manual_schedule_sessions_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.accounts(id);
+
+
+--
+-- Name: notifications notifications_recipient_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.notifications
@@ -10811,7 +10777,7 @@ ALTER TABLE ONLY public.notifications
 
 
 --
--- Name: project_supervisors project_supervisors_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: project_supervisors project_supervisors_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.project_supervisors
@@ -10819,7 +10785,7 @@ ALTER TABLE ONLY public.project_supervisors
 
 
 --
--- Name: project_supervisors project_supervisors_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: project_supervisors project_supervisors_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.project_supervisors
@@ -10827,7 +10793,7 @@ ALTER TABLE ONLY public.project_supervisors
 
 
 --
--- Name: projects projects_major_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: projects projects_major_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.projects
@@ -10835,7 +10801,7 @@ ALTER TABLE ONLY public.projects
 
 
 --
--- Name: projects projects_semester_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: projects projects_semester_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.projects
@@ -10843,7 +10809,7 @@ ALTER TABLE ONLY public.projects
 
 
 --
--- Name: remediation_cases remediation_cases_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: remediation_cases remediation_cases_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.remediation_cases
@@ -10851,7 +10817,7 @@ ALTER TABLE ONLY public.remediation_cases
 
 
 --
--- Name: remediation_cases remediation_cases_session_result_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: remediation_cases remediation_cases_session_result_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.remediation_cases
@@ -10859,7 +10825,7 @@ ALTER TABLE ONLY public.remediation_cases
 
 
 --
--- Name: remediation_cases remediation_cases_verifier_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: remediation_cases remediation_cases_verifier_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.remediation_cases
@@ -10867,7 +10833,7 @@ ALTER TABLE ONLY public.remediation_cases
 
 
 --
--- Name: reschedule_requests reschedule_requests_requested_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: reschedule_requests reschedule_requests_requested_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.reschedule_requests
@@ -10875,7 +10841,7 @@ ALTER TABLE ONLY public.reschedule_requests
 
 
 --
--- Name: reschedule_requests reschedule_requests_reviewed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: reschedule_requests reschedule_requests_reviewed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.reschedule_requests
@@ -10883,7 +10849,7 @@ ALTER TABLE ONLY public.reschedule_requests
 
 
 --
--- Name: reschedule_requests reschedule_requests_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: reschedule_requests reschedule_requests_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.reschedule_requests
@@ -10891,7 +10857,7 @@ ALTER TABLE ONLY public.reschedule_requests
 
 
 --
--- Name: round_committees round_committees_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_committees round_committees_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_committees
@@ -10899,7 +10865,7 @@ ALTER TABLE ONLY public.round_committees
 
 
 --
--- Name: round_days round_days_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_days round_days_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_days
@@ -10907,7 +10873,7 @@ ALTER TABLE ONLY public.round_days
 
 
 --
--- Name: round_groups round_groups_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_groups round_groups_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_groups
@@ -10915,7 +10881,7 @@ ALTER TABLE ONLY public.round_groups
 
 
 --
--- Name: round_groups round_groups_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_groups round_groups_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_groups
@@ -10923,7 +10889,7 @@ ALTER TABLE ONLY public.round_groups
 
 
 --
--- Name: round_invitations round_invitations_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_invitations round_invitations_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_invitations
@@ -10931,7 +10897,7 @@ ALTER TABLE ONLY public.round_invitations
 
 
 --
--- Name: round_invitations round_invitations_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_invitations round_invitations_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_invitations
@@ -10939,7 +10905,7 @@ ALTER TABLE ONLY public.round_invitations
 
 
 --
--- Name: round_operation_records round_operation_records_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_operation_records round_operation_records_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_operation_records
@@ -10947,7 +10913,7 @@ ALTER TABLE ONLY public.round_operation_records
 
 
 --
--- Name: round_operation_records round_operation_records_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_operation_records round_operation_records_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_operation_records
@@ -10955,7 +10921,7 @@ ALTER TABLE ONLY public.round_operation_records
 
 
 --
--- Name: round_room_types round_room_types_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: round_room_types round_room_types_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.round_room_types
@@ -10963,7 +10929,7 @@ ALTER TABLE ONLY public.round_room_types
 
 
 --
--- Name: rounds rounds_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rounds rounds_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rounds
@@ -10971,7 +10937,7 @@ ALTER TABLE ONLY public.rounds
 
 
 --
--- Name: rounds rounds_semester_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rounds rounds_semester_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rounds
@@ -10979,7 +10945,7 @@ ALTER TABLE ONLY public.rounds
 
 
 --
--- Name: rounds rounds_timeframe_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rounds rounds_timeframe_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rounds
@@ -10987,7 +10953,7 @@ ALTER TABLE ONLY public.rounds
 
 
 --
--- Name: rounds rounds_timeframe_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: rounds rounds_timeframe_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.rounds
@@ -10995,7 +10961,7 @@ ALTER TABLE ONLY public.rounds
 
 
 --
--- Name: schedule_assignment_reviewers schedule_assignment_reviewers_assignment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_assignment_reviewers schedule_assignment_reviewers_assignment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignment_reviewers
@@ -11003,7 +10969,7 @@ ALTER TABLE ONLY public.schedule_assignment_reviewers
 
 
 --
--- Name: schedule_assignment_reviewers schedule_assignment_reviewers_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_assignment_reviewers schedule_assignment_reviewers_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignment_reviewers
@@ -11011,7 +10977,7 @@ ALTER TABLE ONLY public.schedule_assignment_reviewers
 
 
 --
--- Name: schedule_assignments schedule_assignments_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_assignments schedule_assignments_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignments
@@ -11019,7 +10985,7 @@ ALTER TABLE ONLY public.schedule_assignments
 
 
 --
--- Name: schedule_assignments schedule_assignments_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_assignments schedule_assignments_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignments
@@ -11027,7 +10993,7 @@ ALTER TABLE ONLY public.schedule_assignments
 
 
 --
--- Name: schedule_assignments schedule_assignments_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_assignments schedule_assignments_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignments
@@ -11035,7 +11001,7 @@ ALTER TABLE ONLY public.schedule_assignments
 
 
 --
--- Name: schedule_assignments schedule_assignments_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_assignments schedule_assignments_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_assignments
@@ -11043,7 +11009,7 @@ ALTER TABLE ONLY public.schedule_assignments
 
 
 --
--- Name: schedule_change_records schedule_change_records_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_change_records schedule_change_records_actor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_change_records
@@ -11051,7 +11017,7 @@ ALTER TABLE ONLY public.schedule_change_records
 
 
 --
--- Name: schedule_change_records schedule_change_records_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_change_records schedule_change_records_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_change_records
@@ -11059,7 +11025,7 @@ ALTER TABLE ONLY public.schedule_change_records
 
 
 --
--- Name: schedule_change_records schedule_change_records_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_change_records schedule_change_records_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_change_records
@@ -11067,7 +11033,7 @@ ALTER TABLE ONLY public.schedule_change_records
 
 
 --
--- Name: schedule_change_records schedule_change_records_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_change_records schedule_change_records_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_change_records
@@ -11075,7 +11041,7 @@ ALTER TABLE ONLY public.schedule_change_records
 
 
 --
--- Name: schedule_versions schedule_versions_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_versions schedule_versions_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_versions
@@ -11083,7 +11049,7 @@ ALTER TABLE ONLY public.schedule_versions
 
 
 --
--- Name: schedule_versions schedule_versions_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_versions schedule_versions_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.schedule_versions
@@ -11091,7 +11057,7 @@ ALTER TABLE ONLY public.schedule_versions
 
 
 --
--- Name: scheduler_jobs scheduler_jobs_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: scheduler_jobs scheduler_jobs_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.scheduler_jobs
@@ -11099,7 +11065,7 @@ ALTER TABLE ONLY public.scheduler_jobs
 
 
 --
--- Name: scheduler_jobs scheduler_jobs_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: scheduler_jobs scheduler_jobs_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.scheduler_jobs
@@ -11107,7 +11073,7 @@ ALTER TABLE ONLY public.scheduler_jobs
 
 
 --
--- Name: semester_lecturer_quotas semester_lecturer_quotas_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: semester_lecturer_quotas semester_lecturer_quotas_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semester_lecturer_quotas
@@ -11115,7 +11081,7 @@ ALTER TABLE ONLY public.semester_lecturer_quotas
 
 
 --
--- Name: semester_lecturer_quotas semester_lecturer_quotas_semester_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: semester_lecturer_quotas semester_lecturer_quotas_semester_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semester_lecturer_quotas
@@ -11123,7 +11089,7 @@ ALTER TABLE ONLY public.semester_lecturer_quotas
 
 
 --
--- Name: semester_lecturer_quotas semester_lecturer_quotas_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: semester_lecturer_quotas semester_lecturer_quotas_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semester_lecturer_quotas
@@ -11131,7 +11097,7 @@ ALTER TABLE ONLY public.semester_lecturer_quotas
 
 
 --
--- Name: semesters semesters_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: semesters semesters_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semesters
@@ -11139,7 +11105,7 @@ ALTER TABLE ONLY public.semesters
 
 
 --
--- Name: semesters semesters_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: semesters semesters_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.semesters
@@ -11147,7 +11113,23 @@ ALTER TABLE ONLY public.semesters
 
 
 --
--- Name: session_results session_results_entered_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: session_groups session_groups_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.session_groups
+    ADD CONSTRAINT session_groups_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.groups(id);
+
+
+--
+-- Name: session_groups session_groups_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
+--
+
+ALTER TABLE ONLY public.session_groups
+    ADD CONSTRAINT session_groups_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: session_results session_results_entered_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.session_results
@@ -11155,7 +11137,7 @@ ALTER TABLE ONLY public.session_results
 
 
 --
--- Name: session_results session_results_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: session_results session_results_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.session_results
@@ -11163,7 +11145,7 @@ ALTER TABLE ONLY public.session_results
 
 
 --
--- Name: session_results session_results_verifier_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: session_results session_results_verifier_lecturer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.session_results
@@ -11171,7 +11153,7 @@ ALTER TABLE ONLY public.session_results
 
 
 --
--- Name: sessions sessions_council_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_council_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -11179,7 +11161,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: sessions sessions_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -11187,7 +11169,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: sessions sessions_makeup_of_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_makeup_of_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -11195,7 +11177,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: sessions sessions_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -11203,7 +11185,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: sessions sessions_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_schedule_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -11211,7 +11193,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: sessions sessions_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: sessions sessions_timeslot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.sessions
@@ -11219,7 +11201,7 @@ ALTER TABLE ONLY public.sessions
 
 
 --
--- Name: students students_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: students students_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.students
@@ -11227,7 +11209,7 @@ ALTER TABLE ONLY public.students
 
 
 --
--- Name: timeframe_break_windows timeframe_break_windows_timeframe_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: timeframe_break_windows timeframe_break_windows_timeframe_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframe_break_windows
@@ -11235,7 +11217,7 @@ ALTER TABLE ONLY public.timeframe_break_windows
 
 
 --
--- Name: timeframe_versions timeframe_versions_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: timeframe_versions timeframe_versions_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframe_versions
@@ -11243,7 +11225,7 @@ ALTER TABLE ONLY public.timeframe_versions
 
 
 --
--- Name: timeframe_versions timeframe_versions_timeframe_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: timeframe_versions timeframe_versions_timeframe_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframe_versions
@@ -11251,7 +11233,7 @@ ALTER TABLE ONLY public.timeframe_versions
 
 
 --
--- Name: timeframes timeframes_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: timeframes timeframes_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeframes
@@ -11259,7 +11241,7 @@ ALTER TABLE ONLY public.timeframes
 
 
 --
--- Name: timeslots timeslots_round_day_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: timeslots timeslots_round_day_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: scheduler
 --
 
 ALTER TABLE ONLY public.timeslots
@@ -11270,5 +11252,4 @@ ALTER TABLE ONLY public.timeslots
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kadntd3JeuYmFvv0ekl2VtwsUrV0L9ufwZD4WEWjfYbLrQF5H0yfgsKZAEeYGiK
-
+\unrestrict BohixT33MY8eHCcFf2ITClEONvhRaoshndiltWflHBnuZYnMdpfi50LdVTOI80T

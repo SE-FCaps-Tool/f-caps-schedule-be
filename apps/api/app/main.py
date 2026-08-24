@@ -28,6 +28,7 @@ from .response_models import HealthResponse, PublicMeResponse
 from .routes.auth_routes import router as auth_router
 from .routes.committee_contract import router as committee_contract_router
 from .routes.manager_extensions import router as manager_extensions_router
+from .routes.manual_scheduling import router as manual_scheduling_router
 from .routes.master_data import router as master_data_router
 from .routes.operations import router as operations_router
 from .routes.results import router as results_router
@@ -137,6 +138,7 @@ def create_app() -> FastAPI:
         return response
     app.include_router(master_data_router)
     app.include_router(manager_extensions_router)
+    app.include_router(manual_scheduling_router)
     app.include_router(schedule_operations_router)
     app.include_router(target_group_project_router)
     app.include_router(target_round_contract_router)
