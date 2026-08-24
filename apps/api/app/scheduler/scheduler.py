@@ -163,6 +163,29 @@ def solve_schedule(
     solver.parameters.num_search_workers = 1
     status = solver.solve(model)
     status_name = solver.status_name(status)
+    if status_name not in {"OPTIMAL", "FEASIBLE"}:
+        # CpSolver.value() is undefined for UNKNOWN/INFEASIBLE/MODEL_INVALID.
+        # Reading those values can fabricate overlapping sessions that the
+        # shared validator correctly rejects as SOLVER_OUTPUT_INVALID.
+        unscheduled = tuple(
+            reason_for_unscheduled(
+                group_id,
+                context,
+                reviewers=reviewers,
+                timeslots=[timeslot[0] for timeslot in timeslots],
+            )
+            for group_id in sorted(groups)
+        )
+        return SolverResult(
+            "PARTIAL",
+            (),
+            unscheduled,
+            _empty_soft_scores(),
+            random_seed,
+            0,
+            objective_profile,
+            _schedule_metrics(()),
+        )
     selected = [candidate for index, candidate in enumerate(candidates) if solver.value(variables[index])]
     sessions = tuple(
         ScheduledSession(

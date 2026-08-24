@@ -1,6 +1,8 @@
 from collections import Counter
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
+from app.scheduler import scheduler as scheduler_module
 from app.scheduler.models import RoundInput
 from app.scheduler.scheduler import solve_schedule
 from app.scheduler.validator import validate_schedule
@@ -45,6 +47,61 @@ def test_solver_returns_validator_safe_partial_schedule_with_reason_codes():
         time_limit_seconds=2,
         random_seed=7,
     ).soft_scores
+
+
+def test_solver_does_not_read_values_when_cp_sat_returns_unknown(monkeypatch):
+    class UnknownSolver:
+        def __init__(self):
+            self.parameters = SimpleNamespace()
+
+        def solve(self, model):
+            return 0
+
+        def status_name(self, status):
+            return "UNKNOWN"
+
+        def value(self, variable):
+            raise AssertionError("solver values must not be read for UNKNOWN")
+
+    monkeypatch.setattr(scheduler_module.cp_model, "CpSolver", UnknownSolver)
+    context = RoundInput(
+        round_type="REVIEW_1_1",
+        expected_reviewer_count=1,
+        group_status={1: "PENDING_D11"},
+        group_project={1: 10},
+        project_supervisors={10: set()},
+        lecturer_availability={(2, 1)},
+        conflicts=set(),
+        group_selected_slots={},
+        group_selection_mode=False,
+        prior_reviewer_ids={},
+        remediation_verifier_ids={},
+        h11_waiver_groups=set(),
+        h12_sessions_per_part=4,
+        h12_sessions_per_day=8,
+        h12_semester_quota=None,
+        existing_semester_load={},
+    )
+
+    result = solve_schedule(
+        context,
+        groups=[1],
+        timeslots=[
+            (
+                1,
+                datetime(2030, 1, 1, 9, tzinfo=UTC),
+                datetime(2030, 1, 1, 9, 30, tzinfo=UTC),
+                "2030-01-01",
+                "AM",
+            )
+        ],
+        reviewers=[2],
+        time_limit_seconds=2,
+    )
+
+    assert result.status == "PARTIAL"
+    assert result.sessions == ()
+    assert len(result.unscheduled) == 1
 
 
 def test_solver_balances_reviewer_load_when_quota_and_s1_are_configured():
