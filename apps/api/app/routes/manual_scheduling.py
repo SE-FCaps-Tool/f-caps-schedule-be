@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.api_contract import RequestModel, parse_external_id, success_payload
 from app.auth import CurrentUser, get_current_user
 from app.database import get_db
+from app.domain.enums import RoundStatus
 from app.domain.round_types import (
     DEFENSE_1_1_TYPES,
     DEFENSE_1_2_TYPES,
@@ -33,8 +34,9 @@ Db = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
-EDITABLE_ROUND_STATUSES = {"DRAFT", "OPEN_REGISTRATION", "REGISTRATION_CLOSED", "SCHEDULING"}
-PUBLISHABLE_ROUND_STATUSES = EDITABLE_ROUND_STATUSES | {"SCHEDULED"}
+ALL_ROUND_STATUSES = frozenset(status.value for status in RoundStatus)
+EDITABLE_ROUND_STATUSES = ALL_ROUND_STATUSES
+PUBLISHABLE_ROUND_STATUSES = EDITABLE_ROUND_STATUSES - {"ONGOING", "POSTPONED", "COMPLETED", "LOCKED", "CANCELLED"}
 MANUAL_SESSION_PREFIX = "manual_session_"
 BLOCKED_REASON_LABELS = {
     "SESSION_INCOMPLETE": "Phiên chưa đầy đủ thông tin.",
@@ -462,6 +464,8 @@ def _upsert_session(
             ).scalar_one()
         )
     else:
+        # This updates only the manual draft row. A published_session_id is kept
+        # as the live baseline; the actual published session is never mutated.
         updated = db.execute(
             text(
                 "UPDATE manual_schedule_sessions SET timeslot_id = :timeslot_id, room_id = :room_id, "
@@ -1478,6 +1482,11 @@ def manual_publish_readiness(round_id: Annotated[int, Path(alias="roundId")], db
     sessions = _load_manual_sessions(db, round_id)
     validation = _validate_manual(db, round_row, sessions)
     checks = [
+        {
+            "code": "ROUND_STATUS",
+            "passed": round_row["round_status"] in PUBLISHABLE_ROUND_STATUSES,
+            "count": 0 if round_row["round_status"] in PUBLISHABLE_ROUND_STATUSES else 1,
+        },
         {
             "code": "ALL_GROUPS_SCHEDULED",
             "passed": not validation["summary"]["unscheduledGroupIds"],

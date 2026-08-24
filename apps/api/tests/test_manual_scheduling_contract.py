@@ -3,9 +3,14 @@ from fastapi import HTTPException
 from starlette.datastructures import QueryParams
 
 from app.routes.manual_scheduling import (
+    ALL_ROUND_STATUSES,
+    EDITABLE_ROUND_STATUSES,
+    PUBLISHABLE_ROUND_STATUSES,
     ManualReviewerPayload,
     ManualSessionPayload,
     _constraint_statuses,
+    _ensure_mutable_round,
+    _ensure_publishable_round,
     _manual_session_id,
     _normalize_reviewers,
     _query_list,
@@ -104,6 +109,25 @@ def test_manual_constraint_statuses_do_not_report_unconfigured_rules_as_passed()
 def test_manual_session_external_ids_are_accepted():
     assert _manual_session_id("manual_session_42") == 42
     assert _manual_session_id("42") == 42
+
+
+def test_manual_schedule_editing_is_available_for_every_round_status():
+    assert EDITABLE_ROUND_STATUSES == ALL_ROUND_STATUSES
+
+    for round_status in ALL_ROUND_STATUSES:
+        _ensure_mutable_round({"round_status": round_status})
+
+
+def test_manual_schedule_publish_keeps_terminal_rounds_locked():
+    for round_status in PUBLISHABLE_ROUND_STATUSES:
+        _ensure_publishable_round({"round_status": round_status})
+
+    for round_status in ("ONGOING", "POSTPONED", "COMPLETED", "LOCKED", "CANCELLED"):
+        with pytest.raises(HTTPException) as exc_info:
+            _ensure_publishable_round({"round_status": round_status})
+
+        assert exc_info.value.status_code == 409
+        assert exc_info.value.detail["code"] == "ROUND_STATUS_INVALID"
 
 
 def test_manual_scheduling_router_exposes_required_endpoints():
