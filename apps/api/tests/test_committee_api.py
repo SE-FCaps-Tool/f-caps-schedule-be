@@ -51,6 +51,7 @@ def lecturer_ids():
         db.execute(text("DELETE FROM accounts WHERE id = ANY(:ids)"), {"ids": account_ids})
 
 
+@pytest.mark.integration
 def test_committee_preview_requires_manager(client, lecturer_ids):
     payload = {"groups": [{"code": "CMT-TEST-01", "memberIds": lecturer_ids[:3]}]}
     forbidden = client.post(
@@ -61,6 +62,7 @@ def test_committee_preview_requires_manager(client, lecturer_ids):
     assert forbidden.status_code == 403
 
 
+@pytest.mark.integration
 def test_committee_preview_labels_reviewer_only_group(client, lecturer_ids):
     payload = {"groups": [{"code": "CMT-TEST-REVIEWER", "memberIds": lecturer_ids[:3]}]}
     response = client.post(
@@ -75,6 +77,7 @@ def test_committee_preview_labels_reviewer_only_group(client, lecturer_ids):
     assert [member["roleLabel"] for member in group["members"]] == ["Reviewer 1", "Reviewer 2", "Reviewer 3"]
 
 
+@pytest.mark.integration
 def test_committee_preview_labels_chair_secretary_member_group(client, lecturer_ids):
     payload = {"groups": [{"code": "CMT-TEST-DEFENSE", "memberIds": lecturer_ids[:5]}]}
     response = client.post(
@@ -95,6 +98,7 @@ def test_committee_preview_labels_chair_secretary_member_group(client, lecturer_
     ]
 
 
+@pytest.mark.integration
 def test_committee_preview_reports_duplicate_member_error(client, lecturer_ids):
     payload = {"groups": [{"code": "CMT-TEST-DUP", "memberIds": [lecturer_ids[0], lecturer_ids[0]]}]}
     response = client.post(
