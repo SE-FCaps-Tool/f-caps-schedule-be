@@ -459,7 +459,10 @@ def list_accounts(db: Db, user: User) -> list[dict[str, object]]:
     rows = db.execute(
         text(
             "SELECT a.id, a.email, a.display_name, a.status, a.created_at, "
-            "COALESCE(MIN(ar.role::text), '') AS role "
+            "COALESCE(MIN(ar.role::text), '') AS role, "
+            "COALESCE(ARRAY_AGG(ar.role::text ORDER BY CASE ar.role::text "
+            "WHEN 'ADMIN' THEN 1 WHEN 'MANAGER' THEN 2 WHEN 'LECTURER' THEN 3 "
+            "WHEN 'STUDENT' THEN 4 ELSE 99 END) FILTER (WHERE ar.role IS NOT NULL), ARRAY[]::text[]) AS roles "
             "FROM accounts a "
             "LEFT JOIN account_roles ar ON ar.account_id = a.id "
             "GROUP BY a.id ORDER BY a.email"

@@ -92,6 +92,7 @@ class AccountResponse(ResponseModel):
     display_name: str
     status: str
     role: str | None = None
+    roles: list[str] = Field(default_factory=list)
     created_at: datetime | None = None
 
 

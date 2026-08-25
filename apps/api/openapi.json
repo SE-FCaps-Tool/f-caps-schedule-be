@@ -105,6 +105,13 @@
             ],
             "title": "Role"
           },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -3292,18 +3299,6 @@
             "title": "Id",
             "type": "integer"
           },
-          "nameEn": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Nameen"
-          },
           "mainSupervisor": {
             "anyOf": [
               {
@@ -3314,6 +3309,21 @@
               }
             ]
           },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "nameEn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nameen"
+          },
           "nameVi": {
             "anyOf": [
               {
@@ -3323,12 +3333,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Namevi"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
           },
           "status": {
             "title": "Status",
@@ -4387,7 +4392,7 @@
                 "type": "null"
               }
             ],
-            "title": "Display Name"
+            "title": "Displayname"
           },
           "email": {
             "anyOf": [
@@ -4755,7 +4760,7 @@
                 "type": "null"
               }
             ],
-            "title": "Display Name"
+            "title": "Displayname"
           },
           "email": {
             "anyOf": [
@@ -14267,7 +14272,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "0a46e87da59794e54ac9d6bd88d29d5930960591",
+    "x-be-commit": "a426df3a8e776d71aa81387ab92f2924899eef95",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",

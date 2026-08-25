@@ -55,6 +55,17 @@ def test_admin_account_lifecycle_is_audited(client):
     assert accounts.status_code == 200, accounts.text
     created_account = next(item for item in accounts.json() if item["id"] == account_id)
     assert created_account["role"] == "MANAGER"
+    assert created_account["roles"] == ["MANAGER"]
+    assigned = client.post(
+        f"/api/v1/accounts/{account_id}/roles",
+        json={"role": "ADMIN", "reason": "Operator also manages account access"},
+        headers=admin_headers,
+    )
+    assert assigned.status_code == 200, assigned.text
+    accounts_after_role_change = client.get("/api/v1/accounts", headers=admin_headers)
+    assert accounts_after_role_change.status_code == 200, accounts_after_role_change.text
+    changed_account = next(item for item in accounts_after_role_change.json() if item["id"] == account_id)
+    assert changed_account["roles"] == ["ADMIN", "MANAGER"]
     disabled = client.patch(
         f"/api/v1/accounts/{account_id}/status",
         json={"status": "INACTIVE", "reason": "End of local pilot"},
