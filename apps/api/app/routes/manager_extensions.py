@@ -649,7 +649,8 @@ def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db
     group = db.execute(
         text(
             "SELECT g.id, g.code, g.status, p.id AS project_id, p.code AS project_code, "
-            "COALESCE(p.title_en, p.title_vi, p.title) AS project_name, p.status AS project_status, "
+            "COALESCE(p.title_en, p.title_vi, p.title) AS project_name, p.title_vi AS project_name_vi, "
+            "p.title_en AS project_name_en, p.status AS project_status, "
             "sem.id AS semester_id, sem.code AS semester_code, sem.name AS semester_name "
             "FROM groups g LEFT JOIN projects p ON p.id = g.project_id "
             "LEFT JOIN semesters sem ON sem.id = p.semester_id WHERE g.id = :group_id"
@@ -744,6 +745,7 @@ def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db
         "members": members,
         "project": {
             "id": group["project_id"], "code": group["project_code"], "name": group["project_name"],
+            "name_vi": group["project_name_vi"], "name_en": group["project_name_en"],
             "status": str(group["project_status"]),
             "main_supervisor": supervisor_map.get("MAIN"), "co_supervisor": supervisor_map.get("CO"),
         } if group["project_id"] is not None else None,

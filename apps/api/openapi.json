@@ -3292,6 +3292,18 @@
             "title": "Id",
             "type": "integer"
           },
+          "nameEn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Nameen"
+          },
           "mainSupervisor": {
             "anyOf": [
               {
@@ -3301,6 +3313,18 @@
                 "type": "null"
               }
             ]
+          },
+          "nameVi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Namevi"
           },
           "name": {
             "title": "Name",

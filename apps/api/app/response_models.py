@@ -203,6 +203,8 @@ class GroupOverviewProjectResponse(TargetResponseModel):
     id: int
     code: str
     name: str
+    name_vi: str | None = None
+    name_en: str | None = None
     status: str
     main_supervisor: GroupOverviewSupervisorResponse | None = None
     co_supervisor: GroupOverviewSupervisorResponse | None = None
