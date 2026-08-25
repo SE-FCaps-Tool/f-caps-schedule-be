@@ -62,7 +62,7 @@ def login(payload: LoginPayload, response: Response, request: Request, db: Db, s
         raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.", headers={"Retry-After": str(throttle["retry_after"])})
     row = db.execute(
         text(
-            "SELECT a.id, a.password_hash, a.status FROM accounts a "
+            "SELECT a.id, a.email, a.display_name, a.password_hash, a.status FROM accounts a "
             "WHERE lower(a.email) = lower(:email)"
         ),
         {"email": payload.email.strip()},
@@ -83,9 +83,23 @@ def login(payload: LoginPayload, response: Response, request: Request, db: Db, s
     if len(roles) > 1:
         challenge = _create_login_challenge(db, int(row["id"]), provider="password")
         _set_login_challenge_cookie(response, challenge, settings)
-        return {"role": None, "expires_at": None, "requires_role_selection": True, "available_roles": roles}
+        return {
+            "role": None,
+            "expires_at": None,
+            "requires_role_selection": True,
+            "available_roles": roles,
+            "email": row["email"],
+            "display_name": row["display_name"],
+        }
     expires = _create_session(db, int(row["id"]), roles[0], response, settings, provider="password")
-    return {"role": roles[0], "expires_at": expires.isoformat(), "requires_role_selection": False, "available_roles": roles}
+    return {
+        "role": roles[0],
+        "expires_at": expires.isoformat(),
+        "requires_role_selection": False,
+        "available_roles": roles,
+        "email": row["email"],
+        "display_name": row["display_name"],
+    }
 
 
 @router.get("/google/start", include_in_schema=True)
@@ -153,6 +167,13 @@ def google_callback(
         return _oauth_error_redirect(settings, "account_inactive")
 
     account_id = int(account["id"])
+    db.execute(
+        text(
+            "UPDATE accounts SET display_name = COALESCE(NULLIF(BTRIM(display_name), ''), :display_name) "
+            "WHERE id = :account_id"
+        ),
+        {"account_id": account_id, "display_name": claims["display_name"]},
+    )
     identity = db.execute(
         text("SELECT account_id FROM auth_identities WHERE provider = 'google' AND subject = :subject"),
         {"subject": claims["subject"]},
@@ -267,12 +288,35 @@ def select_role(
     db.commit()
     expires = _create_session(db, int(challenge["account_id"]), role, response, settings, provider=str(challenge["provider"]))
     response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
-    return {"role": role, "expires_at": expires.isoformat(), "requires_role_selection": False, "available_roles": roles}
+    account = db.execute(
+        text("SELECT email, display_name FROM accounts WHERE id = :account_id"),
+        {"account_id": int(challenge["account_id"])},
+    ).mappings().one()
+    return {
+        "role": role,
+        "expires_at": expires.isoformat(),
+        "requires_role_selection": False,
+        "available_roles": roles,
+        "email": account["email"],
+        "display_name": account["display_name"],
+    }
 
 
 @router.get("/me", response_model=MeResponse)
-def authenticated_me(user: User) -> dict[str, str | int | None]:
-    return {"role": user.role, "status": user.status, "account_id": user.account_id}
+def authenticated_me(user: User, db: Db) -> dict[str, str | int | None]:
+    identity = None
+    if user.account_id is not None:
+        identity = db.execute(
+            text("SELECT email, display_name FROM accounts WHERE id = :account_id"),
+            {"account_id": user.account_id},
+        ).mappings().one_or_none()
+    return {
+        "role": user.role,
+        "status": user.status,
+        "account_id": user.account_id,
+        "email": identity["email"] if identity else None,
+        "display_name": identity["display_name"] if identity else None,
+    }
 
 
 class GoogleOAuthError(Exception):

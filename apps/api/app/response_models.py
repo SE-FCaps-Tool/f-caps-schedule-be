@@ -33,6 +33,8 @@ class LoginResponse(ResponseModel):
     expires_at: datetime | str | None = None
     requires_role_selection: bool = False
     available_roles: list[str] = Field(default_factory=list)
+    email: str | None = None
+    display_name: str | None = None
 
 
 class RoleSelectionResponse(ResponseModel):
@@ -51,6 +53,8 @@ class MeResponse(ResponseModel):
     role: str
     status: str
     account_id: int | None = None
+    email: str | None = None
+    display_name: str | None = None
 
 
 class PublicMeResponse(ResponseModel):
