@@ -1,7 +1,7 @@
 """Seed the local room catalog and allow those room types for a round.
 
-This is intentionally idempotent.  Room usage counts are not tracked or
-validated here; the scheduler may reuse a room across different timeslots.
+This is intentionally idempotent.  The scheduler may reuse a room across
+different non-overlapping timeslots, but never for overlapping sessions.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def seed_rooms(session: Session, round_id: int | None) -> dict[str, Any]:
             ":reason, CAST(:after_json AS JSONB))"
         ),
         {
-            "reason": "Seed local room catalog; room reuse limits are intentionally ignored",
+            "reason": "Seed local room catalog; rooms are reused only across non-overlapping timeslots",
             "after_json": json.dumps(
                 {
                     "rooms": len(ROOMS),

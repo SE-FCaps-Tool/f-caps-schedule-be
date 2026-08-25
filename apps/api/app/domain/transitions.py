@@ -32,15 +32,23 @@ def transition_round(current: RoundStatus, target: RoundStatus) -> RoundStatus:
     current = RoundStatus(current)
     target = RoundStatus(target)
     if current is RoundStatus.LOCKED:
-        raise DomainError("ROUND_LOCKED", "A locked round cannot be changed.")
+        raise DomainError("ROUND_LOCKED", "Đợt đánh giá đã khóa nên không thể thay đổi.")
     if current is RoundStatus.CANCELLED:
-        raise DomainError("ROUND_TERMINAL", "A cancelled round is terminal.")
+        raise DomainError("ROUND_TERMINAL", "Đợt đánh giá đã hủy nên không thể tiếp tục chuyển trạng thái.")
     if target not in _ROUND_TRANSITIONS[current]:
         raise DomainError(
             "ROUND_TRANSITION_NOT_ALLOWED",
-            f"Cannot transition a round from {current} to {target}.",
+            f"Không thể chuyển đợt đánh giá từ {current} sang {target}.",
         )
     return target
+
+
+def scheduler_round_status(current: RoundStatus) -> RoundStatus:
+    """Return the round state required before generating another schedule draft."""
+    current = RoundStatus(current)
+    if current in {RoundStatus.SCHEDULING, RoundStatus.SCHEDULED}:
+        return current
+    return transition_round(current, RoundStatus.SCHEDULING)
 
 
 def transition_group(
@@ -53,7 +61,7 @@ def transition_group(
     outcome = ResultOutcome(outcome)
 
     if current is GroupStatus.DROPPED:
-        raise DomainError("GROUP_TERMINAL", "A dropped group cannot receive a result.")
+        raise DomainError("GROUP_TERMINAL", "Nhóm đã bị loại nên không thể tiếp nhận kết quả.")
     if defense.value in REVIEW_1_1_TYPES | REVIEW_2_1_TYPES | {"REVIEW"}:
         return current
     if defense is DefenseType.REMEDIATION:
@@ -82,5 +90,5 @@ def transition_group(
 
     raise DomainError(
         "GROUP_RESULT_NOT_ALLOWED",
-        f"{defense} with {outcome} is invalid for group status {current}.",
+        f"Kết quả {defense} với mức {outcome} không hợp lệ khi nhóm đang ở trạng thái {current}.",
     )

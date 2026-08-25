@@ -207,6 +207,8 @@ class GroupOverviewProjectResponse(TargetResponseModel):
     id: int
     code: str
     name: str
+    name_vi: str | None = None
+    name_en: str | None = None
     status: str
     main_supervisor: GroupOverviewSupervisorResponse | None = None
     co_supervisor: GroupOverviewSupervisorResponse | None = None
@@ -616,9 +618,29 @@ class VersionSummaryResponse(ResponseModel):
     metrics: dict[str, Any] = Field(default_factory=dict)
 
 
+class ScheduleAssignmentResponse(ResponseModel):
+    """Durable solver assignment exposed with the same camel-case contract as sessions."""
+
+    assignment_id: int
+    id: int
+    schedule_version_id: int
+    group_id: int
+    group_code: str
+    project_id: int
+    timeslot_id: int
+    start_at: datetime
+    end_at: datetime
+    room_id: int | None = None
+    room_code: str | None = None
+    status: str
+    reviewer_ids: list[int] = Field(default_factory=list)
+    result_owner_ids: list[int] = Field(default_factory=list)
+    reviewer_names: dict[str, str] = Field(default_factory=dict)
+
+
 class VersionDetailResponse(VersionSummaryResponse):
     sessions: list[SessionResponse] = Field(default_factory=list)
-    assignments: list[dict[str, Any]] = Field(default_factory=list)
+    assignments: list[ScheduleAssignmentResponse] = Field(default_factory=list)
 
 
 class DashboardSemesterResponse(ResponseModel):

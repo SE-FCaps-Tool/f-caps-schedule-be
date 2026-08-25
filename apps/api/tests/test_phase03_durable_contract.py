@@ -74,7 +74,10 @@ def test_generate_persists_assignments_only_and_leaves_round_scheduling():
     assert "schedule_assignments" in source
     assert "schedule_assignment_reviewers" in source
     assert "'DRAFT'" in source or '"DRAFT"' in source
-    assert "'SCHEDULING'" in source or '"SCHEDULING"' in source
+    # The scheduler status transition is centralized in scheduler_round_status;
+    # keep this contract resilient to that domain helper rather than requiring
+    # the route to duplicate the literal transition target.
+    assert "scheduler_round_status" in source or "'SCHEDULING'" in source or '"SCHEDULING"' in source
     assert "INSERT INTO sessions" not in source.upper()
     assert "INSERT INTO SESSION_REVIEWERS" not in source.upper()
 

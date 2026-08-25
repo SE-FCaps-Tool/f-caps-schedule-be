@@ -70,6 +70,11 @@ ADMIN/MANAGER chuẩn bị dữ liệu, nhưng không cho công bố bản nháp
 Thay đổi người dùng lưu sau publish vẫn nằm trong manual draft; khi publish sẽ tạo
 schedule version mới trong cùng transaction, không mutate trực tiếp session live cũ.
 
+Khi round đang `SCHEDULED`, Manager có thể chạy lại scheduler để tạo các
+`schedule_versions` mới ở trạng thái `DRAFT`; version đang `ACTIVE` vẫn được giữ
+cho tới khi Manager chọn activate một version mới. Đây là luồng khác với manual
+board: `manual_schedule_sessions` không tự đồng bộ từ scheduler output.
+
 ### 2.2. Trạng thái session
 
     DRAFT      Có thể thiếu group/phòng/reviewer, chỉ dùng để lưu nháp.
@@ -296,7 +301,10 @@ Request cho phép lưu nháp thiếu dữ liệu:
 
     DELETE /api/v1/rounds/:roundId/manual-schedule/sessions/:sessionId
 
-Chỉ xóa session draft hoặc round chưa publish. Xóa phải giải phóng group, room và reviewer khỏi conflict index.
+Manager có thể xóa session trong workspace draft kể cả khi round đã từng publish.
+Thao tác này không xóa session/version công khai hiện tại; phiên bản mới chỉ thay
+đổi sau khi Manager kiểm tra và bấm công bố lại. Xóa phải giải phóng group, room và
+reviewer khỏi conflict index.
 
 ## 7. Bulk upsert
 
@@ -538,7 +546,9 @@ Codes tối thiểu:
 - Publish lock round/draft revision và validate lại trong cùng transaction.
 - Lưu createdBy, updatedBy, createdAt, updatedAt cho session.
 - Audit tối thiểu: tạo, sửa group, sửa room, thêm/xóa reviewer, xóa session, validate, publish.
-- Không mutate lịch đã publish; thay đổi sau publish tạo controlled-change/version mới.
+- Không mutate trực tiếp lịch đã publish. Thay đổi sau publish ghi vào workspace draft
+  trong DB; khi Manager bấm công bố lại, hệ thống tạo controlled-change/version mới,
+  giữ audit và thay thế phiên bản công khai hiện tại.
 
 ## 16. Publish readiness
 

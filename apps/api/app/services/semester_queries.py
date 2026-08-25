@@ -22,12 +22,12 @@ def ensure_semester_writable(db: Session, semester_id: int) -> str:
     if status is None:
         raise HTTPException(
             status_code=404,
-            detail={"code": "SEMESTER_NOT_FOUND", "message": "Semester does not exist."},
+            detail={"code": "SEMESTER_NOT_FOUND", "message": "Không tìm thấy học kỳ."},
         )
     if str(status) == "ARCHIVED":
         raise HTTPException(
             status_code=409,
-            detail={"code": "SEMESTER_ARCHIVED", "message": "An archived semester is read-only."},
+            detail={"code": "SEMESTER_ARCHIVED", "message": "Học kỳ đã lưu trữ chỉ được phép đọc."},
         )
     return str(status)
 
@@ -41,7 +41,7 @@ def ensure_round_semester_writable(db: Session, round_id: int) -> str:
     if semester_id is None:
         raise HTTPException(
             status_code=404,
-            detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."},
+            detail={"code": "ROUND_NOT_FOUND", "message": "Không tìm thấy đợt đánh giá."},
         )
     return ensure_semester_writable(db, int(semester_id))
 
@@ -61,7 +61,7 @@ def validate_academic_year(value: str | None) -> str | None:
             status_code=422,
             detail={
                 "code": "ACADEMIC_YEAR_INVALID",
-                "message": "academic_year must use YYYY-YYYY with consecutive years.",
+                "message": "Năm học phải có dạng YYYY-YYYY với hai năm liên tiếp.",
             },
         )
     return normalized
@@ -156,6 +156,6 @@ def semester_or_404(db: Session, semester_id: int) -> dict[str, Any]:
     if not row:
         raise HTTPException(
             status_code=404,
-            detail={"code": "SEMESTER_NOT_FOUND", "message": "Semester does not exist."},
+            detail={"code": "SEMESTER_NOT_FOUND", "message": "Không tìm thấy học kỳ."},
         )
     return row[0]

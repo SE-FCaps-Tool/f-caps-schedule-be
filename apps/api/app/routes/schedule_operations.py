@@ -17,7 +17,7 @@ from app.domain.schedule_operations import (
     ensure_reschedule_allowed,
     require_change_reason,
 )
-from app.domain.transitions import transition_round
+from app.domain.transitions import scheduler_round_status, transition_round
 from app.response_models import (
     ActionResponse,
     CompareResponse,
@@ -152,7 +152,7 @@ def _validate_scheduler_inputs(db: Session, round_id: int, required_reviewer_cou
     if not group_rows:
         raise DomainError(
             "ROUND_GROUPS_REQUIRED",
-            "Register at least one group in this round before running the scheduler.",
+            "Hãy đăng ký ít nhất một nhóm trong đợt trước khi chạy thuật toán.",
         )
 
     timeslot_ids = list(
@@ -168,14 +168,14 @@ def _validate_scheduler_inputs(db: Session, round_id: int, required_reviewer_cou
     if not timeslot_ids:
         raise DomainError(
             "ROUND_TIMESLOTS_REQUIRED",
-            "Add at least one active timeslot to this round before running the scheduler.",
+            "Hãy thêm ít nhất một khung giờ đang hoạt động vào đợt trước khi chạy thuật toán.",
         )
 
     missing_projects = [int(row["id"]) for row in group_rows if row["project_id"] is None]
     if missing_projects:
         raise DomainError(
             "ROUND_GROUP_PROJECT_REQUIRED",
-            f"Groups {missing_projects} have no project assigned. Assign a project before scheduling.",
+            f"Các nhóm {missing_projects} chưa được gán đề tài. Hãy gán đề tài trước khi xếp lịch.",
         )
 
     invalid_leaders = [
@@ -186,8 +186,8 @@ def _validate_scheduler_inputs(db: Session, round_id: int, required_reviewer_cou
     if invalid_leaders:
         raise DomainError(
             "ROUND_GROUP_LEADER_INVALID",
-            "Each scheduled group must have exactly one active Project Leader. "
-            f"Invalid groups: {invalid_leaders}.",
+            "Mỗi nhóm được xếp lịch phải có đúng một Project Leader đang hoạt động. "
+            f"Nhóm không hợp lệ: {invalid_leaders}.",
         )
 
     accepted_reviewers = set(
@@ -214,20 +214,20 @@ def _validate_scheduler_inputs(db: Session, round_id: int, required_reviewer_cou
         if len(accepted_reviewers) < required_reviewer_count:
             raise DomainError(
                 "ROUND_REVIEWERS_ACCEPTANCE_REQUIRED",
-                f"This {required_reviewer_count}-Reviewer round has only {len(accepted_reviewers)} accepted invitation(s). "
-                f"Accept {required_reviewer_count - len(accepted_reviewers)} more Reviewer invitation(s).",
+                f"Đợt cần {required_reviewer_count} reviewer nhưng mới có {len(accepted_reviewers)} lời mời được chấp nhận. "
+                f"Hãy chấp nhận thêm {required_reviewer_count - len(accepted_reviewers)} lời mời reviewer.",
             )
         available_accepted = accepted_reviewers & available_reviewers
         if len(available_accepted) < required_reviewer_count:
             raise DomainError(
                 "ROUND_REVIEWER_AVAILABILITY_REQUIRED",
-                f"Only {len(available_accepted)} of {required_reviewer_count} accepted Reviewer(s) have availability on an active round timeslot. "
-                "Collect availability for the accepted Reviewers before scheduling.",
+                f"Chỉ có {len(available_accepted)}/{required_reviewer_count} reviewer đã chấp nhận có lịch rảnh ở khung giờ đang hoạt động. "
+                "Hãy thu thập lịch rảnh của các reviewer trước khi xếp lịch.",
             )
     elif len(available_reviewers) < required_reviewer_count:
         raise DomainError(
             "ROUND_REVIEWERS_INSUFFICIENT",
-            f"This round requires {required_reviewer_count} Reviewer(s), but only {len(available_reviewers)} Lecturer(s) have availability on an active round timeslot.",
+            f"Đợt này cần {required_reviewer_count} reviewer nhưng chỉ có {len(available_reviewers)} giảng viên rảnh ở khung giờ đang hoạt động.",
         )
 
 
@@ -289,7 +289,7 @@ def _round_input(
         .one_or_none()
     )
     if round_row is None:
-        raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
+        raise DomainError("ROUND_NOT_FOUND", "Không tìm thấy đợt đánh giá.")
     group_rows = (
         db.execute(
             text(
@@ -468,9 +468,12 @@ def _session_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
     sessions = (
         db.execute(
             text(
-                "SELECT s.id, a.id AS assignment_id, s.group_id, g.code AS group_code, a.project_id, s.timeslot_id, s.room_id, s.council_id, "
+                "SELECT s.id, a.id AS assignment_id, s.group_id, g.code AS group_code, a.project_id, s.timeslot_id, s.room_id, rm.code AS room_code, s.council_id, "
                 "s.start_at, s.end_at, s.status "
-                "FROM sessions s JOIN groups g ON g.id = s.group_id JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id WHERE s.schedule_version_id = :version_id ORDER BY s.id"
+                "FROM sessions s JOIN groups g ON g.id = s.group_id "
+                "LEFT JOIN rooms rm ON rm.id = s.room_id "
+                "JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id "
+                "WHERE s.schedule_version_id = :version_id ORDER BY s.id"
             ),
             {"version_id": version_id},
         )
@@ -508,8 +511,10 @@ def _assignment_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
     """Load the durable solver record, including reviewer snapshots."""
     rows = db.execute(text(
         "SELECT a.id AS assignment_id, a.id, a.schedule_version_id, a.group_id, g.code AS group_code, "
-        "a.project_id, a.timeslot_id, a.start_at, a.end_at FROM schedule_assignments a "
-        "JOIN groups g ON g.id=a.group_id WHERE a.schedule_version_id=:version_id ORDER BY a.id"
+        "a.project_id, a.timeslot_id, a.start_at, a.end_at, a.room_id, rm.code AS room_code "
+        "FROM schedule_assignments a JOIN groups g ON g.id=a.group_id "
+        "LEFT JOIN rooms rm ON rm.id = a.room_id "
+        "WHERE a.schedule_version_id=:version_id ORDER BY a.id"
     ), {"version_id": version_id}).mappings().all()
     reviewers = db.execute(text(
         "SELECT r.assignment_id, r.lecturer_id, r.is_result_owner, r.snapshot_name "
@@ -524,9 +529,19 @@ def _assignment_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
         names.setdefault(aid, {})[lecturer_id] = snapshot_name
         if is_owner:
             owners.setdefault(aid, []).append(lecturer_id)
-    return [{**dict(row), "room_id": None, "status": "PLANNED", "reviewer_ids": tuple(by_assignment.get(row["assignment_id"], [])),
-             "result_owner_ids": tuple(owners.get(row["assignment_id"], [])),
-             "reviewer_names": names.get(row["assignment_id"], {})} for row in rows]
+    return [
+        {
+            **dict(row),
+            "status": "PLANNED",
+            "reviewer_ids": tuple(by_assignment.get(row["assignment_id"], [])),
+            "result_owner_ids": tuple(owners.get(row["assignment_id"], [])),
+            "reviewer_names": {
+                str(lecturer_id): name
+                for lecturer_id, name in names.get(row["assignment_id"], {}).items()
+            },
+        }
+        for row in rows
+    ]
 
 
 def _to_domain_sessions(rows: list[dict[str, Any]]) -> list[ScheduledSession]:
@@ -555,11 +570,11 @@ def _edited_rows(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     target = next((row for row in rows if row["id"] == session_id), None)
     if target is None:
-        raise DomainError("SESSION_NOT_FOUND", "Session does not exist in this version.")
+        raise DomainError("SESSION_NOT_FOUND", "Không tìm thấy phiên trong phương án này.")
     slot_map = {slot[0]: slot for slot in timeslots}
     next_slot_id = payload.timeslot_id or target["timeslot_id"]
     if next_slot_id not in slot_map:
-        raise DomainError("TIMESLOT_NOT_IN_ROUND", "The requested timeslot is not attached to this round.")
+        raise DomainError("TIMESLOT_NOT_IN_ROUND", "Khung giờ được yêu cầu không thuộc đợt đánh giá này.")
     slot = slot_map[next_slot_id]
     changed = {
         **target,
@@ -597,7 +612,7 @@ def _owner_for_edit(
     if owner_id is None or owner_id not in reviewer_ids:
         raise DomainError(
             "RESULT_OWNER_REQUIRED",
-            "Exactly one Result Owner from the session Reviewers is required.",
+            "Phải chọn đúng một Result Owner trong danh sách reviewer của phiên.",
         )
     return owner_id
 
@@ -642,7 +657,7 @@ def schedule_version_detail(version_id: Annotated[int, Path(alias="versionId")],
     if version is None:
         raise HTTPException(
             status_code=404,
-            detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."},
+            detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."},
         )
     assignments = _assignment_rows(db, version_id)
     sessions = [] if version["status"] == "DRAFT" else _session_rows(db, version_id)
@@ -650,7 +665,7 @@ def schedule_version_detail(version_id: Annotated[int, Path(alias="versionId")],
         visible = visible_session_ids(db, user, version_id=version_id)
         sessions = [row for row in sessions if row["id"] in visible]
         if not sessions:
-            raise HTTPException(status_code=403, detail="Schedule is outside the actor's scope.")
+            raise HTTPException(status_code=403, detail="Lịch không thuộc phạm vi dữ liệu của tài khoản này.")
     return {**_version_ui(version), "sessions": sessions, "assignments": assignments}
 
 
@@ -676,14 +691,14 @@ def compare_schedule_versions(version_a: Annotated[int, Path(alias="versionA")],
         {"ids": [version_a, version_b]},
     ).mappings().all()
     if len(versions) != 2 or versions[0]["round_id"] != versions[1]["round_id"]:
-        raise HTTPException(status_code=404, detail={"code": "VERSION_COMPARE_INVALID", "message": "Both versions must exist in the same round."})
+        raise HTTPException(status_code=404, detail={"code": "VERSION_COMPARE_INVALID", "message": "Hai phương án phải cùng thuộc một đợt đánh giá."})
     sessions = db.execute(text(
-        "SELECT a.schedule_version_id, a.group_id, a.project_id, a.timeslot_id, "
+        "SELECT a.schedule_version_id, a.group_id, a.project_id, a.timeslot_id, a.room_id, "
         "COALESCE(array_agg(ar.lecturer_id ORDER BY ar.lecturer_id) "
         "FILTER (WHERE ar.lecturer_id IS NOT NULL), ARRAY[]::bigint[]) AS reviewer_ids "
         "FROM schedule_assignments a LEFT JOIN schedule_assignment_reviewers ar ON ar.assignment_id = a.id "
         "WHERE a.schedule_version_id = ANY(:ids) "
-        "GROUP BY a.schedule_version_id, a.group_id, a.project_id, a.timeslot_id"
+        "GROUP BY a.schedule_version_id, a.group_id, a.project_id, a.timeslot_id, a.room_id"
     ), {"ids": [version_a, version_b]}).mappings().all()
     by_version = {version_a: {}, version_b: {}}
     for row in sessions:
@@ -704,16 +719,16 @@ def delete_draft_version(version_id: Annotated[int, Path(alias="versionId")], db
     with db.begin():
         version_ref = db.execute(text("SELECT round_id FROM schedule_versions WHERE id = :id"), {"id": version_id}).mappings().one_or_none()
         if version_ref is None:
-            raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+            raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."})
         ensure_round_semester_writable(db, int(version_ref["round_id"]))
         row = db.execute(text("SELECT id, round_id, status, activated_at FROM schedule_versions WHERE id = :id FOR UPDATE"), {"id": version_id}).mappings().one_or_none()
         if row is None:
-            raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+            raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."})
         if row["status"] != "DRAFT":
-            raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_FORBIDDEN", "message": "Only an unused draft/valid version can be deleted."})
+            raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_FORBIDDEN", "message": "Chỉ được xóa phương án nháp hợp lệ chưa được sử dụng."})
         dependency_count = db.execute(text("SELECT COUNT(*) FROM schedule_change_records WHERE schedule_version_id=:id"), {"id": version_id}).scalar_one()
         if dependency_count:
-            raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_HAS_DEPENDENCIES", "message": "Version has dependent schedule or audit records and cannot be deleted."})
+            raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_HAS_DEPENDENCIES", "message": "Phương án đã có lịch hoặc bản ghi audit phụ thuộc nên không thể xóa."})
         db.execute(text("DELETE FROM schedule_versions WHERE id = :id"), {"id": version_id})
     return {"id": version_id, "deleted": True}
 
@@ -776,14 +791,15 @@ def _persist_generated_schedule_draft(
     for session in result.sessions:
         assignment_id = db.execute(
             text(
-                "INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,start_at,end_at) "
-                "VALUES (:version_id,:group_id,:project_id,:timeslot_id,:start_at,:end_at) RETURNING id"
+                "INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,room_id,start_at,end_at) "
+                "VALUES (:version_id,:group_id,:project_id,:timeslot_id,:room_id,:start_at,:end_at) RETURNING id"
             ),
             {
                 "version_id": version_id,
                 "group_id": session.group_id,
                 "project_id": context.group_project[session.group_id],
                 "timeslot_id": session.timeslot_id,
+                "room_id": session.room_id,
                 "start_at": session.start_at,
                 "end_at": session.end_at,
             },
@@ -870,22 +886,22 @@ def run_scheduler(round_id: Annotated[int, Path(alias="roundId")], payload: Sche
                 {"round_id": round_id},
             ).mappings().one_or_none()
             if round_row is None:
-                raise DomainError("ROUND_NOT_FOUND", "Round does not exist.")
+                raise DomainError("ROUND_NOT_FOUND", "Không tìm thấy đợt đánh giá.")
             current_status = RoundStatus(round_row["status"])
-            if current_status is not RoundStatus.SCHEDULING:
-                next_status = transition_round(current_status, RoundStatus("SCHEDULING"))
-                _validate_scheduler_inputs(db, round_id, round_row["reviewer_count"])
+            next_status = scheduler_round_status(current_status)
+            _validate_scheduler_inputs(db, round_id, round_row["reviewer_count"])
+            if next_status is not current_status:
                 db.execute(
                     text("UPDATE rounds SET status = CAST(:status AS round_status) WHERE id = :round_id"),
                     {"status": next_status.value, "round_id": round_id},
                 )
             context, groups, timeslots, reviewers = _round_input(db, round_id)
             if not groups:
-                raise DomainError("ROUND_GROUPS_REQUIRED", "Register at least one group in this round before running the scheduler.")
+                raise DomainError("ROUND_GROUPS_REQUIRED", "Hãy đăng ký ít nhất một nhóm trong đợt trước khi chạy thuật toán.")
             if not timeslots:
-                raise DomainError("ROUND_TIMESLOTS_REQUIRED", "Add at least one active timeslot to this round before running the scheduler.")
+                raise DomainError("ROUND_TIMESLOTS_REQUIRED", "Hãy thêm ít nhất một khung giờ đang hoạt động vào đợt trước khi chạy thuật toán.")
             if not reviewers:
-                raise DomainError("ROUND_REVIEWERS_INSUFFICIENT", "No Reviewer is available on an active round timeslot.")
+                raise DomainError("ROUND_REVIEWERS_INSUFFICIENT", "Không có reviewer nào rảnh ở khung giờ đang hoạt động của đợt.")
             candidate_pool = generate_candidates(
                 context,
                 groups=groups,
@@ -950,7 +966,7 @@ def run_scheduler(round_id: Annotated[int, Path(alias="roundId")], payload: Sche
             status_code=409,
             detail={
                 "code": "SCHEDULE_PERSIST_FAILED",
-                "message": "Schedule could not be persisted.",
+                "message": "Không thể lưu phương án lịch.",
             },
         ) from exc
 
@@ -963,7 +979,7 @@ def grant_h11_waiver(round_id: Annotated[int, Path(alias="roundId")], group_id: 
         ensure_round_semester_writable(db, round_id)
         attached = db.execute(text("SELECT 1 FROM round_groups WHERE round_id = :round_id AND group_id = :group_id"), {"round_id": round_id, "group_id": group_id}).scalar_one_or_none()
         if attached is None:
-            raise HTTPException(status_code=404, detail={"code": "ROUND_GROUP_NOT_FOUND", "message": "The group is not attached to this round."})
+            raise HTTPException(status_code=404, detail={"code": "ROUND_GROUP_NOT_FOUND", "message": "Nhóm không thuộc đợt đánh giá này."})
         actor_id = _actor_id(db, user)
         row = db.execute(text("INSERT INTO h11_waivers (round_id, group_id, granted_by, reason, active) VALUES (:round_id, :group_id, :actor_id, :reason, TRUE) ON CONFLICT (round_id, group_id) DO UPDATE SET granted_by = EXCLUDED.granted_by, reason = EXCLUDED.reason, active = TRUE, created_at = now() RETURNING id, active"), {"round_id": round_id, "group_id": group_id, "actor_id": actor_id, "reason": payload.reason.strip()}).mappings().one()
         db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'H11_WAIVER_GRANTED', 'h11_waiver', :entity_id, :reason, CAST(:after_json AS JSONB))"), {"actor_id": actor_id, "entity_id": f"{round_id}:{group_id}", "reason": payload.reason.strip(), "after_json": _json({"active": True, "scope": "H11"})})
@@ -977,7 +993,7 @@ def revoke_h11_waiver(round_id: Annotated[int, Path(alias="roundId")], group_id:
         ensure_round_semester_writable(db, round_id)
         updated = db.execute(text("UPDATE h11_waivers SET active = FALSE WHERE round_id = :round_id AND group_id = :group_id AND active = TRUE RETURNING id"), {"round_id": round_id, "group_id": group_id}).mappings().one_or_none()
         if updated is None:
-            raise HTTPException(status_code=404, detail={"code": "H11_WAIVER_NOT_FOUND", "message": "Active H11 waiver does not exist."})
+            raise HTTPException(status_code=404, detail={"code": "H11_WAIVER_NOT_FOUND", "message": "Không tìm thấy miễn trừ H11 đang hiệu lực."})
         db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'H11_WAIVER_REVOKED', 'h11_waiver', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": f"{round_id}:{group_id}", "after_json": _json({"active": False})})
     return {"id": updated["id"], "round_id": round_id, "group_id": group_id, "active": False}
 
@@ -998,7 +1014,7 @@ def activate_schedule_version(version_id: Annotated[int, Path(alias="versionId")
         if version is None:
             raise HTTPException(
                 status_code=404,
-                detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."},
+                detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."},
             )
         db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": version["round_id"]})
         ensure_round_semester_writable(db, int(version["round_id"]))
@@ -1016,14 +1032,14 @@ def activate_schedule_version(version_id: Annotated[int, Path(alias="versionId")
         if version is None:
             raise HTTPException(
                 status_code=404,
-                detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."},
+                detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."},
             )
         if version["status"] != "DRAFT":
             raise HTTPException(
                 status_code=422,
                 detail={
                     "code": "VERSION_NOT_VALID",
-                    "message": "Only a draft version can become active.",
+                    "message": "Chỉ phương án nháp mới có thể được kích hoạt.",
                 },
             )
         group_ids = [row[0] for row in db.execute(text(
@@ -1031,7 +1047,7 @@ def activate_schedule_version(version_id: Annotated[int, Path(alias="versionId")
         ), {"version_id": version_id}).all()]
         db.execute(text("SELECT id FROM groups WHERE id=ANY(:group_ids) ORDER BY id FOR UPDATE"), {"group_ids": group_ids or [0]}).all()
         assignments = db.execute(text(
-            "SELECT id, group_id, project_id, timeslot_id, start_at, end_at FROM schedule_assignments "
+            "SELECT id, group_id, project_id, timeslot_id, room_id, start_at, end_at FROM schedule_assignments "
             "WHERE schedule_version_id=:version_id ORDER BY id FOR UPDATE"
         ), {"version_id": version_id}).mappings().all()
         stale = db.execute(text(
@@ -1039,7 +1055,7 @@ def activate_schedule_version(version_id: Annotated[int, Path(alias="versionId")
             "WHERE a.schedule_version_id=:version_id AND g.project_id IS DISTINCT FROM a.project_id"
         ), {"version_id": version_id}).all()
         if stale:
-            raise HTTPException(status_code=409, detail={"code": "DRAFT_ASSIGNMENT_STALE", "message": "Group project provenance changed; regenerate the draft."})
+            raise HTTPException(status_code=409, detail={"code": "DRAFT_ASSIGNMENT_STALE", "message": "Thông tin đề tài của nhóm đã thay đổi; hãy tạo lại phương án nháp."})
         reviewer_ids = [row[0] for row in db.execute(text(
             "SELECT lecturer_id FROM schedule_assignment_reviewers r JOIN schedule_assignments a ON a.id=r.assignment_id WHERE a.schedule_version_id=:version_id"
         ), {"version_id": version_id}).all()]
@@ -1051,7 +1067,6 @@ def activate_schedule_version(version_id: Annotated[int, Path(alias="versionId")
             reviewer_map.setdefault(assignment_id, []).append(lecturer_id)
         for item in validation_rows:
             item["reviewer_ids"] = tuple(reviewer_map.get(item["id"], []))
-            item["room_id"] = None
             item["status"] = "PLANNED"
         activation_context, _, _, _ = _round_input(db, version["round_id"])
         activation_validation = validate_schedule(_to_domain_sessions(validation_rows), activation_context)
@@ -1067,10 +1082,11 @@ def activate_schedule_version(version_id: Annotated[int, Path(alias="versionId")
             "JOIN council_members cm ON cm.council_id=s.council_id AND cm.lecturer_id=ar.lecturer_id "
             "JOIN schedule_versions sv ON sv.id=s.schedule_version_id "
             "WHERE a.schedule_version_id=:version_id AND s.schedule_version_id<>:version_id "
+            "AND sv.round_id<>:round_id "
             "AND sv.status IN ('ACTIVE','PUBLISHED') LIMIT 1"
-        ), {"version_id": version_id}).first()
+        ), {"version_id": version_id, "round_id": version["round_id"]}).first()
         if conflict:
-            raise HTTPException(status_code=409, detail={"code": "REVIEWER_OVERLAP", "message": "A Reviewer is already assigned in an overlapping live schedule."})
+            raise HTTPException(status_code=409, detail={"code": "REVIEWER_OVERLAP", "message": "Reviewer đã được phân công trong một lịch đang hoạt động bị trùng thời gian."})
         for assignment in assignments:
             reviewers = db.execute(text(
                 "SELECT lecturer_id,is_result_owner,snapshot_name FROM schedule_assignment_reviewers WHERE assignment_id=:assignment_id ORDER BY lecturer_id"
@@ -1084,7 +1100,7 @@ def activate_schedule_version(version_id: Annotated[int, Path(alias="versionId")
             )
             db.execute(text(
                 "INSERT INTO sessions (schedule_version_id,group_id,timeslot_id,room_id,council_id,start_at,end_at,status) "
-                "VALUES (:version_id,:group_id,:timeslot_id,NULL,:council_id,:start_at,:end_at,'PLANNED') RETURNING id"
+                "VALUES (:version_id,:group_id,:timeslot_id,:room_id,:council_id,:start_at,:end_at,'PLANNED') RETURNING id"
             ), {"version_id": version_id, **dict(assignment), "council_id": council_id}).scalar_one()
         db.execute(
             text(
@@ -1125,7 +1141,7 @@ def assign_result_owner(version_id: Annotated[int, Path(alias="versionId")], ses
                 {"session_id": session_id, "version_id": version_id},
             ).mappings().one_or_none()
             if session_ref is None:
-                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist in this version."})
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm trong phương án này."})
             db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": session_ref["round_id"]})
             ensure_round_semester_writable(db, int(session_ref["round_id"]))
             session = db.execute(text(
@@ -1134,15 +1150,15 @@ def assign_result_owner(version_id: Annotated[int, Path(alias="versionId")], ses
                 "JOIN rounds r ON r.id = sv.round_id WHERE s.id = :session_id AND s.schedule_version_id = :version_id FOR UPDATE"
             ), {"session_id": session_id, "version_id": version_id}).mappings().one_or_none()
             if session is None:
-                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist in this version."})
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm trong phương án này."})
             if session["status"] in {"COMPLETED", "GROUP_ABSENT", "POSTPONED", "CANCELLED"}:
-                raise HTTPException(status_code=422, detail={"code": "SESSION_IMMUTABLE", "message": "This session's Council ownership is immutable."})
+                raise HTTPException(status_code=422, detail={"code": "SESSION_IMMUTABLE", "message": "Hội đồng của phiên này đã được niêm phong và không thể thay đổi."})
             before_recipients = affected_schedule_recipients(db, version_id)
             if not session["result_owner_mode"] or session["type"] not in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"}:
-                raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_NOT_ALLOWED", "message": "Result Owner mode is disabled for this session."})
+                raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_NOT_ALLOWED", "message": "Phiên này không bật chế độ Result Owner."})
             members = load_council_members(db, int(session["council_id"]))
             if lecturer_id not in {int(member["lecturer_id"]) for member in members}:
-                raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_MUST_BE_REVIEWER", "message": "The Result Owner must be one of this session's Reviewers."})
+                raise HTTPException(status_code=422, detail={"code": "RESULT_OWNER_MUST_BE_REVIEWER", "message": "Result Owner phải là một reviewer của phiên này."})
             validate_council_change(db, session_id, int(session["round_id"]), [member["lecturer_id"] for member in members], session["start_at"], session["end_at"])
             next_members = [{**member, "is_result_owner": int(member["lecturer_id"]) == lecturer_id} for member in members]
             council_id = create_council(db, int(session["round_id"]), next_members, created_by=_actor_id(db, user), reason="Result Owner reassignment", supersedes_council_id=int(session["council_id"]))
@@ -1170,10 +1186,10 @@ def edit_draft_session(version_id: Annotated[int, Path(alias="versionId")], sess
     require_change_reason(payload.reason)
     version = db.execute(text("SELECT round_id, status FROM schedule_versions WHERE id = :id"), {"id": version_id}).mappings().one_or_none()
     if version is None:
-        raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+        raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."})
     ensure_round_semester_writable(db, int(version["round_id"]))
     if version["status"] != "DRAFT":
-        raise HTTPException(status_code=422, detail={"code": "DRAFT_EDIT_REQUIRED", "message": "Only a draft version can be edited."})
+                raise HTTPException(status_code=422, detail={"code": "DRAFT_EDIT_REQUIRED", "message": "Chỉ phương án nháp mới có thể chỉnh sửa."})
     context, _, timeslots, _ = _round_input(db, version["round_id"])
     rows = _assignment_rows(db, version_id)
     try:
@@ -1197,7 +1213,7 @@ def edit_draft_session(version_id: Annotated[int, Path(alias="versionId")], sess
             if locked_version is None or locked_version["status"] != "DRAFT":
                 raise HTTPException(
                     status_code=409,
-                    detail={"code": "DRAFT_EDIT_CONCURRENT_UPDATE", "message": "The draft version changed while this request was being prepared."},
+                    detail={"code": "DRAFT_EDIT_CONCURRENT_UPDATE", "message": "Phương án nháp đã thay đổi trong lúc yêu cầu này được xử lý."},
                 )
             fresh_context, _, fresh_timeslots, _ = _round_input(db, locked_version["round_id"])
             fresh_rows = _assignment_rows(db, version_id)
@@ -1206,7 +1222,7 @@ def edit_draft_session(version_id: Annotated[int, Path(alias="versionId")], sess
             if fresh_target is None or any(fresh_target[field] != prepared_before[field] for field in compared_fields):
                 raise HTTPException(
                     status_code=409,
-                    detail={"code": "DRAFT_EDIT_CONCURRENT_UPDATE", "message": "The session changed while this request was being prepared."},
+                    detail={"code": "DRAFT_EDIT_CONCURRENT_UPDATE", "message": "Phiên chấm đã thay đổi trong lúc yêu cầu này được xử lý."},
                 )
             edited, change = _edited_rows(fresh_rows, session_id, payload, fresh_timeslots)
             validation = validate_schedule(_to_domain_sessions(edited), fresh_context)
@@ -1251,7 +1267,7 @@ def controlled_change(
                 {"id": version_id},
             ).mappings().one_or_none()
             if version_ref is None:
-                raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+                raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."})
             # Controlled-change lock order is Round -> ScheduleVersion -> Sessions
             # -> Rooms -> Reviewers. The initial version lookup is non-locking so
             # the round can be serialized before the version row is locked.
@@ -1262,7 +1278,7 @@ def controlled_change(
                 {"id": version_id, "round_id": version_ref["round_id"]},
             ).mappings().one_or_none()
             if version is None:
-                raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."})
+                raise HTTPException(status_code=404, detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."})
             locked_source_ids = [
                 int(row[0])
                 for row in db.execute(
@@ -1271,20 +1287,20 @@ def controlled_change(
                 ).all()
             ]
             if version["status"] != "PUBLISHED":
-                raise HTTPException(status_code=422, detail={"code": "CONTROLLED_CHANGE_REQUIRES_PUBLISHED", "message": "Controlled change is only for a published version."})
+                raise HTTPException(status_code=422, detail={"code": "CONTROLLED_CHANGE_REQUIRES_PUBLISHED", "message": "Thay đổi có kiểm soát chỉ áp dụng cho phương án đã công bố."})
             context, _, timeslots, _ = _round_input(db, version["round_id"])
             rows = _session_rows(db, version_id)
             target = next((row for row in rows if row["id"] == session_id), None)
             if target is None:
-                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist in this version."})
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm trong phương án này."})
             if target["status"] in {"COMPLETED", "GROUP_ABSENT", "POSTPONED", "CANCELLED"}:
-                raise HTTPException(status_code=422, detail={"code": "SESSION_IMMUTABLE", "message": "This session's history is immutable."})
+                raise HTTPException(status_code=422, detail={"code": "SESSION_IMMUTABLE", "message": "Lịch sử của phiên này đã được niêm phong và không thể thay đổi."})
             current_owner_ids = set(target.get("result_owner_ids", ()))
             reviewer_changed = payload.reviewer_ids is not None and set(payload.reviewer_ids) != set(target["reviewer_ids"])
             reviewer_changed = reviewer_changed or (payload.result_owner_id is not None and payload.result_owner_id not in current_owner_ids)
             topology_changed = (payload.timeslot_id is not None and payload.timeslot_id != target["timeslot_id"]) or (payload.room_id is not None and payload.room_id != target["room_id"])
             if not reviewer_changed and not topology_changed:
-                raise HTTPException(status_code=422, detail={"code": "CONTROLLED_CHANGE_EMPTY", "message": "Provide a reviewer, result-owner, time, or room change."})
+                raise HTTPException(status_code=422, detail={"code": "CONTROLLED_CHANGE_EMPTY", "message": "Hãy cung cấp thay đổi về reviewer, Result Owner, thời gian hoặc phòng."})
             edited, change = _edited_rows(rows, session_id, payload, timeslots)
             before_recipients = affected_schedule_recipients(db, version_id)
             validation = validate_schedule(_to_domain_sessions(edited), context)
@@ -1321,14 +1337,14 @@ def controlled_change(
                 if row.get("room_id") is not None:
                     conflict = find_room_conflict(db, int(row["room_id"]), row["start_at"], row["end_at"], exclude_session_ids=source_session_ids)
                     if conflict is not None:
-                        raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Controlled change conflicts with another live room assignment."})
+                        raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Thay đổi có kiểm soát bị trùng với một phân công phòng đang hoạt động khác."})
                 validate_council_change(db, int(row["id"]), int(version["round_id"]), row["reviewer_ids"], row["start_at"], row["end_at"], exclude_session_ids=source_session_ids)
             new_version_no = db.execute(text("SELECT COALESCE(MAX(version_no),0)+1 FROM schedule_versions WHERE round_id=:round_id"), {"round_id": version["round_id"]}).scalar_one()
             new_version_id = db.execute(text("INSERT INTO schedule_versions (round_id,version_no,status,activated_at,input_snapshot,algorithm_parameters,random_seed,solver_status,total_score,soft_scores,created_by) VALUES (:round_id,:version_no,'PUBLISHED',now(),CAST(:snapshot AS JSONB),CAST(:parameters AS JSONB),:seed,'CONTROLLED_CHANGE',:score,CAST(:soft_scores AS JSONB),:created_by) RETURNING id"), {"round_id": version["round_id"], "version_no": new_version_no, "snapshot": _json(version["input_snapshot"]), "parameters": _json(version["algorithm_parameters"]), "seed": version["random_seed"], "score": version["total_score"], "soft_scores": _json(version["soft_scores"]), "created_by": _actor_id(db, user)}).scalar_one()
             new_session_ids: dict[int, int] = {}
             after_target_council = target["council_id"]
             for row in edited:
-                assignment_id = db.execute(text("INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,start_at,end_at) VALUES (:version_id,:group_id,:project_id,:timeslot_id,:start_at,:end_at) RETURNING id"), {"version_id": new_version_id, **{key: row[key] for key in ("group_id", "project_id", "timeslot_id", "start_at", "end_at")}}).scalar_one()
+                assignment_id = db.execute(text("INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,room_id,start_at,end_at) VALUES (:version_id,:group_id,:project_id,:timeslot_id,:room_id,:start_at,:end_at) RETURNING id"), {"version_id": new_version_id, **{key: row[key] for key in ("group_id", "project_id", "timeslot_id", "room_id", "start_at", "end_at")}}).scalar_one()
                 council_id = int(row["council_id"]) if "council_id" in row else int(next(item["council_id"] for item in rows if item["id"] == row["id"]))
                 if row["id"] == session_id and reviewer_changed:
                     names = db.execute(text("SELECT l.id,a.display_name FROM lecturers l JOIN accounts a ON a.id=l.account_id WHERE l.id=ANY(:ids)"), {"ids": list(row["reviewer_ids"]) or [0]}).all()
@@ -1412,7 +1428,7 @@ def replacement_suggestions(session_id: Annotated[int, Path(alias="sessionId")],
     _require(user, "ADMIN", "MANAGER")
     row = db.execute(text("SELECT s.*, sv.round_id, a.project_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN groups g ON g.id = s.group_id JOIN schedule_assignments a ON a.schedule_version_id=s.schedule_version_id AND a.group_id=s.group_id WHERE s.id = :id"), {"id": session_id}).mappings().one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+        raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm."})
     context, _, timeslots, reviewers = _round_input(db, row["round_id"])
     current_reviewers = {item[0] for item in db.execute(text("SELECT cm.lecturer_id FROM council_members cm JOIN sessions s ON s.council_id=cm.council_id WHERE s.id = :id"), {"id": session_id}).all()}
     existing_rows = [item for item in _session_rows(db, row["schedule_version_id"]) if item["id"] != session_id]
@@ -1449,15 +1465,15 @@ def postpone_session(session_id: Annotated[int, Path(alias="sessionId")], payloa
     with db.begin():
         round_id_ref = db.execute(text("SELECT sv.round_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE s.id = :id"), {"id": session_id}).scalar_one_or_none()
         if round_id_ref is None:
-            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm."})
         db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": round_id_ref})
         ensure_round_semester_writable(db, int(round_id_ref))
         session_row = db.execute(text("SELECT s.id, s.schedule_version_id, sv.round_id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id WHERE s.id = :id FOR UPDATE"), {"id": session_id}).mappings().one_or_none()
         if session_row is None:
-            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm."})
         updated = db.execute(text("UPDATE sessions SET status = 'POSTPONED' WHERE id = :id AND status = 'SCHEDULED' RETURNING id, status"), {"id": session_id}).mappings().one_or_none()
         if updated is None:
-            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_POSTPONABLE", "message": "Session is not in an operational state."})
+            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_POSTPONABLE", "message": "Phiên chấm hiện không ở trạng thái có thể thao tác."})
         db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason) VALUES (:actor_id, 'SESSION_POSTPONED', 'session', :entity_id, :reason)"), {"actor_id": _actor_id(db, user), "entity_id": str(session_id), "reason": payload.reason.strip()})
         for recipient_id in affected_schedule_recipients(db, session_row["schedule_version_id"]):
             key = f"postponed:{session_id}:{recipient_id}"
@@ -1482,7 +1498,7 @@ def create_makeup_session(session_id: Annotated[int, Path(alias="sessionId")], p
                 {"id": session_id},
             ).scalar_one_or_none()
             if original_ref is None:
-                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm."})
             db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": original_ref})
             ensure_round_semester_writable(db, int(original_ref))
             original = db.execute(
@@ -1497,23 +1513,23 @@ def create_makeup_session(session_id: Annotated[int, Path(alias="sessionId")], p
                 {"id": session_id},
             ).mappings().one_or_none()
             if original is None:
-                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+                raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm."})
             if original["version_status"] != "PUBLISHED":
-                raise HTTPException(status_code=403, detail={"code": "SESSION_OUT_OF_SCOPE", "message": "Only a session in a published schedule can receive a make-up."})
+                raise HTTPException(status_code=403, detail={"code": "SESSION_OUT_OF_SCOPE", "message": "Chỉ phiên thuộc lịch đã công bố mới có thể tạo lịch bù."})
             if original["status"] != "POSTPONED":
-                raise HTTPException(status_code=409, detail={"code": "SESSION_NOT_POSTPONED", "message": "Only a postponed session can receive a make-up."})
+                raise HTTPException(status_code=409, detail={"code": "SESSION_NOT_POSTPONED", "message": "Chỉ phiên đã hoãn mới có thể tạo lịch bù."})
             existing_makeup = db.execute(
                 text("SELECT id FROM sessions WHERE makeup_of_session_id = :id FOR UPDATE"),
                 {"id": session_id},
             ).scalar_one_or_none()
             if existing_makeup is not None:
-                raise HTTPException(status_code=409, detail={"code": "MAKEUP_ALREADY_EXISTS", "message": "This session already has a make-up session."})
+                raise HTTPException(status_code=409, detail={"code": "MAKEUP_ALREADY_EXISTS", "message": "Phiên này đã có một lịch bù."})
             db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": original["round_id"]})
             db.execute(text("SELECT id FROM schedule_versions WHERE id = :id FOR UPDATE"), {"id": original["schedule_version_id"]})
             context, _, timeslots, _ = _round_input(db, original["round_id"])
             slot = next((item for item in timeslots if item[0] == payload.timeslot_id), None)
             if slot is None:
-                raise HTTPException(status_code=404, detail={"code": "TIMESLOT_NOT_FOUND", "message": "Timeslot does not belong to this round."})
+                raise HTTPException(status_code=404, detail={"code": "TIMESLOT_NOT_FOUND", "message": "Khung giờ không thuộc đợt đánh giá này."})
             _, start_at, end_at, _, _ = slot
             original_members = load_council_members(db, int(original["council_id"]))
             original_owner_ids = {int(member["lecturer_id"]) for member in original_members if member["is_result_owner"]}
@@ -1572,13 +1588,13 @@ def create_makeup_session(session_id: Annotated[int, Path(alias="sessionId")], p
                 if room is None:
                     exists = db.execute(text("SELECT id, active FROM rooms WHERE id = :id"), {"id": room_id}).mappings().one_or_none()
                     if exists is None:
-                        raise HTTPException(status_code=404, detail={"code": "ROOM_NOT_FOUND", "message": "Room does not exist."})
+                        raise HTTPException(status_code=404, detail={"code": "ROOM_NOT_FOUND", "message": "Không tìm thấy phòng."})
                     if not exists["active"]:
-                        raise HTTPException(status_code=422, detail={"code": "ROOM_INACTIVE", "message": "Room is not active."})
-                    raise HTTPException(status_code=422, detail={"code": "ROOM_TYPE_NOT_ALLOWED", "message": "Room type is not allowed for this round."})
+                        raise HTTPException(status_code=422, detail={"code": "ROOM_INACTIVE", "message": "Phòng hiện không hoạt động."})
+                    raise HTTPException(status_code=422, detail={"code": "ROOM_TYPE_NOT_ALLOWED", "message": "Loại phòng này không được phép dùng cho đợt đánh giá."})
                 room_conflict = find_room_conflict(db, room_id, start_at, end_at)
                 if room_conflict is not None:
-                    raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Room is already occupied during this session."})
+                    raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Phòng đã được sử dụng trong khoảng thời gian của phiên này."})
             actor_id = _actor_id(db, user)
             council_id = create_council(
                 db,
@@ -1605,7 +1621,7 @@ def create_makeup_session(session_id: Annotated[int, Path(alias="sessionId")], p
                     },
                 ).scalar_one()
             except IntegrityError as exc:
-                raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Room is already occupied during this session."}) from exc
+                raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "message": "Phòng đã được sử dụng trong khoảng thời gian của phiên này."}) from exc
             db.execute(
                 text(
                     "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) "
@@ -1648,7 +1664,7 @@ def mark_group_absent(session_id: Annotated[int, Path(alias="sessionId")], paylo
             {"id": session_id},
         ).scalar_one_or_none()
         if session_ref is None:
-            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm."})
         db.execute(text("SELECT id FROM rounds WHERE id = :round_id FOR UPDATE"), {"round_id": session_ref})
         ensure_round_semester_writable(db, int(session_ref))
         session_row = db.execute(
@@ -1660,15 +1676,15 @@ def mark_group_absent(session_id: Annotated[int, Path(alias="sessionId")], paylo
             {"id": session_id},
         ).mappings().one_or_none()
         if session_row is None:
-            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+            raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm."})
         if session_row["version_status"] != "PUBLISHED":
-            raise HTTPException(status_code=403, detail={"code": "SESSION_OUT_OF_SCOPE", "message": "Only a published session can be marked absent."})
+            raise HTTPException(status_code=403, detail={"code": "SESSION_OUT_OF_SCOPE", "message": "Chỉ phiên đã công bố mới có thể đánh dấu nhóm vắng mặt."})
         updated = db.execute(
             text("UPDATE sessions SET status = 'GROUP_ABSENT' WHERE id = :id AND status = 'SCHEDULED' RETURNING id, status"),
             {"id": session_id},
         ).mappings().one_or_none()
         if updated is None:
-            raise HTTPException(status_code=422, detail={"code": "SESSION_NOT_ABSENTABLE", "message": "Only a scheduled session can be marked absent."})
+            raise HTTPException(status_code=422, detail={"code": "SESSION_NOT_ABSENTABLE", "message": "Chỉ phiên đã xếp lịch mới có thể đánh dấu nhóm vắng mặt."})
         actor_id = _actor_id(db, user)
         db.execute(
             text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'GROUP_MARKED_ABSENT', 'session', :entity_id, :reason, CAST(:after_json AS JSONB))"),
@@ -1702,12 +1718,12 @@ def publish_schedule(round_id: Annotated[int, Path(alias="roundId")], version_id
         if version is None:
             raise HTTPException(
                 status_code=404,
-                detail={"code": "VERSION_NOT_FOUND", "message": "ScheduleVersion does not exist."},
+                detail={"code": "VERSION_NOT_FOUND", "message": "Không tìm thấy phương án lịch."},
             )
         context, _, _, _ = _round_input(db, round_id)
         try:
             if version["status"] != "ACTIVE":
-                raise DomainError("VERSION_NOT_ACTIVE", "Activate the selected version before publishing it.")
+                raise DomainError("VERSION_NOT_ACTIVE", "Hãy kích hoạt phương án đã chọn trước khi công bố.")
             assignment_count = db.execute(text(
                 "SELECT COUNT(*) FROM schedule_assignments WHERE schedule_version_id=:version_id"
             ), {"version_id": version_id}).scalar_one()
@@ -1723,7 +1739,7 @@ def publish_schedule(round_id: Annotated[int, Path(alias="roundId")], version_id
                 ") LIMIT 1"
             ), {"version_id": version_id}).first()
             if incomplete:
-                raise DomainError("MATERIALIZATION_INCOMPLETE", "Every assignment must have exactly one materialized Session and reviewer set before publishing.")
+                raise DomainError("MATERIALIZATION_INCOMPLETE", "Mỗi phân công phải có đúng một phiên chấm và đủ hội đồng trước khi công bố.")
             # Room readiness reads round_room_types and raises ROOM_INACTIVE,
             # ROOM_TYPE_NOT_ALLOWED, or ROOM_CONFLICT.
             validate_publish_room_readiness(db, round_id, version_id)
@@ -1817,7 +1833,7 @@ def request_reschedule(
         {"id": session_id},
     ).mappings().one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Session does not exist."})
+        raise HTTPException(status_code=404, detail={"code": "SESSION_NOT_FOUND", "message": "Không tìm thấy phiên chấm."})
     assigned = user.role == "MANAGER" or can_read_session(db, user, session_id)
     ensure_reschedule_allowed(role=user.role, assigned=assigned, is_leader=is_active_group_leader(db, user, row["group_id"]))
     db.commit()
@@ -1866,7 +1882,7 @@ def decide_reschedule(
                 status_code=404,
                 detail={
                     "code": "RESCHEDULE_REQUEST_NOT_FOUND",
-                    "message": "Open request does not exist.",
+                    "message": "Không tìm thấy yêu cầu mở lịch.",
                 },
             )
         db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'RESCHEDULE_DECISION', 'reschedule_request', :entity_id, :reason, CAST(:after_json AS JSONB))"), {"actor_id": actor_id, "entity_id": str(request_id), "reason": payload.note.strip(), "after_json": _json({"decision": payload.decision})})
@@ -1897,7 +1913,7 @@ def operate_round(
         if row is None:
             raise HTTPException(
                 status_code=404,
-                detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."},
+                detail={"code": "ROUND_NOT_FOUND", "message": "Không tìm thấy đợt đánh giá."},
             )
         try:
             after = transition_round(RoundStatus(row["status"]), RoundStatus(payload.action))

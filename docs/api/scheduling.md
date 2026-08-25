@@ -75,7 +75,8 @@ require `ADMIN` or `MANAGER` and operate on the current `ACTIVE` version:
 - `GET /rounds/{round_id}/rooms/available?timeslot_id=&room_type=` lists active, allowed rooms
   that are not occupied in any live schedule for the requested interval.
 - `PUT /sessions/{session_id}/room` assigns an active allowed room to a `PLANNED` session.
-- `POST /rounds/{round_id}/rooms/suggest` returns deterministic least-used room suggestions.
+- `POST /rounds/{round_id}/rooms/suggest` returns deterministic conflict-free room suggestions,
+  preferring room continuity across adjacent slots when possible.
 - `POST /rounds/{round_id}/rooms/apply-suggestions` validates the complete batch under room
   advisory locks, applies it atomically, and reports `changed_count`/`unchanged_count`.
 

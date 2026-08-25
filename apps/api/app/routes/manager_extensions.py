@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import secrets
+import unicodedata
 from datetime import UTC, date, datetime
 from io import BytesIO
 from typing import Annotated, Any, Literal
@@ -17,6 +18,9 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -435,7 +439,7 @@ def update_round(round_id: Annotated[int, Path(alias="roundId")], payload: Round
                 {"id": round_id},
             ).scalar_one()
             if int(dependent_slots) > 0:
-                raise HTTPException(status_code=409, detail={"code": "ROUND_TIMEFRAME_REGENERATION_BLOCKED", "message": "Cannot regenerate Timeframe slots after availability or group preferences exist."})
+                raise HTTPException(status_code=409, detail={"code": "ROUND_TIMEFRAME_REGENERATION_BLOCKED", "message": "Không thể tạo lại khung giờ sau khi đã có dữ liệu lịch rảnh hoặc đăng ký của nhóm."})
             db.execute(text("DELETE FROM round_days WHERE round_id = :id"), {"id": round_id})
             if generated_timeframe is None:
                 raise HTTPException(status_code=422, detail={"code": "TIMEFRAME_NOT_FOUND", "message": "The selected Timeframe does not have a usable revision."})
@@ -649,7 +653,8 @@ def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db
     group = db.execute(
         text(
             "SELECT g.id, g.code, g.status, p.id AS project_id, p.code AS project_code, "
-            "COALESCE(p.title_en, p.title_vi, p.title) AS project_name, p.status AS project_status, "
+            "COALESCE(p.title_en, p.title_vi, p.title) AS project_name, p.title_vi AS project_name_vi, "
+            "p.title_en AS project_name_en, p.status AS project_status, "
             "sem.id AS semester_id, sem.code AS semester_code, sem.name AS semester_name "
             "FROM groups g LEFT JOIN projects p ON p.id = g.project_id "
             "LEFT JOIN semesters sem ON sem.id = p.semester_id WHERE g.id = :group_id"
@@ -744,6 +749,7 @@ def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db
         "members": members,
         "project": {
             "id": group["project_id"], "code": group["project_code"], "name": group["project_name"],
+            "name_vi": group["project_name_vi"], "name_en": group["project_name_en"],
             "status": str(group["project_status"]),
             "main_supervisor": supervisor_map.get("MAIN"), "co_supervisor": supervisor_map.get("CO"),
         } if group["project_id"] is not None else None,
@@ -1233,6 +1239,35 @@ async def import_groups(
     return {"created": created, "skipped": len(errors), "errors": errors}
 
 
+_HEADER_FILL = PatternFill(fill_type="solid", start_color="305496", end_color="305496")
+_HEADER_FONT = Font(bold=True, color="FFFFFF")
+_HEADER_ALIGNMENT = Alignment(horizontal="center", vertical="center", wrap_text=True)
+_DATA_ALIGNMENT = Alignment(vertical="top", wrap_text=True)
+_MAX_COLUMN_WIDTH = 60  # a free-text title can run 100+ chars; wrap instead of stretching one column off-screen
+
+
+def _style_header_row(sheet: Worksheet, column_count: int) -> None:
+    for column_index in range(1, column_count + 1):
+        cell = sheet.cell(row=1, column=column_index)
+        cell.fill = _HEADER_FILL
+        cell.font = _HEADER_FONT
+        cell.alignment = _HEADER_ALIGNMENT
+    sheet.freeze_panes = "A2"
+
+
+def _autofit_column_widths(sheet: Worksheet, column_count: int) -> None:
+    for column_index in range(1, column_count + 1):
+        letter = get_column_letter(column_index)
+        widest = max(
+            (len(str(cell.value)) for cell in sheet[letter] if cell.value is not None),
+            default=0,
+        )
+        sheet.column_dimensions[letter].width = min(widest + 2, _MAX_COLUMN_WIDTH)
+        if widest + 2 > _MAX_COLUMN_WIDTH:
+            for cell in sheet[letter][1:]:
+                cell.alignment = _DATA_ALIGNMENT
+
+
 def _xlsx_response(workbook: Workbook, filename: str) -> StreamingResponse:
     output = BytesIO()
     workbook.save(output)
@@ -1277,3 +1312,136 @@ def export_semester_results(semester_id: Annotated[int, Path(alias="semesterId")
     for row in rows:
         sheet.append([row[key] for key in ("group_code", "type", "outcome", "entered_at", "verify_status")])
     return _xlsx_response(workbook, f"semester-{semester_id}-results.xlsx")
+
+
+_COUNCIL_EXPORT_FIXED_HEADERS = ["STT", "Mã nhóm", "Mã đề tài", "Tên đề tài", "Ngày bảo vệ", "Giờ bảo vệ", "Phòng"]
+_COUNCIL_SEAT_ROLE_THRESHOLD = 3  # matches app.domain.committees.REVIEWER_ONLY_MAX
+
+
+def _council_seat_headers(seat_count: int) -> list[str]:
+    """Return the human-readable role headers for the exported council seats.
+
+    Mirrors ``app.domain.committees.assign_roles``: a Round configured with
+    more than 3 reviewers per session gets an explicit Chair + Secretary,
+    followed by numbered members. Smaller reviewer-only rounds use numbered
+    ``TV HD`` seats because a live Council does not carry Chair/Secretary
+    roles for 3-or-fewer seats.
+    """
+    if seat_count > _COUNCIL_SEAT_ROLE_THRESHOLD:
+        return ["Chủ tịch", "Thư ký", *(f"TV HD{index}" for index in range(1, seat_count - 1))]
+    return [f"TV HD{index}" for index in range(1, seat_count + 1)]
+
+
+def _lecturer_export_name(snapshot_name: str) -> str:
+    """Format a lecturer name as ``LASTNAME`` plus preceding initials.
+
+    The council tables intentionally keep the full ``snapshot_name`` for
+    audit/history. Only the Excel presentation is abbreviated, for example
+    ``Lâm Hữu Khánh Phương`` becomes ``PHUONGLHK``.
+    """
+    raw_name = " ".join(str(snapshot_name or "").split())
+    if not raw_name:
+        return ""
+    ascii_name = unicodedata.normalize("NFKD", raw_name.replace("đ", "d").replace("Đ", "D"))
+    ascii_name = "".join(character for character in ascii_name if not unicodedata.combining(character))
+    tokens = re.findall(r"[A-Z0-9]+", ascii_name.upper())
+    if not tokens:
+        return raw_name.upper()
+    return tokens[-1] + "".join(token[0] for token in tokens[:-1])
+
+
+@router.get("/exports/round/{roundId}/council.xlsx")
+def export_round_council(round_id: Annotated[int, Path(alias="roundId")], db: Db, user: User) -> StreamingResponse:
+    """Council export: one row per Group with its council seats spread across fixed columns.
+
+    Seat count follows the Round's own ``reviewer_count`` configuration (not a
+    hardcoded number), so a 3-reviewer Round exports 3 seat columns and a
+    5-reviewer Round exports 5. Seat order (Chủ tịch/Thư ký/Thành viên when
+    seat_count > 3) is recovered from the Round's assigned Committee catalog
+    when a Session's Council members match a Committee's member set exactly
+    (same order the Committee was created with); otherwise seats fall back to
+    ascending lecturer_id order, since a live Council only stores membership,
+    not a Chair/Secretary/Member role.
+    """
+    _require(user, "ADMIN", "MANAGER")
+    round_row = db.execute(
+        text("SELECT id, reviewer_count FROM rounds WHERE id = :round_id"), {"round_id": round_id}
+    ).mappings().one_or_none()
+    if round_row is None:
+        raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
+    seat_count = int(round_row["reviewer_count"])
+    sessions = db.execute(
+        text(
+            "SELECT s.council_id, g.code AS group_code, p.code AS project_code, "
+            "COALESCE(p.title_en, p.title_vi, p.title) AS project_title, "
+            "s.start_at, s.end_at, rm.code AS room_code "
+            "FROM sessions s "
+            "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+            "JOIN groups g ON g.id = s.group_id "
+            "JOIN schedule_assignments a ON a.schedule_version_id = sv.id AND a.group_id = s.group_id "
+            "JOIN projects p ON p.id = a.project_id "
+            "LEFT JOIN rooms rm ON rm.id = s.room_id "
+            "WHERE sv.round_id = :round_id AND sv.activated_at IS NOT NULL AND sv.status IN ('ACTIVE', 'PUBLISHED') "
+            "ORDER BY g.code"
+        ),
+        {"round_id": round_id},
+    ).mappings().all()
+    council_ids = [int(row["council_id"]) for row in sessions]
+    member_rows = db.execute(
+        text(
+            "SELECT council_id, lecturer_id, snapshot_name FROM council_members "
+            "WHERE council_id = ANY(:council_ids) ORDER BY council_id, lecturer_id"
+        ),
+        {"council_ids": council_ids or [0]},
+    ).mappings().all()
+    members_by_council: dict[int, list[dict[str, Any]]] = {}
+    for row in member_rows:
+        members_by_council.setdefault(int(row["council_id"]), []).append(row)
+    committee_rows = db.execute(
+        text(
+            "SELECT cm.committee_id, cm.lecturer_id, cm.sequence_number "
+            "FROM round_committees rc JOIN committee_members cm ON cm.committee_id = rc.committee_id "
+            "WHERE rc.round_id = :round_id ORDER BY cm.committee_id, cm.sequence_number"
+        ),
+        {"round_id": round_id},
+    ).mappings().all()
+    committees_by_id: dict[int, list[dict[str, Any]]] = {}
+    for row in committee_rows:
+        committees_by_id.setdefault(int(row["committee_id"]), []).append(row)
+    committee_seat_order: dict[frozenset[int], list[int]] = {
+        frozenset(int(member["lecturer_id"]) for member in members): [int(member["lecturer_id"]) for member in members]
+        for members in committees_by_id.values()
+    }
+
+    def _seat_names(council_id: int) -> list[str]:
+        members = members_by_council.get(council_id, [])
+        lecturer_ids = [int(member["lecturer_id"]) for member in members]
+        names_by_id = {int(member["lecturer_id"]): str(member["snapshot_name"]) for member in members}
+        seat_order = committee_seat_order.get(frozenset(lecturer_ids), lecturer_ids)
+        names = [_lecturer_export_name(names_by_id.get(lecturer_id, "")) for lecturer_id in seat_order]
+        names += [""] * (seat_count - len(names))
+        return names[:seat_count]
+
+    headers = [*_COUNCIL_EXPORT_FIXED_HEADERS, *_council_seat_headers(seat_count)]
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Council"
+    sheet.append(headers)
+    for index, row in enumerate(sessions, start=1):
+        start_at: datetime = row["start_at"]
+        local_start = start_at.astimezone(_ROUND_DETAIL_TIMEZONE) if start_at.tzinfo else start_at.replace(tzinfo=UTC).astimezone(_ROUND_DETAIL_TIMEZONE)
+        sheet.append(
+            [
+                index,
+                row["group_code"],
+                row["project_code"],
+                row["project_title"],
+                local_start.strftime("%d/%m/%Y"),
+                f"{_local_time(row['start_at'])}-{_local_time(row['end_at'])}",
+                row["room_code"] or "",
+                *_seat_names(int(row["council_id"])),
+            ]
+        )
+    _style_header_row(sheet, len(headers))
+    _autofit_column_widths(sheet, len(headers))
+    return _xlsx_response(workbook, f"round-{round_id}-council.xlsx")

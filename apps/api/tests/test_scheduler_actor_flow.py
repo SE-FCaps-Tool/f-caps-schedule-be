@@ -236,6 +236,7 @@ def test_scheduler_requires_accepted_lecturers_and_intersects_group_preference(c
     assert detail.status_code == 200, detail.text
     session = detail.json()["sessions"][0]
     assert session["timeslotId"] == timeslot_id
+    assert session["roomId"] is None
     assert set(session["reviewerIds"]).issubset({lecturer["id"] for lecturer in lecturers})
 
     assigned_lecturer_id = session["reviewerIds"][0]
