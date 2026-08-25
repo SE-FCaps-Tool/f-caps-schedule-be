@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from app.scheduler.candidates import generate_candidates, reason_for_unscheduled
 from app.scheduler.models import RoundInput
 from app.scheduler.snapshot import build_input_snapshot
@@ -35,6 +37,19 @@ def test_candidate_generator_filters_supervisor_and_unavailable_reviewer():
     assert candidates
     assert all(99 not in candidate.reviewer_ids for candidate in candidates)
     assert all(set(candidate.reviewer_ids) == {2, 3, 4} for candidate in candidates)
+
+
+def test_candidate_generator_only_uses_group_registered_slots():
+    context = replace(candidate_input(), group_selected_slots={1: {2}}, group_selection_mode=True)
+    candidates = generate_candidates(
+        context,
+        groups=[1],
+        timeslots=[(1, "2030-01-01", "AM"), (2, "2030-01-01", "AM")],
+        reviewers=[2, 3, 4],
+    )
+
+    assert candidates
+    assert {candidate.timeslot_id for candidate in candidates} == {2}
 
 
 def test_unscheduled_reason_has_one_stable_reason_code():

@@ -19,10 +19,7 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = ""
-    cors_origins: str = (
-        "http://localhost:3000,http://localhost:5173,"
-        "http://127.0.0.1:3000,http://127.0.0.1:5173"
-    )
+    cors_origins: str = "http://localhost:3000,http://localhost:5173"
     semester_min_duration_days: int = 105
     semester_max_duration_days: int = 120
 

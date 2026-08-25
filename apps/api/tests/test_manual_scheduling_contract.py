@@ -129,6 +129,10 @@ def test_manual_schedule_publish_keeps_terminal_rounds_locked():
         assert exc_info.value.status_code == 409
         assert exc_info.value.detail["code"] == "ROUND_STATUS_INVALID"
 
+    # Re-publishing is the explicit controlled step that promotes a DB-backed
+    # workspace draft after a previously published schedule was edited.
+    _ensure_publishable_round({"round_status": "PUBLISHED"})
+
 
 def test_manual_scheduling_router_exposes_required_endpoints():
     routes = {(next(iter(route.methods)), route.path) for route in router.routes}

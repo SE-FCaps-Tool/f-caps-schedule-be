@@ -63,6 +63,7 @@ def find_room_conflict(
     end_at: datetime,
     *,
     exclude_session_ids: Iterable[int] = (),
+    exclude_round_id: int | None = None,
 ):
     """Find the first overlapping session in any live schedule version."""
 
@@ -80,6 +81,7 @@ def find_room_conflict(
               AND sv.status IN ('ACTIVE', 'PUBLISHED')
               AND s.start_at < :end_at
               AND s.end_at > :start_at
+              AND (:exclude_round_id IS NULL OR sv.round_id <> :exclude_round_id)
               AND (cardinality(CAST(:excluded AS BIGINT[])) = 0 OR s.id <> ALL(CAST(:excluded AS BIGINT[])))
             ORDER BY s.start_at, s.id
             LIMIT 1
@@ -90,12 +92,120 @@ def find_room_conflict(
             "start_at": start_at,
             "end_at": end_at,
             "excluded": excluded,
+            "exclude_round_id": exclude_round_id,
         },
     ).mappings().one_or_none()
 
 
 def _overlaps(left: Mapping[str, object], right: Mapping[str, object]) -> bool:
     return bool(left["start_at"] < right["end_at"] and right["start_at"] < left["end_at"])
+
+
+def allocate_room_assignments(
+    sessions: Sequence[Mapping[str, object]],
+    rooms: Sequence[Mapping[str, object]],
+    occupied: Sequence[Mapping[str, object]] = (),
+) -> list[dict[str, object]]:
+    """Assign rooms without overlaps, preferring continuity between slots.
+
+    The solver decides the group, time and reviewer tuple.  Room allocation is
+    deliberately a deterministic second pass so it can be shared by generated
+    drafts and the existing room-suggestion endpoint.  A room from the directly
+    previous slot on the same day wins when it is still free; otherwise the
+    allocator reuses rooms already selected by this schedule and then falls
+    back to the least-used eligible room.  It never returns an overlapping room
+    assignment: a session remains unassigned when the room capacity is too low.
+    """
+
+    ordered_rooms = sorted(
+        (dict(room) for room in rooms),
+        key=lambda room: (str(room.get("code", "")), int(room["id"])),
+    )
+    occupancy: dict[int, list[Mapping[str, object]]] = {
+        int(room["id"]): [] for room in ordered_rooms
+    }
+    for row in occupied:
+        room_id = row.get("room_id")
+        if room_id is not None and int(room_id) in occupancy:
+            occupancy[int(room_id)].append(row)
+
+    assigned_room_ids: set[int] = set()
+    result: list[dict[str, object]] = []
+    ordered_sessions = sorted(
+        (dict(session) for session in sessions),
+        key=lambda session: (
+            session["start_at"],
+            session["end_at"],
+            int(session.get("session_id", session.get("group_id", 0))),
+        ),
+    )
+    index = 0
+    previous_end: object = None
+    previous_day: object = None
+    previous_room_ids: set[int] = set()
+    while index < len(ordered_sessions):
+        start_at = ordered_sessions[index]["start_at"]
+        end_at = ordered_sessions[index]["end_at"]
+        slot_sessions: list[dict[str, object]] = []
+        while index < len(ordered_sessions):
+            current = ordered_sessions[index]
+            if current["start_at"] != start_at or current["end_at"] != end_at:
+                break
+            slot_sessions.append(current)
+            index += 1
+
+        current_room_ids: set[int] = set()
+        day = slot_sessions[0].get("day")
+        has_previous_slot = previous_day == day and previous_end == start_at
+        for session in slot_sessions:
+            choices: list[tuple[object, ...]] = []
+            for room in ordered_rooms:
+                room_id = int(room["id"])
+                if room_id in current_room_ids:
+                    continue
+                conflicts = [
+                    item for item in occupancy[room_id] if _overlaps(session, item)
+                ]
+                if conflicts:
+                    continue
+                continuity_rank = (
+                    0 if has_previous_slot and room_id in previous_room_ids else 1
+                )
+                current_room_rank = 0 if session.get("room_id") == room_id else 1
+                reuse_rank = 0 if room_id in assigned_room_ids else 1
+                choices.append(
+                    (
+                        continuity_rank,
+                        current_room_rank,
+                        reuse_rank,
+                        len(occupancy[room_id]),
+                        str(room.get("code", "")),
+                        room_id,
+                        room,
+                    )
+                )
+
+            if not choices:
+                result.append({**session, "room_id": None})
+                continue
+
+            _, _, _, _, _, room_id, room = min(choices)
+            assigned = {
+                **session,
+                "room_id": int(room_id),
+                "room_code": room.get("code"),
+                "room_type": room.get("room_type"),
+            }
+            result.append(assigned)
+            current_room_ids.add(int(room_id))
+            assigned_room_ids.add(int(room_id))
+            occupancy[int(room_id)].append(assigned)
+
+        previous_day = day
+        previous_end = end_at
+        previous_room_ids = current_room_ids
+
+    return result
 
 
 def validate_assignment_batch(
@@ -199,7 +309,7 @@ def validate_assignment_batch(
 
 
 def build_room_suggestions(db: Session, round_id: int) -> list[dict[str, object]]:
-    """Build deterministic least-overlap suggestions for the current ACTIVE version."""
+    """Build deterministic conflict-free suggestions for the current ACTIVE version."""
 
     sessions = db.execute(
         text(
@@ -233,41 +343,33 @@ def build_room_suggestions(db: Session, round_id: int) -> list[dict[str, object]
             """
             SELECT s.id AS session_id, room_id, start_at, end_at
             FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id
-            WHERE room_id IS NOT NULL AND sv.status IN ('ACTIVE', 'PUBLISHED')
+            WHERE room_id IS NOT NULL
+              AND sv.status IN ('ACTIVE', 'PUBLISHED')
+              AND NOT (sv.round_id = :round_id AND sv.status = 'ACTIVE')
             """
-        )
+        ),
+        {"round_id": round_id},
     ).mappings().all()
-    occupancy: dict[int, list[Mapping[str, object]]] = {int(room["id"]): [] for room in rooms}
-    for row in live:
-        if int(row["room_id"]) in occupancy:
-            occupancy[int(row["room_id"])].append(row)
-    suggestions: list[dict[str, object]] = []
-    for session in sessions:
-        choices = []
-        for room in rooms:
-            conflicts = [item for item in occupancy[int(room["id"])] if _overlaps(session, item)]
-            choices.append(
-                (
-                    len(conflicts),
-                    len(occupancy[int(room["id"])]),
-                    str(room["code"]),
-                    int(room["id"]),
-                    room,
-                )
-            )
-        if not choices:
-            continue
-        # Prefer conflict-free rooms, then the least-used room and stable code/id
-        # tie-breakers. If every eligible room is occupied, least conflicts wins.
-        conflict_free = [choice for choice in choices if choice[0] == 0]
-        _, _, _, room_id, room = min(conflict_free or choices)
-        suggestion = {**dict(session), "room_id": room_id, "room_code": room["code"], "room_type": room["room_type"]}
-        suggestions.append(suggestion)
-        occupancy[room_id].append(session)
-    return suggestions
+    room_by_id = {int(room["id"]): room for room in rooms}
+    allocated = allocate_room_assignments(sessions, rooms, live)
+    return [
+        {
+            **row,
+            "room_code": room_by_id[int(row["room_id"])]["code"],
+            "room_type": room_by_id[int(row["room_id"])]["room_type"],
+        }
+        for row in allocated
+        if row.get("room_id") is not None
+    ]
 
 
-def validate_publish_room_readiness(db: Session, round_id: int, version_id: int) -> list[dict[str, object]]:
+def validate_publish_room_readiness(
+    db: Session,
+    round_id: int,
+    version_id: int,
+    *,
+    exclude_round_id: int | None = None,
+) -> list[dict[str, object]]:
     """Require every live session to have an eligible room with no global conflict."""
 
     rows = db.execute(
@@ -297,7 +399,14 @@ def validate_publish_room_readiness(db: Session, round_id: int, version_id: int)
         for right in rows[index + 1 :]:
             if left["room_id"] == right["room_id"] and _overlaps(left, right):
                 raise RoomAssignmentError("ROOM_CONFLICT", "Published sessions overlap in the same room.", 409, {"room_id": left["room_id"], "session_id": right["session_id"]})
-        conflict = find_room_conflict(db, int(left["room_id"]), left["start_at"], left["end_at"], exclude_session_ids=[int(item["session_id"]) for item in rows])
+        conflict = find_room_conflict(
+            db,
+            int(left["room_id"]),
+            left["start_at"],
+            left["end_at"],
+            exclude_session_ids=[int(item["session_id"]) for item in rows],
+            exclude_round_id=exclude_round_id,
+        )
         if conflict is not None:
             raise RoomAssignmentError("ROOM_CONFLICT", "A live schedule already occupies this room.", 409, {"room_id": left["room_id"], **dict(conflict)})
     return [dict(row) for row in rows]

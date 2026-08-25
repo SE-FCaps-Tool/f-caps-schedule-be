@@ -36,6 +36,8 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 ALL_ROUND_STATUSES = frozenset(status.value for status in RoundStatus)
 EDITABLE_ROUND_STATUSES = ALL_ROUND_STATUSES
+# A published round keeps its public version immutable, but Manager may edit
+# the DB-backed workspace draft and publish a new version after validation.
 PUBLISHABLE_ROUND_STATUSES = EDITABLE_ROUND_STATUSES - {"ONGOING", "POSTPONED", "COMPLETED", "LOCKED", "CANCELLED"}
 MANUAL_SESSION_PREFIX = "manual_session_"
 BLOCKED_REASON_LABELS = {
@@ -442,6 +444,56 @@ def _replace_session_children(
         )
 
 
+def _ensure_registered_timeslot(
+    db: Session,
+    round_id: int,
+    timeslot_id: int,
+    payload: ManualSessionPayload | BulkManualSessionPayload,
+) -> None:
+    """Manual edits may only move a selected group into one of its chosen slots."""
+    group_ids = {
+        _parse_positive_id(raw_group_id, prefix="grp", code="GROUP_NOT_ELIGIBLE")
+        for raw_group_id in payload.group_ids
+    }
+    if not group_ids:
+        return
+
+    mode_enabled = db.execute(
+        text("SELECT group_selection_mode FROM rounds WHERE id = :round_id"),
+        {"round_id": round_id},
+    ).scalar_one_or_none()
+    if not mode_enabled:
+        return
+
+    selected_rows = db.execute(
+        text(
+            "SELECT group_id, timeslot_id FROM group_slot_preferences "
+            "WHERE round_id = :round_id AND selected = TRUE "
+            "AND group_id = ANY(CAST(:group_ids AS BIGINT[]))"
+        ),
+        {"round_id": round_id, "group_ids": sorted(group_ids)},
+    ).all()
+    selected_by_group: dict[int, set[int]] = defaultdict(set)
+    for group_id, selected_timeslot_id in selected_rows:
+        selected_by_group[int(group_id)].add(int(selected_timeslot_id))
+
+    invalid_groups = sorted(
+        group_id
+        for group_id, selected_timeslots in selected_by_group.items()
+        if timeslot_id not in selected_timeslots
+    )
+    if invalid_groups:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "GROUP_SLOT_NOT_SELECTED",
+                "message": "Chỉ được xếp nhóm vào khung giờ mà nhóm đã đăng ký.",
+                "groupIds": [_external_group(group_id) for group_id in invalid_groups],
+                "roundTimeslotId": str(timeslot_id),
+            },
+        )
+
+
 def _upsert_session(
     db: Session,
     round_id: int,
@@ -452,6 +504,7 @@ def _upsert_session(
     session_id: int | None = None,
 ) -> int:
     timeslot_id = _timeslot_id_for(db, round_id, payload.round_timeslot_id, session_date=payload.date)
+    _ensure_registered_timeslot(db, round_id, timeslot_id, payload)
     room_id = None if payload.room_id is None else _parse_positive_id(payload.room_id, prefix="room", code="ROOM_NOT_FOUND")
     if session_id is None:
         session_id = int(

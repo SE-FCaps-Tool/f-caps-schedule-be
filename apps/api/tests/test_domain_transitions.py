@@ -2,7 +2,7 @@ import pytest
 
 from app.domain.enums import DefenseType, GroupStatus, ResultOutcome, RoundStatus
 from app.domain.errors import DomainError
-from app.domain.transitions import transition_group, transition_round
+from app.domain.transitions import scheduler_round_status, transition_group, transition_round
 
 
 @pytest.mark.parametrize(
@@ -36,6 +36,13 @@ def test_round_cancelled_and_locked_are_terminal_without_privileged_action():
 def test_round_rejects_skipping_required_lifecycle_state():
     with pytest.raises(DomainError, match="ROUND_TRANSITION_NOT_ALLOWED"):
         transition_round(RoundStatus.DRAFT, RoundStatus.PUBLISHED)
+
+
+def test_scheduler_can_regenerate_from_scheduled_without_reopening_published_round():
+    assert scheduler_round_status(RoundStatus.SCHEDULED) is RoundStatus.SCHEDULED
+    assert scheduler_round_status(RoundStatus.SCHEDULING) is RoundStatus.SCHEDULING
+    with pytest.raises(DomainError, match="ROUND_TRANSITION_NOT_ALLOWED"):
+        scheduler_round_status(RoundStatus.PUBLISHED)
 
 
 @pytest.mark.parametrize(

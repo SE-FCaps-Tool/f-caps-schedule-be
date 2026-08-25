@@ -179,6 +179,17 @@ def assign_session_room(
                 db.execute(text("UPDATE sessions SET room_id = :room_id WHERE id = :id"), {"room_id": payload.room_id, "id": session_id})
                 db.execute(
                     text(
+                        "UPDATE schedule_assignments SET room_id = :room_id "
+                        "WHERE schedule_version_id = :version_id AND group_id = :group_id"
+                    ),
+                    {
+                        "room_id": payload.room_id,
+                        "version_id": session["schedule_version_id"],
+                        "group_id": session["group_id"],
+                    },
+                )
+                db.execute(
+                    text(
                         "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
                         "VALUES (:actor_id, 'ROOM_ASSIGNED', 'session', :entity_id, CAST(:after_json AS JSONB))"
                     ),
@@ -232,6 +243,17 @@ def apply_room_suggestions(
                     unchanged += 1
                     continue
                 db.execute(text("UPDATE sessions SET room_id = :room_id WHERE id = :id"), {"room_id": row["room_id"], "id": row["session_id"]})
+                db.execute(
+                    text(
+                        "UPDATE schedule_assignments SET room_id = :room_id "
+                        "WHERE schedule_version_id = :version_id AND group_id = :group_id"
+                    ),
+                    {
+                        "room_id": row["room_id"],
+                        "version_id": version,
+                        "group_id": row["group_id"],
+                    },
+                )
                 changed += 1
                 db.execute(
                     text(
