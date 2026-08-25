@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import secrets
+import unicodedata
 from datetime import UTC, date, datetime
 from io import BytesIO
 from typing import Annotated, Any, Literal
@@ -1318,16 +1319,35 @@ _COUNCIL_SEAT_ROLE_THRESHOLD = 3  # matches app.domain.committees.REVIEWER_ONLY_
 
 
 def _council_seat_headers(seat_count: int) -> list[str]:
-    """Chair/Secretary/Member split above the Reviewer-only threshold, else plain seats.
+    """Return the human-readable role headers for the exported council seats.
 
     Mirrors ``app.domain.committees.assign_roles``: a Round configured with
     more than 3 reviewers per session gets an explicit Chair + Secretary,
-    everyone else stays an undifferentiated Council member — same as a live
-    Council never carries a Chair/Secretary/Member role for 3-or-fewer seats.
+    followed by numbered members. Smaller reviewer-only rounds use numbered
+    ``TV HD`` seats because a live Council does not carry Chair/Secretary
+    roles for 3-or-fewer seats.
     """
     if seat_count > _COUNCIL_SEAT_ROLE_THRESHOLD:
-        return ["Chủ tịch hội đồng", "Thư ký hội đồng", *(["Thành viên hội đồng"] * (seat_count - 2))]
-    return ["Thành viên hội đồng"] * seat_count
+        return ["Chủ tịch", "Thư ký", *(f"TV HD{index}" for index in range(1, seat_count - 1))]
+    return [f"TV HD{index}" for index in range(1, seat_count + 1)]
+
+
+def _lecturer_export_name(snapshot_name: str) -> str:
+    """Format a lecturer name as ``LASTNAME`` plus preceding initials.
+
+    The council tables intentionally keep the full ``snapshot_name`` for
+    audit/history. Only the Excel presentation is abbreviated, for example
+    ``Lâm Hữu Khánh Phương`` becomes ``PHUONGLHK``.
+    """
+    raw_name = " ".join(str(snapshot_name or "").split())
+    if not raw_name:
+        return ""
+    ascii_name = unicodedata.normalize("NFKD", raw_name.replace("đ", "d").replace("Đ", "D"))
+    ascii_name = "".join(character for character in ascii_name if not unicodedata.combining(character))
+    tokens = re.findall(r"[A-Z0-9]+", ascii_name.upper())
+    if not tokens:
+        return raw_name.upper()
+    return tokens[-1] + "".join(token[0] for token in tokens[:-1])
 
 
 @router.get("/exports/round/{roundId}/council.xlsx")
@@ -1398,7 +1418,7 @@ def export_round_council(round_id: Annotated[int, Path(alias="roundId")], db: Db
         lecturer_ids = [int(member["lecturer_id"]) for member in members]
         names_by_id = {int(member["lecturer_id"]): str(member["snapshot_name"]) for member in members}
         seat_order = committee_seat_order.get(frozenset(lecturer_ids), lecturer_ids)
-        names = [names_by_id.get(lecturer_id, "") for lecturer_id in seat_order]
+        names = [_lecturer_export_name(names_by_id.get(lecturer_id, "")) for lecturer_id in seat_order]
         names += [""] * (seat_count - len(names))
         return names[:seat_count]
 

@@ -14,9 +14,18 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_engine
+from app.routes.manager_extensions import _council_seat_headers, _lecturer_export_name
 from app.services.councils import create_council
 
 HEADERS = {"X-Test-Session": "active-manager"}
+
+
+def test_council_export_uses_role_headers_and_abbreviates_lecturer_names():
+    assert _council_seat_headers(4) == ["Chủ tịch", "Thư ký", "TV HD1", "TV HD2"]
+    assert _council_seat_headers(5) == ["Chủ tịch", "Thư ký", "TV HD1", "TV HD2", "TV HD3"]
+    assert _council_seat_headers(3) == ["TV HD1", "TV HD2", "TV HD3"]
+    assert _lecturer_export_name("Lâm Hữu Khánh Phương") == "PHUONGLHK"
+    assert _lecturer_export_name("Đặng  Văn An") == "ANDV"
 
 
 @pytest.fixture()
@@ -192,7 +201,25 @@ def test_council_export_recovers_committee_seat_order_and_falls_back_to_lecturer
             {"round_id": round_id},
         ).scalar_one()
 
-        names = {lecturer_id: f"Council Export Lecturer {index}" for index, lecturer_id in enumerate(lecturer_ids)}
+        names = {
+            lecturer_id: name
+            for lecturer_id, name in zip(
+                lecturer_ids,
+                [
+                    "Lâm Hữu Khánh Phương",
+                    "Nguyễn Văn An",
+                    "Trần Thị Bích",
+                    "Đặng Văn Long",
+                    "Phạm Hữu Minh",
+                    "Lê Quốc Nam",
+                    "Võ Thanh Sơn",
+                    "Bùi Hoàng Yến",
+                    "Hồ Gia Khang",
+                    "Mai Đức Hùng",
+                ],
+                strict=True,
+            )
+        }
 
         matched_council_id = create_council(
             db,
@@ -237,27 +264,27 @@ def test_council_export_recovers_committee_seat_order_and_falls_back_to_lecturer
         "Ngày bảo vệ",
         "Giờ bảo vệ",
         "Phòng",
-        "Chủ tịch hội đồng",
-        "Thư ký hội đồng",
-        "Thành viên hội đồng",
-        "Thành viên hội đồng",
-        "Thành viên hội đồng",
+        "Chủ tịch",
+        "Thư ký",
+        "TV HD1",
+        "TV HD2",
+        "TV HD3",
     )
     by_group_code = {row[1]: row for row in rows[1:]}
 
     matched_row = by_group_code[f"CEXP-G-{marker}-matched"]
     assert matched_row[4:7] == ("01/04/2055", "08:00-09:00", None)
     assert matched_row[7:12] == (
-        names[shuffled[0]],
-        names[shuffled[1]],
-        names[shuffled[2]],
-        names[shuffled[3]],
-        names[shuffled[4]],
+        _lecturer_export_name(names[shuffled[0]]),
+        _lecturer_export_name(names[shuffled[1]]),
+        _lecturer_export_name(names[shuffled[2]]),
+        _lecturer_export_name(names[shuffled[3]]),
+        _lecturer_export_name(names[shuffled[4]]),
     )
 
     fallback_row = by_group_code[f"CEXP-G-{marker}-fallback"]
     assert fallback_row[4:7] == ("02/04/2055", "08:00-09:00", None)
-    assert fallback_row[7:12] == tuple(names[lid] for lid in fallback_member_ids)
+    assert fallback_row[7:12] == tuple(_lecturer_export_name(names[lid]) for lid in fallback_member_ids)
 
     header_cell = sheet.cell(row=1, column=1)
     assert header_cell.font.bold is True
@@ -330,11 +357,11 @@ def test_council_export_uses_plain_seats_for_reviewer_only_rounds(client, lectur
         "Ngày bảo vệ",
         "Giờ bảo vệ",
         "Phòng",
-        "Thành viên hội đồng",
-        "Thành viên hội đồng",
-        "Thành viên hội đồng",
+        "TV HD1",
+        "TV HD2",
+        "TV HD3",
     )
-    assert rows[1][7:10] == tuple(names[lid] for lid in member_ids)
+    assert rows[1][7:10] == tuple(_lecturer_export_name(names[lid]) for lid in member_ids)
 
     with Session(engine) as db, db.begin():
         db.execute(text("DELETE FROM sessions WHERE group_id = :id"), {"id": group_id})

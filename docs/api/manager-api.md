@@ -461,7 +461,7 @@ Các màn hình mockdata hiện có API tương ứng:
 - `GET /sessions`, `GET /sessions/{id}`, `GET /reschedule-requests`, `GET /results`, `GET /reports/group-progress`.
 - `GET /schedule/versions/compare/{version_a}/{version_b}` và `DELETE /schedule/versions/{version_id}` cho Compare/Delete draft.
 - `GET /exports/round/{id}.xlsx`, `GET /exports/semester/{id}/schedule.xlsx`, `GET /exports/semester/{id}/results.xlsx`.
-- `GET /exports/round/{id}/council.xlsx`: bảng hội đồng theo nhóm (STT, Mã nhóm, Mã đề tài, Tên đề tài, Ngày/Giờ bảo vệ, Phòng, rồi N cột ghế hội đồng). Số cột ghế = `reviewer_count` thật của Round đó (không cố định 5): `reviewer_count > 3` → Chủ tịch + Thư ký + (N-2) Thành viên; `reviewer_count <= 3` → N cột Thành viên hội đồng (không phân vai, đúng theo `assign_roles`). Xuất được ngay khi version đã activate (`ACTIVE`), không cần đợi công bố (`PUBLISHED`).
+- `GET /exports/round/{id}/council.xlsx`: bảng hội đồng theo nhóm (STT, Mã nhóm, Mã đề tài, Tên đề tài, Ngày/Giờ bảo vệ, Phòng, rồi N cột ghế hội đồng). Số cột ghế = `reviewer_count` thật của Round đó (không cố định 5): `reviewer_count > 3` → `Chủ tịch`, `Thư ký`, rồi `TV HD1`...; `reviewer_count <= 3` → `TV HD1`...`TV HDN` (không phân vai, đúng theo `assign_roles`). Tên giảng viên trong file được viết tắt theo dạng họ/từ cuối + chữ cái đầu các từ trước, bỏ dấu và viết hoa; dữ liệu `snapshot_name` đầy đủ trong DB không bị thay đổi. Xuất được ngay khi version đã activate (`ACTIVE`), không cần đợi công bố (`PUBLISHED`).
 
 Các API này vẫn dùng ID số của backend; FE có thể hiển thị code dạng `LEC001`, `G01`, `SV-D11-003` từ các field code tương ứng.
 
