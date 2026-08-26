@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
 from typing import Annotated, Any
 
@@ -475,6 +476,37 @@ def create_semester_project(semester_id: Annotated[int, Path(alias="semesterId")
     return success_payload({"id": external_id(project_id, "prj"), "code": code, "nameVi": payload.name_vi.strip(), "nameEn": payload.name_en, "topicType": payload.topic_type.value, "status": status_value})
 
 
+def _project_progression_payload(
+    project: Mapping[str, Any],
+    result_rows: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    timeline = [
+        {
+            "round": str(row["round_type"]),
+            "result": str(row["outcome"]) if row["outcome"] is not None else None,
+        }
+        for row in result_rows
+    ]
+
+    remediation = None
+    for row in result_rows:
+        if row["remediation_status"] in {"OPEN", "OVERDUE"} and row["remediation_deadline"] is not None:
+            remediation = {
+                "status": str(row["remediation_status"]),
+                "deadline": row["remediation_deadline"],
+                "verifier_id": external_id(row["remediation_verifier_id"], "lec"),
+            }
+
+    return {
+        "status": project_from_legacy(
+            str(project["project_status"]),
+            has_group=project["group_id"] is not None,
+        ).value,
+        "timeline": timeline,
+        "remediation": remediation,
+    }
+
+
 @router.get(
     "/projects/{projectId}/progression",
     response_model=ApiDataEnvelope[TargetProjectProgressionResponse],
@@ -484,23 +516,30 @@ def project_progression(project_id: Annotated[str | int, Path(alias="projectId")
     project_id = _parse_project_id(project_id)
     if user.role not in {"ADMIN", "MANAGER", "LECTURER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Project access is not available."})
-    row = db.execute(
+    project = db.execute(
         text(
-            "SELECT p.id AS project_id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, "
-            "p.title_vi, p.title_en, p.topic_type, p.status::text AS project_status, "
-            "g.id AS group_id, g.status::text AS group_status "
+            "SELECT p.status::text AS project_status, g.id AS group_id "
             "FROM projects p LEFT JOIN groups g ON g.project_id = p.id WHERE p.id = :id"
         ),
         {"id": project_id},
     ).mappings().one_or_none()
-    if row is None:
+    if project is None:
         raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "message": "Project does not exist."})
-    result = dict(row)
-    has_group = result["group_id"] is not None
-    result["project_status"] = project_from_legacy(result["project_status"], has_group=has_group).value
-    if has_group:
-        result["group_status"] = group_from_legacy(result["group_status"], project_assigned=True).value
-    return success_payload(result)
+    result_rows = db.execute(
+        text(
+            "SELECT r.type::text AS round_type, sr.outcome::text AS outcome, "
+            "rc.status::text AS remediation_status, rc.due_at AS remediation_deadline, "
+            "rc.verifier_lecturer_id AS remediation_verifier_id "
+            "FROM session_results sr JOIN sessions s ON s.id = sr.session_id "
+            "JOIN groups g ON g.id = s.group_id "
+            "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
+            "JOIN rounds r ON r.id = sv.round_id "
+            "LEFT JOIN remediation_cases rc ON rc.session_result_id = sr.id "
+            "WHERE g.project_id = :project_id ORDER BY sr.entered_at, sr.id"
+        ),
+        {"project_id": project_id},
+    ).mappings().all()
+    return success_payload(_project_progression_payload(project, result_rows))
 
 
 @router.get(

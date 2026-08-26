@@ -997,16 +997,21 @@ class TargetProjectCreateResponse(TargetResponseModel):
     status: str
 
 
+class TargetProjectProgressionEntryResponse(TargetResponseModel):
+    round: str
+    result: str | None
+
+
+class TargetProjectRemediationResponse(TargetResponseModel):
+    status: str
+    deadline: datetime
+    verifier_id: str
+
+
 class TargetProjectProgressionResponse(TargetResponseModel):
-    project_id: int
-    code: str
-    title: str
-    title_vi: str | None
-    title_en: str | None
-    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"]
-    project_status: str
-    group_id: int | None
-    group_status: str | None
+    status: str
+    timeline: list[TargetProjectProgressionEntryResponse]
+    remediation: TargetProjectRemediationResponse | None
 
 
 class TargetProjectResultResponse(TargetResponseModel):

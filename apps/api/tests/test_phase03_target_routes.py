@@ -42,3 +42,12 @@ def test_project_detail_uses_target_envelope_and_detail_shape_in_openapi():
 
     detail_schema = create_app().openapi()["components"]["schemas"]["TargetProjectDetailResponse"]
     assert {"nameVi", "nameEn", "mainSupervisor", "coSupervisor", "group"}.issubset(detail_schema["properties"])
+
+
+def test_project_progression_uses_frontend_timeline_contract_in_openapi():
+    schemas = create_app().openapi()["components"]["schemas"]
+    progression_schema = schemas["TargetProjectProgressionResponse"]
+
+    assert {"status", "timeline", "remediation"}.issubset(progression_schema["properties"])
+    timeline_schema = progression_schema["properties"]["timeline"]
+    assert timeline_schema["items"]["$ref"].endswith("TargetProjectProgressionEntryResponse")
