@@ -71,7 +71,7 @@ User = Depends(get_current_user)
   -> hash token
   -> SELECT auth_sessions + accounts + account_roles
   -> kiểm tra active/expire/idle timeout
-  -> UPDATE last_seen_at và commit
+  -> UPDATE last_seen_at có điều kiện (throttle theo SESSION_HEARTBEAT_SECONDS) và commit khi có write
   -> CurrentUser(role, account_id)
 ```
 

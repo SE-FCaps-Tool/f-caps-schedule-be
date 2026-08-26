@@ -93,11 +93,17 @@ chối. Role vẫn lấy từ `account_roles`, không lấy từ Google.
 
 ### `POST /api/v1/auth/select-role`
 
-- **Auth:** dùng challenge cookie, chưa cần session đầy đủ.
+- **Auth:** hai chế độ, cùng handler:
+  - **Login-time:** dùng `login_challenge` cookie, chưa cần session đầy đủ (multi-role account vừa login).
+  - **Switch mid-session:** không có challenge cookie nhưng có session cookie hợp lệ — chuyển role
+    của session hiện tại sang role khác account sở hữu, không cần logout. Session cũ bị revoke
+    ngay khi tạo session mới thành công (2 bước này commit atomic cùng nhau, không tách transaction).
 - **Body:** `{ "role": "MANAGER" }`.
 - **Success:** tạo session gắn với role đã chọn và trả cùng shape `LoginResponse` với `role` đã chọn.
-- **403 `ROLE_NOT_ASSIGNED`:** role không thuộc account.
-- **401 `ROLE_SELECTION_EXPIRED`:** challenge đã dùng hoặc hết hạn; yêu cầu đăng nhập lại.
+- **403 `ROLE_NOT_ASSIGNED`:** role không thuộc account — session/challenge hiện tại giữ nguyên, không bị revoke.
+- **401 `ROLE_SELECTION_EXPIRED`:** không có challenge lẫn session hợp lệ; yêu cầu đăng nhập lại.
+- **CSRF:** miễn khi request chưa có session cookie (login-time, lần đầu); bắt buộc khi đã có
+  session cookie (switch mid-session, hoặc re-login trong lúc tab khác vẫn còn phiên sống).
 
 Mọi request sau đó, bao gồm `GET /api/v1/auth/me`, dùng role đã gắn trong session. Không suy ra
 role bằng cách lấy role đầu tiên từ `account_roles` nữa.
@@ -144,10 +150,18 @@ Alias ngắn cho current user dùng ở UI guard.
 - Absolute timeout: `168 giờ` (7 ngày) kể từ lúc login.
 - Backend không dùng refresh token và không có endpoint `/auth/refresh`.
 - Khi session hết hạn, API trả `401`; FE cần xóa auth state và chuyển user về màn hình login.
+- `last_seen_at` (dùng cho idle timeout) chỉ được ghi khi lần ghi trước đã cũ hơn
+  `SESSION_HEARTBEAT_SECONDS` (mặc định `60s`) — không phải mỗi request nữa. Idle-timeout vẫn được
+  kiểm tra trên mọi request bất kể throttle này.
 
 Có thể override bằng biến môi trường:
 
 ```env
 SESSION_IDLE_MINUTES=60
 SESSION_ABSOLUTE_HOURS=168
+SESSION_HEARTBEAT_SECONDS=60
 ```
+
+`SESSION_HEARTBEAT_SECONDS` phải nhỏ hơn hẳn `SESSION_IDLE_MINUTES * 60` — nếu set sai, giá trị bị
+tự động clamp về `idle_minutes * 60 // 2` (heartbeat ≥ idle window sẽ khiến mọi session chết ở
+idle-timeout bất kể có traffic).
