@@ -11709,25 +11709,10 @@
         "title": "TargetProjectListItemResponse",
         "type": "object"
       },
-      "TargetProjectProgressionResponse": {
+      "TargetProjectProgressionEntryResponse": {
         "additionalProperties": true,
         "properties": {
-          "code": {
-            "title": "Code",
-            "type": "string"
-          },
-          "groupId": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Groupid"
-          },
-          "groupStatus": {
+          "result": {
             "anyOf": [
               {
                 "type": "string"
@@ -11736,65 +11721,76 @@
                 "type": "null"
               }
             ],
-            "title": "Groupstatus"
+            "title": "Result"
           },
-          "projectId": {
-            "title": "Projectid",
-            "type": "integer"
-          },
-          "projectStatus": {
-            "title": "Projectstatus",
-            "type": "string"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "titleEn": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Titleen"
-          },
-          "titleVi": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Titlevi"
-          },
-          "topicType": {
-            "enum": [
-              "APPLICATION",
-              "RESEARCH",
-              "INTEGRATED",
-              "REGULAR"
-            ],
-            "title": "Topictype",
+          "round": {
+            "title": "Round",
             "type": "string"
           }
         },
         "required": [
-          "projectId",
-          "code",
-          "title",
-          "titleVi",
-          "titleEn",
-          "topicType",
-          "projectStatus",
-          "groupId",
-          "groupStatus"
+          "round",
+          "result"
+        ],
+        "title": "TargetProjectProgressionEntryResponse",
+        "type": "object"
+      },
+      "TargetProjectProgressionResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "remediation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetProjectRemediationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/TargetProjectProgressionEntryResponse"
+            },
+            "title": "Timeline",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "timeline",
+          "remediation"
         ],
         "title": "TargetProjectProgressionResponse",
+        "type": "object"
+      },
+      "TargetProjectRemediationResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "deadline": {
+            "format": "date-time",
+            "title": "Deadline",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "verifierId": {
+            "title": "Verifierid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "deadline",
+          "verifierId"
+        ],
+        "title": "TargetProjectRemediationResponse",
         "type": "object"
       },
       "TargetProjectResultResponse": {
@@ -14479,7 +14475,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "7a4edf8eb2caf927c0abdfc30717c31a85411f63",
+    "x-be-commit": "4d910a63e8bd1ca654aa6477bc90067f2803ddc0",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
