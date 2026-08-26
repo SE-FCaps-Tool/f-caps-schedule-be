@@ -22,7 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.responses import RedirectResponse
 
-from app.auth import CurrentUser, get_current_user
+from app.auth import CurrentUser, get_current_user, lookup_session_row
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.response_models import (
@@ -269,28 +269,71 @@ def select_role(
     db: Db,
     settings: SettingsDep,
 ) -> dict[str, object]:
+    # Consumes a pending login challenge, OR — when none is present — switches
+    # the caller's already-authenticated session to a different role it owns.
+    # Both paths share the same DB-backed role-ownership check below.
     challenge = _get_login_challenge(db, request.cookies.get(LOGIN_CHALLENGE_COOKIE), for_update=True)
-    if challenge is None:
+    # Looked up unconditionally: even on the challenge (fresh-login) path, an
+    # existing session must be revoked so it can't outlive this call under a
+    # different token the browser no longer holds.
+    session_token = request.cookies.get(settings.session_cookie_name)
+    session_row = lookup_session_row(db, settings, session_token) if session_token else None
+
+    if challenge is None and session_row is None:
         response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
         raise HTTPException(
             status_code=401,
             detail={"code": "ROLE_SELECTION_EXPIRED", "message": "Role selection has expired. Please sign in again."},
         )
+
+    account_id = int(challenge["account_id"]) if challenge is not None else int(session_row["account_id"])
     role = payload.role.strip().upper()
-    roles = _roles_for_account(db, int(challenge["account_id"]))
+    roles = _roles_for_account(db, account_id)
     if role not in roles:
         db.rollback()
         raise HTTPException(
             status_code=403,
             detail={"code": "ROLE_NOT_ASSIGNED", "message": "This role is not assigned to the account."},
         )
-    db.execute(text("UPDATE auth_login_challenges SET used_at = now() WHERE id = :id"), {"id": challenge["id"]})
-    db.commit()
-    expires = _create_session(db, int(challenge["account_id"]), role, response, settings, provider=str(challenge["provider"]))
+
+    if challenge is not None:
+        db.execute(text("UPDATE auth_login_challenges SET used_at = now() WHERE id = :id"), {"id": challenge["id"]})
+        provider = str(challenge["provider"])
+    else:
+        provider = "switch"
+
+    if session_row is not None:
+        # Gate the revoke on revoked_at IS NULL so two concurrent calls on the
+        # same cookie (double-click, duplicate tab) can win this race only
+        # once instead of both minting a session (no FOR UPDATE needed).
+        revoked = db.execute(
+            text("UPDATE auth_sessions SET revoked_at = now() WHERE id = :id AND revoked_at IS NULL"),
+            {"id": session_row["id"]},
+        )
+        if revoked.rowcount == 0:
+            db.rollback()
+            raise HTTPException(
+                status_code=401,
+                detail={"code": "ROLE_SELECTION_EXPIRED", "message": "Role selection has expired. Please sign in again."},
+            )
+        if challenge is None:
+            db.execute(
+                text(
+                    "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
+                    "VALUES (:actor_id, 'ACCOUNT_ROLE_SWITCHED', 'account', :entity_id, CAST(:after_json AS JSONB))"
+                ),
+                {"actor_id": account_id, "entity_id": str(account_id), "after_json": json.dumps({"role": role})},
+            )
+
+    # No standalone commit here: the challenge/session revoke and its audit
+    # row must commit atomically together with the new session row inside
+    # _create_session — a failure partway through must not leave the account
+    # with zero valid sessions.
+    expires = _create_session(db, account_id, role, response, settings, provider=provider)
     response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
     account = db.execute(
         text("SELECT email, display_name FROM accounts WHERE id = :account_id"),
-        {"account_id": int(challenge["account_id"])},
+        {"account_id": account_id},
     ).mappings().one()
     return {
         "role": role,

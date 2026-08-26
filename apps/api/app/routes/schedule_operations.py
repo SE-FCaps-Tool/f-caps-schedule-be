@@ -729,6 +729,52 @@ def delete_draft_version(version_id: Annotated[int, Path(alias="versionId")], db
         dependency_count = db.execute(text("SELECT COUNT(*) FROM schedule_change_records WHERE schedule_version_id=:id"), {"id": version_id}).scalar_one()
         if dependency_count:
             raise HTTPException(status_code=409, detail={"code": "VERSION_DELETE_HAS_DEPENDENCIES", "message": "Phương án đã có lịch hoặc bản ghi audit phụ thuộc nên không thể xóa."})
+        manual_draft = db.execute(
+            text(
+                "SELECT round_id FROM manual_schedule_drafts "
+                "WHERE source_schedule_version_id = :version_id FOR UPDATE"
+            ),
+            {"version_id": version_id},
+        ).mappings().one_or_none()
+        if manual_draft is None:
+            # Compatibility for manual boards copied before sourceVersionId was
+            # introduced: only treat the board as derived when every group,
+            # timeslot and room exactly matches the version being deleted.
+            manual_draft = db.execute(
+                text(
+                    "SELECT d.round_id FROM manual_schedule_drafts d "
+                    "WHERE d.source_schedule_version_id IS NULL "
+                    "AND EXISTS (SELECT 1 FROM manual_schedule_sessions ms WHERE ms.round_id = d.round_id) "
+                    "AND (SELECT COUNT(*) FROM manual_schedule_session_groups msg "
+                    "JOIN manual_schedule_sessions ms ON ms.id = msg.session_id "
+                    "WHERE ms.round_id = d.round_id) = "
+                    "(SELECT COUNT(*) FROM schedule_assignments a WHERE a.schedule_version_id = :version_id) "
+                    "AND NOT EXISTS ("
+                    "  SELECT msg.group_id, ms.timeslot_id, ms.room_id "
+                    "   FROM manual_schedule_session_groups msg "
+                    "   JOIN manual_schedule_sessions ms ON ms.id = msg.session_id "
+                    "   WHERE ms.round_id = d.round_id "
+                    "  EXCEPT "
+                    "  SELECT a.group_id, a.timeslot_id, a.room_id "
+                    "   FROM schedule_assignments a WHERE a.schedule_version_id = :version_id"
+                    ") FOR UPDATE"
+                ),
+                {"version_id": version_id},
+            ).mappings().one_or_none()
+        if manual_draft is not None:
+            manual_round_id = int(manual_draft["round_id"])
+            db.execute(
+                text("DELETE FROM manual_schedule_sessions WHERE round_id = :round_id"),
+                {"round_id": manual_round_id},
+            )
+            db.execute(
+                text(
+                    "UPDATE manual_schedule_drafts SET source_schedule_version_id = NULL, "
+                    "revision = revision + 1, updated_by = :actor_id, updated_at = now() "
+                    "WHERE round_id = :round_id"
+                ),
+                {"actor_id": _actor_id(db, user), "round_id": manual_round_id},
+            )
         db.execute(text("DELETE FROM schedule_versions WHERE id = :id"), {"id": version_id})
     return {"id": version_id, "deleted": True}
 

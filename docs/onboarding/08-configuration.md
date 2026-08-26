@@ -133,6 +133,7 @@ def create_semester(payload: SemesterCreate, db: Db, user: User, settings: Setti
 | `SESSION_COOKIE_NAME` | `scheduler_session` | Tên cookie phiên |
 | `SESSION_IDLE_MINUTES` | `60` | Không hoạt động bao lâu thì phiên chết |
 | `SESSION_ABSOLUTE_HOURS` | `168` (7 ngày) | Hạn tuyệt đối của phiên |
+| `SESSION_HEARTBEAT_SECONDS` | `60` | Throttle ghi `last_seen_at` — chỉ write khi write trước đó cũ hơn giá trị này. Phải nhỏ hơn hẳn `SESSION_IDLE_MINUTES * 60`; `Settings` tự clamp về `idle_minutes * 60 // 2` nếu set sai, vì bằng/lớn hơn idle window sẽ khiến mọi session chết ở idle-timeout dù có traffic |
 | `CORS_ORIGINS` | 4 origin localhost | Domain frontend được phép gọi API, phân tách bằng dấu phẩy |
 | `FRONTEND_URL` | `http://localhost:5173` | URL FE nhận redirect sau Google login |
 | `GOOGLE_CLIENT_ID` | trống | OAuth Web client ID từ Google Cloud |

@@ -738,7 +738,7 @@ def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db
     if leader is None:
         warnings.append({"code": "NO_LEADER", "message": "Group has no active leader."})
     if len([member for member in members if str(member["status"]) == "ACTIVE"]) < 4:
-        warnings.append({"code": "FEWER_THAN_RECOMMENDED_MEMBERS", "message": "Group has fewer than recommended members."})
+        warnings.append({"code": "FEWER_THAN_RECOMMENDED_MEMBERS", "message": "Nhóm có ít thành viên hơn mức khuyến nghị."})
 
     payload = {
         "id": group["id"], "code": group["code"], "status": str(group["status"]),

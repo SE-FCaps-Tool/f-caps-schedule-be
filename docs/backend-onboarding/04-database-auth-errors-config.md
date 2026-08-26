@@ -115,10 +115,15 @@ email + password
 1. Trong `APP_ENV=test`, có thể dùng `X-Test-Session: active-<role>[:account_id]`.
 2. Môi trường thường đọc cookie session, hash token và query `auth_sessions`.
 3. Kiểm tra session chưa revoke/expire/idle-expire và account `ACTIVE`.
-4. Update `last_seen_at`, commit và trả `CurrentUser`.
-5. Không hợp lệ trả 401.
+4. Update `last_seen_at` **có điều kiện**: chỉ chạy `UPDATE ... WHERE last_seen_at <= now() - SESSION_HEARTBEAT_SECONDS` rồi commit khi `rowcount > 0`; nếu không, rollback (không phải write mỗi request nữa — xem `SESSION_HEARTBEAT_SECONDS` bên dưới). Idle-timeout ở bước 3 vẫn kiểm tra trên mọi request, không bị nới bởi throttle này.
+5. Trả `CurrentUser`.
+6. Không hợp lệ trả 401.
 
 Test seam tuyệt đối không hoạt động ngoài `APP_ENV=test`.
+
+`SESSION_HEARTBEAT_SECONDS` (default `60`) giới hạn tần suất ghi `last_seen_at`. Phải nhỏ hơn hẳn
+`SESSION_IDLE_MINUTES * 60` — `Settings` tự clamp về `idle_minutes * 60 // 2` nếu bị set sai, vì
+heartbeat ≥ idle window sẽ khiến mọi session chết ở idle-timeout bất kể có traffic hay không.
 
 ### Logout
 
