@@ -105,6 +105,13 @@
             ],
             "title": "Role"
           },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -14265,7 +14272,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "92f50f878c8a2d6d5150c3138c9b12a9dd81bebc",
+    "x-be-commit": "77a42635d9d15ed03df9b84efe1ce57cc7ae3f05",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
