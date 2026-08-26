@@ -3,7 +3,7 @@
 from alembic import op
 
 
-revision = "0044_project_topic_lecturer_seniority"
+revision = "0044_project_topic_seniority"
 down_revision = "0043_manual_schedule_source"
 branch_labels = None
 depends_on = None
