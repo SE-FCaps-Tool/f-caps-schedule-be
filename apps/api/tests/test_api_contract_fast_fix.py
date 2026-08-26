@@ -2,7 +2,15 @@ import pytest
 from fastapi import HTTPException
 
 from app.api_contract import external_id, parse_external_id, target_id_fields
-from app.routes.target_group_project import TargetGroupCreate, TargetProjectCreate, _parse_group_id
+from app.routes.manager_extensions import _parse_project_id as _parse_manager_project_id
+from app.routes.target_group_project import (
+    TargetGroupCreate,
+    TargetProjectCreate,
+    _parse_group_id,
+)
+from app.routes.target_group_project import (
+    _parse_project_id as _parse_target_project_id,
+)
 from app.routes.target_round_contract import (
     TargetAvailabilitySubmit,
     TargetInvitationResponse,
@@ -31,6 +39,20 @@ def test_target_group_path_id_accepts_numeric_and_public_forms(value):
 def test_target_group_path_id_rejects_other_resource_prefix():
     with pytest.raises(HTTPException) as exc_info:
         _parse_group_id("prj_28")
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.parametrize("parser", [_parse_manager_project_id, _parse_target_project_id])
+@pytest.mark.parametrize("value", [104, "104", "prj_104"])
+def test_project_path_id_accepts_numeric_and_public_forms(parser, value):
+    assert parser(value) == 104
+
+
+@pytest.mark.parametrize("parser", [_parse_manager_project_id, _parse_target_project_id])
+def test_project_path_id_rejects_other_resource_prefix(parser):
+    with pytest.raises(HTTPException) as exc_info:
+        parser("grp_104")
     assert exc_info.value.status_code == 422
     assert exc_info.value.detail["code"] == "VALIDATION_ERROR"
 

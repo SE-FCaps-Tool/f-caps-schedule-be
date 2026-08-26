@@ -14502,7 +14502,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "3827ce3eea2da5c2efe4a539f4c0e766d98d7c12",
+    "x-be-commit": "5e4460babf625aec6febb5e3d9cf78f1b12eabab",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -18556,8 +18556,15 @@
             "name": "projectId",
             "required": true,
             "schema": {
-              "title": "Projectid",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "title": "Projectid"
             }
           },
           {
@@ -18700,8 +18707,15 @@
             "name": "projectId",
             "required": true,
             "schema": {
-              "title": "Projectid",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "title": "Projectid"
             }
           },
           {
@@ -18768,8 +18782,15 @@
             "name": "projectId",
             "required": true,
             "schema": {
-              "title": "Projectid",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "title": "Projectid"
             }
           },
           {

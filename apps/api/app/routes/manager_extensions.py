@@ -109,6 +109,18 @@ def _parse_group_overview_id(value: str | int) -> int:
         ) from exc
 
 
+def _parse_project_id(value: str | int) -> int:
+    """Accept the public ``prj_<id>`` form and legacy numeric path IDs."""
+
+    try:
+        return parse_external_id(value, prefix="prj")
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "VALIDATION_ERROR", "message": "project_id must be a valid project identifier."},
+        ) from exc
+
+
 class ProjectUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     code: str | None = Field(default=None, min_length=1, max_length=64)
@@ -555,8 +567,9 @@ def update_project(project_id: Annotated[str, Path(alias="projectId")], payload:
 
 
 @router.get("/projects/{projectId}", response_model=ProjectDetailResponse)
-def get_project_detail(project_id: Annotated[int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
+def get_project_detail(project_id: Annotated[str | int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
+    project_id = _parse_project_id(project_id)
     row = db.execute(
         text(
             "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en, p.topic_type, "
