@@ -351,6 +351,7 @@ class BulkUpsertPayload(RequestModel):
     allow_draft_incomplete: bool = Field(default=False, alias="allowDraftIncomplete")
     sessions: list[BulkManualSessionPayload] = Field(default_factory=list)
     deleted_session_ids: list[str | int] = Field(default_factory=list, alias="deletedSessionIds")
+    source_schedule_version_id: int | None = Field(default=None, alias="sourceVersionId", gt=0)
 
 
 class ValidatePayload(RequestModel):
@@ -1063,12 +1064,17 @@ def _board_payload(db: Session, round_id: int) -> dict[str, Any]:
     sessions = _load_manual_sessions(db, round_id)
     validation = _validate_manual(db, round_row, sessions)
     sessions = _decorate_sessions_with_validation(sessions, validation)
+    source_version_id = db.execute(
+        text("SELECT source_schedule_version_id FROM manual_schedule_drafts WHERE round_id = :round_id"),
+        {"round_id": round_id},
+    ).scalar_one_or_none()
     return {
         "roundId": str(round_id),
         "roundStatus": round_row["round_status"],
         "reviewerCount": int(round_row["reviewer_count"]),
         "maxGroupsPerTimeslot": round_row["max_groups_per_timeslot"],
         "revision": _load_revision(db, round_id),
+        "sourceVersionId": int(source_version_id) if source_version_id is not None else None,
         "roles": _role_schema(int(round_row["reviewer_count"])),
         "config": {
             "roomTypes": list(round_row["room_types"] or []),
@@ -1416,6 +1422,28 @@ def bulk_upsert_manual_sessions(
         _ensure_mutable_round(round_row)
         _ensure_draft_row(db, round_id, actor_id)
         _check_revision(db, round_id, payload.client_revision)
+        if payload.source_schedule_version_id is not None:
+            source_version = db.execute(
+                text("SELECT round_id FROM schedule_versions WHERE id = :id"),
+                {"id": payload.source_schedule_version_id},
+            ).mappings().one_or_none()
+            if source_version is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail={"code": "VERSION_NOT_FOUND", "message": "Schedule version source does not exist."},
+                )
+            if int(source_version["round_id"]) != round_id:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"code": "VERSION_ROUND_MISMATCH", "message": "Schedule version source does not belong to this round."},
+                )
+            db.execute(
+                text(
+                    "UPDATE manual_schedule_drafts SET source_schedule_version_id = :version_id, "
+                    "updated_by = :actor_id, updated_at = now() WHERE round_id = :round_id"
+                ),
+                {"version_id": payload.source_schedule_version_id, "actor_id": actor_id, "round_id": round_id},
+            )
         deleted_ids = [_manual_session_id(value) for value in payload.deleted_session_ids]
         if deleted_ids:
             db.execute(
