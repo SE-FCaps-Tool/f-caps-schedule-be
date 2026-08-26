@@ -174,7 +174,7 @@ def list_semester_groups(
         member_count = row["member_count"] or 0
         warnings = []
         if member_count < MIN_RECOMMENDED_MEMBERS:
-            warnings.append({"code": "MEMBER_COUNT_BELOW_MIN", "message": "Group has fewer than recommended members."})
+            warnings.append({"code": "MEMBER_COUNT_BELOW_MIN", "message": "Nhóm có ít thành viên hơn mức khuyến nghị."})
         items.append({
             "id": external_id(row["id"], "grp"),
             "code": row["code"],
