@@ -331,7 +331,7 @@ def eligible_projects(round_id: Annotated[int, Path(alias="roundId")], db: Db, u
             )
         warnings = []
         if has_group and (row["active_member_count"] or 0) < MIN_RECOMMENDED_MEMBERS:
-            warnings.append({"code": "MEMBER_COUNT_BELOW_MIN", "message": "Group has fewer than recommended members."})
+            warnings.append({"code": "MEMBER_COUNT_BELOW_MIN", "message": "Nhóm có ít thành viên hơn mức khuyến nghị."})
         items.append({
             "projectId": external_id(row["project_id"], "prj"),
             "groupId": external_id(row["group_id"], "grp") if has_group else None,
