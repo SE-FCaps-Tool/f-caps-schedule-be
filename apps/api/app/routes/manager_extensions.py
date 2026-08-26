@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import secrets
 import unicodedata
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from io import BytesIO
 from typing import Annotated, Any, Literal
@@ -30,6 +31,7 @@ from app.api_contract import (
     ApiDataEnvelope,
     RequestModel,
     dual_name_query,
+    external_id,
     parse_external_id,
     success_payload,
 )
@@ -41,6 +43,7 @@ from app.domain.errors import DomainError
 from app.domain.master_data import normalize_code
 from app.domain.registration_phase import resolve_registration_phase
 from app.domain.round_setup import validate_round_configuration
+from app.domain.status_compat import project_from_legacy
 from app.response_models import (
     ActionResponse,
     GroupDetailResponse,
@@ -49,7 +52,6 @@ from app.response_models import (
     ImportResponse,
     InvitationResponse,
     LecturerImportResponse,
-    ProjectDetailResponse,
     ProjectMutationResponse,
     QuotaResponse,
     RescheduleRequestResponse,
@@ -59,6 +61,7 @@ from app.response_models import (
     SemesterResponse,
     SessionResponse,
     TargetGroupProgressResponse,
+    TargetProjectDetailResponse,
     TimeslotResponse,
 )
 from app.routes.master_data import _insert_timeframe_slots, password_hasher
@@ -566,14 +569,65 @@ def update_project(project_id: Annotated[str, Path(alias="projectId")], payload:
     return dict(db.execute(text("SELECT id, code, title, title_vi, title_en, topic_type, status, semester_id FROM projects WHERE id = :id"), {"id": project_id}).mappings().one())
 
 
-@router.get("/projects/{projectId}", response_model=ProjectDetailResponse)
+def _project_detail_payload(
+    row: Mapping[str, Any],
+    supervisors: list[Mapping[str, Any]],
+    group: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    supervisor_map = {
+        str(item["supervisor_type"]): {
+            "id": external_id(item["id"], "lec"),
+            "code": item["code"],
+            "full_name": item["full_name"],
+        }
+        for item in supervisors
+    }
+    has_group = group is not None
+    return {
+        "id": external_id(row["id"], "prj"),
+        "code": row["code"],
+        "name": row["name"],
+        "name_vi": row["name_vi"] or row["name"],
+        "name_en": row["name_en"],
+        "topic_type": row["topic_type"],
+        "status": project_from_legacy(row["status"], has_group=has_group).value,
+        "main_supervisor": supervisor_map.get("MAIN"),
+        "co_supervisor": supervisor_map.get("CO"),
+        "group": (
+            {
+                "id": external_id(group["id"], "grp"),
+                "code": group["code"],
+                "member_count": int(group["member_count"] or 0),
+                "leader": (
+                    {
+                        "id": external_id(group["leader_id"], "stu"),
+                        "code": group["leader_code"],
+                        "full_name": group["leader_full_name"],
+                    }
+                    if group["leader_id"] is not None
+                    else None
+                ),
+            }
+            if group is not None
+            else None
+        ),
+    }
+
+
+@router.get(
+    "/projects/{projectId}",
+    tags=["target-groups-projects"],
+    response_model=ApiDataEnvelope[TargetProjectDetailResponse],
+    response_model_exclude_unset=True,
+)
 def get_project_detail(project_id: Annotated[str | int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
     _require(user, "ADMIN", "MANAGER")
     project_id = _parse_project_id(project_id)
     row = db.execute(
         text(
-            "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en, p.topic_type, "
-            "p.status, p.semester_id, s.code AS semester_code, m.code AS major_code "
+            "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS name, "
+            "p.title_vi AS name_vi, p.title_en AS name_en, p.topic_type, p.status, "
+            "p.semester_id, s.code AS semester_code, m.code AS major_code "
             "FROM projects p JOIN semesters s ON s.id = p.semester_id JOIN majors m ON m.id = p.major_id WHERE p.id = :id"
         ),
         {"id": project_id},
@@ -581,18 +635,29 @@ def get_project_detail(project_id: Annotated[str | int, Path(alias="projectId")]
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "message": "Project does not exist."})
     supervisors = db.execute(
-        text("SELECT l.id, l.lecturer_code, a.display_name, ps.supervisor_type FROM project_supervisors ps JOIN lecturers l ON l.id = ps.lecturer_id JOIN accounts a ON a.id = l.account_id WHERE ps.project_id = :id ORDER BY ps.supervisor_type"),
+        text(
+            "SELECT l.id, l.lecturer_code AS code, a.display_name AS full_name, ps.supervisor_type "
+            "FROM project_supervisors ps JOIN lecturers l ON l.id = ps.lecturer_id "
+            "JOIN accounts a ON a.id = l.account_id WHERE ps.project_id = :id ORDER BY ps.supervisor_type, l.id"
+        ),
         {"id": project_id},
     ).mappings().all()
-    group = db.execute(text("SELECT id, code, status FROM groups WHERE project_id = :id"), {"id": project_id}).mappings().one_or_none()
-    # Keep the detail payload consistent with the project list contract.
-    supervisor_items = []
-    for item in supervisors:
-        value = dict(item)
-        value["type"] = value.pop("supervisor_type", None)
-        value.pop("id", None)
-        supervisor_items.append(value)
-    return {**dict(row), "supervisors": supervisor_items, "group": dict(group) if group else None}
+    group = db.execute(
+        text(
+            "SELECT g.id, g.code, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS member_count, "
+            "leader_st.id AS leader_id, leader_st.student_code AS leader_code, leader_a.display_name AS leader_full_name "
+            "FROM groups g "
+            "LEFT JOIN group_memberships gm ON gm.group_id = g.id "
+            "LEFT JOIN group_memberships leader_gm ON leader_gm.group_id = g.id "
+            "AND leader_gm.membership_role = 'LEADER' AND leader_gm.status = 'ACTIVE' "
+            "LEFT JOIN students leader_st ON leader_st.id = leader_gm.student_id "
+            "LEFT JOIN accounts leader_a ON leader_a.id = leader_st.account_id "
+            "WHERE g.project_id = :id GROUP BY g.id, g.code, leader_st.id, leader_st.student_code, leader_a.display_name"
+        ),
+        {"id": project_id},
+    ).mappings().one_or_none()
+
+    return success_payload(_project_detail_payload(row, supervisors, group))
 
 
 @router.patch("/groups/{groupId}", response_model=GroupResponse)
