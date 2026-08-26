@@ -32,6 +32,9 @@ REQUIRED_HEADERS = {
     "title_en": "tên đề tài tiếng anh/ tiếng nhật",
     "supervisors": "gvhd",
 }
+OPTIONAL_HEADERS = {
+    "topic_type": ("loại đề tài", "topic type", "topictype"),
+}
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,7 @@ class ProjectRow:
     title_vi: str
     title_en: str
     supervisors: tuple[str, ...]
+    topic_type: str
     source_row: int
 
 
@@ -62,9 +66,14 @@ def _find_header_row(rows: list[tuple[Any, ...]]) -> tuple[int, dict[str, int]]:
     for row_index, row in enumerate(rows, start=1):
         positions = {_header(value): column for column, value in enumerate(row)}
         if all(header in positions for header in REQUIRED_HEADERS.values()):
-            return row_index, {
+            columns = {
                 field: positions[header] for field, header in REQUIRED_HEADERS.items()
             }
+            for field, headers in OPTIONAL_HEADERS.items():
+                position = next((positions[header] for header in headers if header in positions), None)
+                if position is not None:
+                    columns[field] = position
+            return row_index, columns
     raise ValueError(
         "Could not find a sheet header containing Mã đề tài, "
         "Tên đề tài Tiếng Việt, Tên đề tài Tiếng Anh/ Tiếng Nhật and GVHD."
@@ -106,6 +115,7 @@ def read_projects(workbook_path: Path, requested_sheet: str | None = None) -> tu
         title_vi = _text(row[columns["title_vi"]])
         title_en = _text(row[columns["title_en"]])
         supervisors = _supervisor_names(row[columns["supervisors"]])
+        topic_type = _text(row[columns["topic_type"]]).upper() if "topic_type" in columns else "REGULAR"
         if not any((code, title_vi, title_en, supervisors)):
             continue
         if not code or not title_vi or not supervisors:
@@ -121,13 +131,16 @@ def read_projects(workbook_path: Path, requested_sheet: str | None = None) -> tu
             raise ValueError(f"English title at row {source_row} exceeds 255 characters: {code}")
         if len(supervisors) > 2:
             raise ValueError(f"More than two supervisors at row {source_row}: {code}")
+        if topic_type not in {"APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"}:
+            raise ValueError(f"Invalid topic type at row {source_row}: {code}")
 
-        project = ProjectRow(code, title_vi, title_en, supervisors, source_row)
+        project = ProjectRow(code, title_vi, title_en, supervisors, topic_type, source_row)
         previous = projects.get(code)
         if previous is not None and (
             previous.title_vi != project.title_vi
             or previous.title_en != project.title_en
             or previous.supervisors != project.supervisors
+            or previous.topic_type != project.topic_type
         ):
             raise ValueError(
                 f"Project {code} has inconsistent repeated rows "
@@ -235,11 +248,12 @@ def apply_projects(
         ).scalar_one_or_none()
         project_id = session.execute(
             text(
-                "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) "
-                "VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en) "
+                "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en, topic_type) "
+                "VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en, CAST(:topic_type AS topic_type)) "
                 "ON CONFLICT (semester_id, code) DO UPDATE SET "
                 "major_id = EXCLUDED.major_id, title = EXCLUDED.title, "
-                "title_vi = EXCLUDED.title_vi, title_en = EXCLUDED.title_en, status = 'ACTIVE' "
+                "title_vi = EXCLUDED.title_vi, title_en = EXCLUDED.title_en, "
+                "topic_type = EXCLUDED.topic_type, status = 'ACTIVE' "
                 "RETURNING id"
             ),
             {
@@ -249,6 +263,7 @@ def apply_projects(
                 "title": project.title_en or project.title_vi,
                 "title_vi": project.title_vi,
                 "title_en": project.title_en or None,
+                "topic_type": project.topic_type,
             },
         ).scalar_one()
         if existed is None:

@@ -131,7 +131,7 @@ def lecturer_supervised_projects(db: Db, user: User) -> dict[str, Any]:
     rows = db.execute(
         text(
             "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, "
-            "p.title_vi, p.title_en, p.status::text AS status, p.semester_id, "
+            "p.title_vi, p.title_en, p.topic_type, p.status::text AS status, p.semester_id, "
             "s.code AS semester_code, ps.supervisor_type, "
             "grp.id AS group_id, grp.code AS group_code, grp.member_count, "
             "grp.leader, grp.members "

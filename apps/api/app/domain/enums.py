@@ -13,6 +13,20 @@ class SystemRole(DomainEnum):
     STUDENT = "STUDENT"
 
 
+class TopicType(DomainEnum):
+    APPLICATION = "APPLICATION"
+    RESEARCH = "RESEARCH"
+    INTEGRATED = "INTEGRATED"
+    REGULAR = "REGULAR"
+
+
+class LecturerSeniorityLevel(DomainEnum):
+    SENIOR = "Senior"
+    MID_LEVEL = "MidLevel"
+    JUNIOR = "Junior"
+    ROOKIE = "Rookie"
+
+
 class SemesterStatus(DomainEnum):
     PLANNING = "PLANNING"
     ACTIVE = "ACTIVE"

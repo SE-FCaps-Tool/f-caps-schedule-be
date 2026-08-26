@@ -128,6 +128,7 @@ class ProjectResponse(ResponseModel):
     title: str
     title_vi: str | None = None
     title_en: str | None = None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"] = "REGULAR"
     status: str | None = None
     semester_id: int | None = None
     semester_code: str | None = None
@@ -143,6 +144,7 @@ class ProjectMutationResponse(ResponseModel):
     title: str
     title_vi: str | None = None
     title_en: str | None = None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"] = "REGULAR"
     status: str | None = None
     semester_id: int | None = None
 
@@ -210,6 +212,7 @@ class GroupOverviewProjectResponse(TargetResponseModel):
     name: str
     name_vi: str | None = None
     name_en: str | None = None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"] = "REGULAR"
     status: str
     main_supervisor: GroupOverviewSupervisorResponse | None = None
     co_supervisor: GroupOverviewSupervisorResponse | None = None
@@ -273,6 +276,7 @@ class LecturerResponse(ResponseModel):
     account_id: int | None = None
     email: str | None = None
     display_name: str | None = None
+    seniority_level: Literal["Senior", "MidLevel", "Junior", "Rookie"] | None = None
     account_status: str | None = None
     conflicts: list[ConflictItem] = Field(default_factory=list)
 
@@ -867,6 +871,7 @@ class TargetLecturerResponse(TargetResponseModel):
     account_id: int
     email: str
     display_name: str
+    seniority_level: Literal["Senior", "MidLevel", "Junior", "Rookie"] | None
     account_status: str
     conflicts: list[TargetConflictItemResponse]
 
@@ -897,6 +902,7 @@ class TargetProjectListItemResponse(TargetResponseModel):
     name: str
     name_vi: str
     name_en: str | None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"]
     status: str
     main_supervisor: TargetPersonSummaryResponse | None
     co_supervisor: TargetPersonSummaryResponse | None
@@ -914,6 +920,7 @@ class TargetGroupProjectSummaryResponse(TargetResponseModel):
     name: str
     name_vi: str
     name_en: str | None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"]
     status: str
 
 
@@ -968,6 +975,7 @@ class TargetProjectCreateResponse(TargetResponseModel):
     code: str
     name_vi: str
     name_en: str | None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"]
     status: str
 
 
@@ -977,6 +985,7 @@ class TargetProjectProgressionResponse(TargetResponseModel):
     title: str
     title_vi: str | None
     title_en: str | None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"]
     project_status: str
     group_id: int | None
     group_status: str | None
@@ -1218,6 +1227,7 @@ class TargetSupervisedProjectResponse(TargetResponseModel):
     title: str
     title_vi: str | None
     title_en: str | None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"]
     status: str
     semester_id: int
     semester_code: str
