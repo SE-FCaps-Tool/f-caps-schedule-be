@@ -36,6 +36,7 @@ from app.api_contract import (
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
 from app.database import get_db
+from app.domain.enums import LecturerSeniorityLevel, TopicType
 from app.domain.errors import DomainError
 from app.domain.master_data import normalize_code
 from app.domain.registration_phase import resolve_registration_phase
@@ -114,6 +115,7 @@ class ProjectUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     name_vi: str | None = Field(default=None, alias="nameVi", min_length=1, max_length=255)
     name_en: str | None = Field(default=None, alias="nameEn", max_length=255)
+    topic_type: TopicType | None = Field(default=None, alias="topicType")
     main_supervisor_id: str | int | None = Field(default=None, alias="mainSupervisorId")
     co_supervisor_id: str | int | None = Field(default=None, alias="coSupervisorId")
     supervisors: list[str] | None = None
@@ -510,13 +512,20 @@ def update_project(project_id: Annotated[str, Path(alias="projectId")], payload:
         values["title_en"] = values.pop("name_en")
     try:
         with db.begin():
-            row = db.execute(text("SELECT id, code, title, title_vi, title_en, semester_id FROM projects WHERE id = :id FOR UPDATE"), {"id": project_id}).mappings().one_or_none()
+            row = db.execute(text("SELECT id, code, title, title_vi, title_en, topic_type, semester_id FROM projects WHERE id = :id FOR UPDATE"), {"id": project_id}).mappings().one_or_none()
             if row is None:
                 raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "message": "Project does not exist."})
             ensure_semester_writable(db, int(row["semester_id"]))
-            scalar = {key: values[key] for key in ("code", "title", "title_vi", "title_en") if key in values}
+            scalar = {
+                key: values[key].value if key == "topic_type" and values[key] is not None else values[key]
+                for key in ("code", "title", "title_vi", "title_en", "topic_type")
+                if key in values
+            }
             if scalar:
-                assignments = ", ".join(f"{key} = :{key}" for key in scalar)
+                assignments = ", ".join(
+                    f"{key} = CAST(:{key} AS topic_type)" if key == "topic_type" else f"{key} = :{key}"
+                    for key in scalar
+                )
                 scalar["id"] = project_id
                 db.execute(text(f"UPDATE projects SET {assignments} WHERE id = :id"), scalar)
             if target_supervisor_update or "supervisors" in values:
@@ -542,7 +551,7 @@ def update_project(project_id: Annotated[str, Path(alias="projectId")], payload:
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail={"code": "PROJECT_DUPLICATE", "message": "Project code or supervisor assignment already exists."}) from exc
-    return dict(db.execute(text("SELECT id, code, title, title_vi, title_en, status, semester_id FROM projects WHERE id = :id"), {"id": project_id}).mappings().one())
+    return dict(db.execute(text("SELECT id, code, title, title_vi, title_en, topic_type, status, semester_id FROM projects WHERE id = :id"), {"id": project_id}).mappings().one())
 
 
 @router.get("/projects/{projectId}", response_model=ProjectDetailResponse)
@@ -550,7 +559,7 @@ def get_project_detail(project_id: Annotated[int, Path(alias="projectId")], db: 
     _require(user, "ADMIN", "MANAGER")
     row = db.execute(
         text(
-            "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en, "
+            "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en, p.topic_type, "
             "p.status, p.semester_id, s.code AS semester_code, m.code AS major_code "
             "FROM projects p JOIN semesters s ON s.id = p.semester_id JOIN majors m ON m.id = p.major_id WHERE p.id = :id"
         ),
@@ -654,7 +663,7 @@ def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db
         text(
             "SELECT g.id, g.code, g.status, p.id AS project_id, p.code AS project_code, "
             "COALESCE(p.title_en, p.title_vi, p.title) AS project_name, p.title_vi AS project_name_vi, "
-            "p.title_en AS project_name_en, p.status AS project_status, "
+            "p.title_en AS project_name_en, p.topic_type, p.status AS project_status, "
             "sem.id AS semester_id, sem.code AS semester_code, sem.name AS semester_name "
             "FROM groups g LEFT JOIN projects p ON p.id = g.project_id "
             "LEFT JOIN semesters sem ON sem.id = p.semester_id WHERE g.id = :group_id"
@@ -750,6 +759,7 @@ def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db
         "project": {
             "id": group["project_id"], "code": group["project_code"], "name": group["project_name"],
             "name_vi": group["project_name_vi"], "name_en": group["project_name_en"],
+            "topic_type": group["topic_type"],
             "status": str(group["project_status"]),
             "main_supervisor": supervisor_map.get("MAIN"), "co_supervisor": supervisor_map.get("CO"),
         } if group["project_id"] is not None else None,
@@ -1083,6 +1093,7 @@ def _lecturer_import_rows(upload: UploadFile) -> list[tuple[int, dict[str, Any]]
             "lecturer_code": row[1] if len(row) > 1 else None,
             "display_name": row[2] if len(row) > 2 else None,
             "email": row[3] if len(row) > 3 else None,
+            "seniority_level": row[4] if len(row) > 4 else None,
         }))
     if header_row is None:
         raise HTTPException(status_code=422, detail={"code": "IMPORT_INVALID_FILE", "message": "Expected the lecturers_template.xlsx header row (STT | Mã giảng viên | Họ và tên | Email)."})
@@ -1105,11 +1116,16 @@ async def import_lecturers(
             code = str(row.get("lecturer_code") or "").strip().upper()
             display_name = str(row.get("display_name") or "").strip()
             email = str(row.get("email") or "").strip().lower()
+            seniority_raw = str(row.get("seniority_level") or "").strip()
+            seniority_level = None if not seniority_raw else seniority_raw
             if not code or not display_name or not email:
                 errors.append({"row": row_number, "code": "REQUIRED_FIELD_MISSING", "message": "lecturer_code, display_name and email are all required."})
                 continue
             if len(code) > 32 or len(display_name) > 160 or len(email) > 320 or "@" not in email:
                 errors.append({"row": row_number, "code": "FIELD_INVALID", "message": "lecturer_code/display_name/email exceed the allowed length or email is malformed."})
+                continue
+            if seniority_level is not None and seniority_level not in {item.value for item in LecturerSeniorityLevel}:
+                errors.append({"row": row_number, "code": "SENIORITY_LEVEL_INVALID", "message": "seniorityLevel must be Senior, MidLevel, Junior or Rookie."})
                 continue
             temp_password = secrets.token_urlsafe(9)
             try:
@@ -1120,14 +1136,14 @@ async def import_lecturers(
                     ).scalar_one()
                     db.execute(text("INSERT INTO account_roles (account_id, role) VALUES (:account_id, 'LECTURER')"), {"account_id": account_id})
                     lecturer_id = db.execute(
-                        text("INSERT INTO lecturers (account_id, lecturer_code) VALUES (:account_id, :code) RETURNING id"),
-                        {"account_id": account_id, "code": normalize_code(code)},
+                        text("INSERT INTO lecturers (account_id, lecturer_code, seniority_level) VALUES (:account_id, :code, CAST(:seniority_level AS lecturer_seniority_level)) RETURNING id"),
+                        {"account_id": account_id, "code": normalize_code(code), "seniority_level": seniority_level},
                     ).scalar_one()
             except IntegrityError:
                 errors.append({"row": row_number, "code": "LECTURER_DUPLICATE", "message": "Email or lecturer code already exists."})
                 continue
             created += 1
-            accounts.append({"row": row_number, "lecturer_id": lecturer_id, "lecturer_code": code, "email": email, "display_name": display_name, "temp_password": temp_password})
+            accounts.append({"row": row_number, "lecturer_id": lecturer_id, "lecturer_code": code, "email": email, "display_name": display_name, "seniority_level": seniority_level, "temp_password": temp_password})
         db.execute(
             text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'LECTURERS_IMPORTED', 'lecturer', :entity_id, CAST(:after_json AS JSONB))"),
             {"actor_id": _actor_id(db, user), "entity_id": "bulk", "after_json": _json({"created": created, "skipped": len(errors)})},
@@ -1175,10 +1191,14 @@ async def import_projects(
             if semester_id is None or major_id is None:
                 errors.append({"row": index, "code": "SEMESTER_OR_MAJOR_NOT_FOUND"})
                 continue
+            topic_type = str(row.get("topictype") or "REGULAR").strip().upper()
+            if topic_type not in {"APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"}:
+                errors.append({"row": index, "code": "TOPIC_TYPE_INVALID", "message": "topicType must be APPLICATION, RESEARCH, INTEGRATED or REGULAR."})
+                continue
             ensure_semester_writable(db, int(semester_id))
             try:
                 with db.begin_nested():
-                    db.execute(text("INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en)"), {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title, "title_vi": title_vi, "title_en": title_en})
+                    db.execute(text("INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en, topic_type) VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en, CAST(:topic_type AS topic_type))"), {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title, "title_vi": title_vi, "title_en": title_en, "topic_type": topic_type})
                 created += 1
             except Exception:
                 errors.append({"row": index, "code": "PROJECT_DUPLICATE_OR_INVALID"})

@@ -21,7 +21,7 @@ from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.domain.availability import invitation_response
-from app.domain.enums import RoundStatus, SystemRole
+from app.domain.enums import LecturerSeniorityLevel, RoundStatus, SystemRole, TopicType
 from app.domain.errors import DomainError
 from app.domain.master_data import (
     normalize_code,
@@ -319,6 +319,11 @@ class LecturerCreate(RequestModel):
     email: str = Field(min_length=3, max_length=320)
     display_name: str = Field(min_length=1, max_length=160)
     password: str = Field(min_length=12, max_length=256)
+    seniority_level: LecturerSeniorityLevel | None = None
+
+
+class LecturerUpdate(RequestModel):
+    seniority_level: LecturerSeniorityLevel | None = None
 
 
 class AccountCreate(RequestModel):
@@ -327,6 +332,7 @@ class AccountCreate(RequestModel):
     password: str = Field(min_length=12, max_length=256)
     role: Literal["ADMIN", "MANAGER", "LECTURER", "STUDENT"]
     lecturer_code: str | None = Field(default=None, min_length=1, max_length=32)
+    seniority_level: LecturerSeniorityLevel | None = None
     student_code: str | None = Field(default=None, min_length=1, max_length=32)
 
 
@@ -339,6 +345,7 @@ class AccountRolePayload(RequestModel):
     role: Literal["ADMIN", "MANAGER", "LECTURER", "STUDENT"]
     reason: str = Field(min_length=1, max_length=1000)
     lecturer_code: str | None = Field(default=None, min_length=1, max_length=32)
+    seniority_level: LecturerSeniorityLevel | None = None
     student_code: str | None = Field(default=None, min_length=1, max_length=32)
 
 
@@ -361,6 +368,7 @@ class ProjectCreate(RequestModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     title_vi: str | None = Field(default=None, alias="titleVi", min_length=1, max_length=255)
     title_en: str | None = Field(default=None, alias="titleEn", max_length=255)
+    topic_type: TopicType = TopicType.REGULAR
     supervisors: list[str] = Field(min_length=1, max_length=2)
 
     @model_validator(mode="after")
@@ -483,7 +491,17 @@ def create_account(payload: AccountCreate, db: Db, user: User) -> dict[str, obje
             account_id = db.execute(text("INSERT INTO accounts (email, display_name, password_hash) VALUES (:email, :display_name, :password_hash) RETURNING id"), {"email": payload.email.strip().lower(), "display_name": payload.display_name.strip(), "password_hash": password_hasher.hash(payload.password)}).scalar_one()
             db.execute(text("INSERT INTO account_roles (account_id, role) VALUES (:account_id, CAST(:role AS system_role))"), {"account_id": account_id, "role": payload.role})
             if payload.role == "LECTURER":
-                db.execute(text("INSERT INTO lecturers (account_id, lecturer_code) VALUES (:account_id, :lecturer_code)"), {"account_id": account_id, "lecturer_code": normalize_code(payload.lecturer_code)})
+                db.execute(
+                    text(
+                        "INSERT INTO lecturers (account_id, lecturer_code, seniority_level) "
+                        "VALUES (:account_id, :lecturer_code, CAST(:seniority_level AS lecturer_seniority_level))"
+                    ),
+                    {
+                        "account_id": account_id,
+                        "lecturer_code": normalize_code(payload.lecturer_code),
+                        "seniority_level": payload.seniority_level.value if payload.seniority_level else None,
+                    },
+                )
             elif payload.role == "STUDENT":
                 db.execute(text("INSERT INTO students (account_id, student_code) VALUES (:account_id, :student_code)"), {"account_id": account_id, "student_code": normalize_code(payload.student_code)})
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'ACCOUNT_CREATED', 'account', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(account_id), "after_json": _json({"email": payload.email.strip().lower(), "role": payload.role})})
@@ -518,7 +536,17 @@ def add_account_role(account_id: Annotated[int, Path(alias="accountId")], payloa
                 if has_lecturer is None:
                     if not payload.lecturer_code:
                         raise HTTPException(status_code=422, detail={"code": "LECTURER_CODE_REQUIRED", "message": "lecturer_code is required when granting the LECTURER role."})
-                    db.execute(text("INSERT INTO lecturers (account_id, lecturer_code) VALUES (:account_id, :lecturer_code)"), {"account_id": account_id, "lecturer_code": normalize_code(payload.lecturer_code)})
+                    db.execute(
+                        text(
+                            "INSERT INTO lecturers (account_id, lecturer_code, seniority_level) "
+                            "VALUES (:account_id, :lecturer_code, CAST(:seniority_level AS lecturer_seniority_level))"
+                        ),
+                        {
+                            "account_id": account_id,
+                            "lecturer_code": normalize_code(payload.lecturer_code),
+                            "seniority_level": payload.seniority_level.value if payload.seniority_level else None,
+                        },
+                    )
             elif payload.role == "STUDENT":
                 has_student = db.execute(text("SELECT 1 FROM students WHERE account_id = :account_id"), {"account_id": account_id}).scalar_one_or_none()
                 if has_student is None:
@@ -637,7 +665,7 @@ def list_projects(
     rows = db.execute(
         text(
             "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, "
-             "p.title_vi, p.title_en, p.status, p.semester_id, sem.code AS semester_code, "
+             "p.title_vi, p.title_en, p.topic_type, p.status, p.semester_id, sem.code AS semester_code, "
              "m.code AS major_code, COUNT(ps.lecturer_id) AS supervisor_count, "
              "COALESCE(jsonb_agg(jsonb_build_object('lecturer_code', sl.lecturer_code, 'display_name', sa.display_name, 'type', ps.supervisor_type)) FILTER (WHERE sl.id IS NOT NULL), '[]'::jsonb) AS supervisors "
              "FROM projects p JOIN semesters sem ON sem.id = p.semester_id "
@@ -674,7 +702,7 @@ def list_semester_projects(
     rows = db.execute(
         text(
             "SELECT p.id, p.code, COALESCE(p.title_en, p.title_vi, p.title) AS title, "
-            "p.title_vi, p.title_en, p.status::text AS status, g.id AS group_id, g.code AS group_code, "
+            "p.title_vi, p.title_en, p.topic_type, p.status::text AS status, g.id AS group_id, g.code AS group_code, "
             "(SELECT jsonb_build_object('id', l.id, 'code', l.lecturer_code, 'fullName', a.display_name) "
             " FROM project_supervisors ps JOIN lecturers l ON l.id = ps.lecturer_id "
             " JOIN accounts a ON a.id = l.account_id "
@@ -708,6 +736,7 @@ def list_semester_projects(
             "name": row["title"],
             "nameVi": row["title_vi"] or row["title"],
             "nameEn": row["title_en"],
+            "topicType": row["topic_type"],
             "status": project_from_legacy(row["status"], has_group=row["group_id"] is not None).value,
             "mainSupervisor": (
                 {**dict(row["main_supervisor"]), "id": external_id(row["main_supervisor"]["id"], "lec")}
@@ -744,6 +773,7 @@ def list_lecturers(
     rows = db.execute(
         text(
             "SELECT l.id, l.lecturer_code, l.account_id, a.email, a.display_name, "
+            "l.seniority_level::text AS seniority_level, "
             "a.status AS account_status, "
             "COALESCE("
             "jsonb_agg("
@@ -757,7 +787,7 @@ def list_lecturers(
             "LEFT JOIN conflict_declarations cd ON cd.lecturer_id = l.id "
             "WHERE (CAST(:search AS text) IS NULL OR l.lecturer_code ILIKE '%' || CAST(:search AS text) || '%' "
             "OR a.display_name ILIKE '%' || CAST(:search AS text) || '%' OR a.email ILIKE '%' || CAST(:search AS text) || '%') "
-            "GROUP BY l.id, l.lecturer_code, l.account_id, a.email, a.display_name, a.status "
+            "GROUP BY l.id, l.lecturer_code, l.account_id, a.email, a.display_name, l.seniority_level, a.status "
             "ORDER BY l.lecturer_code "
             "LIMIT :limit OFFSET :offset"
         ),
@@ -787,10 +817,15 @@ def create_lecturer(payload: LecturerCreate, db: Db, user: User) -> dict[str, ob
             )
             row = db.execute(
                 text(
-                    "INSERT INTO lecturers (account_id, lecturer_code) VALUES (:account_id, :code) "
-                    "RETURNING id, lecturer_code, account_id"
+                    "INSERT INTO lecturers (account_id, lecturer_code, seniority_level) "
+                    "VALUES (:account_id, :code, CAST(:seniority_level AS lecturer_seniority_level)) "
+                    "RETURNING id, lecturer_code, account_id, seniority_level"
                 ),
-                {"account_id": account_id, "code": code},
+                {
+                    "account_id": account_id,
+                    "code": code,
+                    "seniority_level": payload.seniority_level.value if payload.seniority_level else None,
+                },
             ).mappings().one()
             db.execute(
                 text(
@@ -804,6 +839,63 @@ def create_lecturer(payload: LecturerCreate, db: Db, user: User) -> dict[str, ob
             status_code=409,
             detail={"code": "DATA_DUPLICATE", "message": "Lecturer email or code already exists."},
         ) from exc
+    return dict(row)
+
+
+@router.patch("/lecturers/{lecturerId}", response_model=LecturerResponse)
+def update_lecturer(
+    lecturer_id: Annotated[int, Path(alias="lecturerId")],
+    payload: LecturerUpdate,
+    db: Db,
+    user: User,
+) -> dict[str, object]:
+    _require(user, "ADMIN", "MANAGER")
+    values = payload.model_dump(exclude_unset=True)
+    with db.begin():
+        if "seniority_level" not in values:
+            row = db.execute(
+                text(
+                    "SELECT l.id, l.lecturer_code, l.account_id, a.email, a.display_name, "
+                    "l.seniority_level::text AS seniority_level, a.status AS account_status, "
+                    "'[]'::jsonb AS conflicts FROM lecturers l JOIN accounts a ON a.id = l.account_id "
+                    "WHERE l.id = :id"
+                ),
+                {"id": lecturer_id},
+            ).mappings().one_or_none()
+            if row is None:
+                raise HTTPException(status_code=404, detail={"code": "LECTURER_NOT_FOUND", "message": "Lecturer does not exist."})
+            return dict(row)
+
+        seniority = values["seniority_level"]
+        updated = db.execute(
+            text(
+                "UPDATE lecturers SET seniority_level = CAST(:seniority_level AS lecturer_seniority_level) "
+                "WHERE id = :id RETURNING id"
+            ),
+            {"id": lecturer_id, "seniority_level": seniority.value if seniority else None},
+        ).scalar_one_or_none()
+        if updated is None:
+            raise HTTPException(status_code=404, detail={"code": "LECTURER_NOT_FOUND", "message": "Lecturer does not exist."})
+        db.execute(
+            text(
+                "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
+                "VALUES (:actor_id, 'MASTER_DATA_UPDATED', 'lecturer', :entity_id, CAST(:after_json AS JSONB))"
+            ),
+            {
+                "actor_id": _actor_id(db, user),
+                "entity_id": str(lecturer_id),
+                "after_json": _json({"seniority_level": seniority.value if seniority else None}),
+            },
+        )
+        row = db.execute(
+            text(
+                "SELECT l.id, l.lecturer_code, l.account_id, a.email, a.display_name, "
+                "l.seniority_level::text AS seniority_level, a.status AS account_status, "
+                "'[]'::jsonb AS conflicts FROM lecturers l JOIN accounts a ON a.id = l.account_id "
+                "WHERE l.id = :id"
+            ),
+            {"id": lecturer_id},
+        ).mappings().one()
     return dict(row)
 
 
@@ -918,8 +1010,8 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
                 lecturer_ids[lecturer_code] = lecturer_id
             project_id = db.execute(
                 text(
-                    "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) "
-                    "VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en) RETURNING id"
+                    "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en, topic_type) "
+                    "VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en, CAST(:topic_type AS topic_type)) RETURNING id"
                 ),
                 {
                     "semester_id": payload.semester_id,
@@ -928,6 +1020,7 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
                     "title": (payload.title_en or payload.title_vi or payload.title).strip(),
                     "title_vi": (payload.title_vi or payload.title).strip(),
                     "title_en": payload.title_en.strip() if payload.title_en else None,
+                    "topic_type": payload.topic_type.value,
                 },
             ).scalar_one()
             for assignment in payload.supervisors:
@@ -948,7 +1041,7 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
                     "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
                     "VALUES (:actor_id, 'MASTER_DATA_CREATED', 'project', :entity_id, CAST(:after_json AS JSONB))"
                 ),
-                {"actor_id": _actor_id(db, user), "entity_id": str(project_id), "after_json": _json({"code": normalize_code(payload.code), "supervisors": payload.supervisors})},
+                {"actor_id": _actor_id(db, user), "entity_id": str(project_id), "after_json": _json({"code": normalize_code(payload.code), "topic_type": payload.topic_type.value, "supervisors": payload.supervisors})},
             )
     except DomainError as exc:
         raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
@@ -967,6 +1060,7 @@ def create_project(payload: ProjectCreate, db: Db, user: User) -> dict[str, obje
         "title": title_en or title_vi,
         "title_vi": title_vi,
         "title_en": title_en,
+        "topic_type": payload.topic_type.value,
     }
 
 

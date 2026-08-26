@@ -44,6 +44,16 @@
             "title": "Role",
             "type": "string"
           },
+          "seniorityLevel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LecturerSeniorityLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "studentCode": {
             "anyOf": [
               {
@@ -156,6 +166,16 @@
             ],
             "title": "Role",
             "type": "string"
+          },
+          "seniorityLevel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LecturerSeniorityLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "studentCode": {
             "anyOf": [
@@ -3350,6 +3370,17 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "topicType": {
+            "default": "REGULAR",
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -4155,6 +4186,16 @@
             "minLength": 12,
             "title": "Password",
             "type": "string"
+          },
+          "seniorityLevel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LecturerSeniorityLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -4354,6 +4395,23 @@
           "lecturerCode": {
             "title": "Lecturercode",
             "type": "string"
+          },
+          "seniorityLevel": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Senior",
+                  "MidLevel",
+                  "Junior",
+                  "Rookie"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Senioritylevel"
           }
         },
         "required": [
@@ -4361,6 +4419,32 @@
           "lecturerCode"
         ],
         "title": "LecturerResponse",
+        "type": "object"
+      },
+      "LecturerSeniorityLevel": {
+        "enum": [
+          "Senior",
+          "MidLevel",
+          "Junior",
+          "Rookie"
+        ],
+        "title": "LecturerSeniorityLevel",
+        "type": "string"
+      },
+      "LecturerUpdate": {
+        "properties": {
+          "seniorityLevel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LecturerSeniorityLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "LecturerUpdate",
         "type": "object"
       },
       "LoginPayload": {
@@ -5327,6 +5411,10 @@
               }
             ],
             "title": "Titlevi"
+          },
+          "topicType": {
+            "$ref": "#/components/schemas/TopicType",
+            "default": "REGULAR"
           }
         },
         "required": [
@@ -5457,6 +5545,17 @@
               }
             ],
             "title": "Titlevi"
+          },
+          "topicType": {
+            "default": "REGULAR",
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -5555,6 +5654,17 @@
               }
             ],
             "title": "Titlevi"
+          },
+          "topicType": {
+            "default": "REGULAR",
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -5674,6 +5784,17 @@
               }
             ],
             "title": "Titlevi"
+          },
+          "topicType": {
+            "default": "REGULAR",
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -5778,6 +5899,16 @@
               }
             ],
             "title": "Title"
+          },
+          "topicType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TopicType"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "title": "ProjectUpdate",
@@ -10297,6 +10428,16 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "topicType": {
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -10305,6 +10446,7 @@
           "name",
           "nameVi",
           "nameEn",
+          "topicType",
           "status"
         ],
         "title": "TargetGroupProjectSummaryResponse",
@@ -11050,6 +11192,23 @@
           "lecturerCode": {
             "title": "Lecturercode",
             "type": "string"
+          },
+          "seniorityLevel": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Senior",
+                  "MidLevel",
+                  "Junior",
+                  "Rookie"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Senioritylevel"
           }
         },
         "required": [
@@ -11058,6 +11217,7 @@
           "accountId",
           "email",
           "displayName",
+          "seniorityLevel",
           "accountStatus",
           "conflicts"
         ],
@@ -11397,6 +11557,10 @@
             "minLength": 1,
             "title": "Namevi",
             "type": "string"
+          },
+          "topicType": {
+            "$ref": "#/components/schemas/TopicType",
+            "default": "REGULAR"
           }
         },
         "required": [
@@ -11436,6 +11600,16 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "topicType": {
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -11443,6 +11617,7 @@
           "code",
           "nameVi",
           "nameEn",
+          "topicType",
           "status"
         ],
         "title": "TargetProjectCreateResponse",
@@ -11530,6 +11705,16 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "topicType": {
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -11538,6 +11723,7 @@
           "name",
           "nameVi",
           "nameEn",
+          "topicType",
           "status",
           "mainSupervisor",
           "coSupervisor",
@@ -11608,6 +11794,16 @@
               }
             ],
             "title": "Titlevi"
+          },
+          "topicType": {
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -11616,6 +11812,7 @@
           "title",
           "titleVi",
           "titleEn",
+          "topicType",
           "projectStatus",
           "groupId",
           "groupStatus"
@@ -12845,6 +13042,16 @@
               }
             ],
             "title": "Titlevi"
+          },
+          "topicType": {
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
           }
         },
         "required": [
@@ -12853,6 +13060,7 @@
           "title",
           "titleVi",
           "titleEn",
+          "topicType",
           "status",
           "semesterId",
           "semesterCode",
@@ -13765,6 +13973,16 @@
         "title": "TimeslotUpdate",
         "type": "object"
       },
+      "TopicType": {
+        "enum": [
+          "APPLICATION",
+          "RESEARCH",
+          "INTEGRATED",
+          "REGULAR"
+        ],
+        "title": "TopicType",
+        "type": "string"
+      },
       "UnlockPayload": {
         "properties": {
           "reason": {
@@ -14284,7 +14502,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "bc6caa6d3e5df9570ef7def5c82eedda1d447343",
+    "x-be-commit": "3827ce3eea2da5c2efe4a539f4c0e766d98d7c12",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -17455,6 +17673,84 @@
         "summary": "Import Lecturers",
         "tags": [
           "manager-ui-compatibility"
+        ]
+      }
+    },
+    "/api/v1/lecturers/{lecturerId}": {
+      "patch": {
+        "operationId": "update_lecturer_api_v1_lecturers__lecturerId__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lecturerId",
+            "required": true,
+            "schema": {
+              "title": "Lecturerid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LecturerUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LecturerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update Lecturer",
+        "tags": [
+          "management"
         ]
       }
     },
