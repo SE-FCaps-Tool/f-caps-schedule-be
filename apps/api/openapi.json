@@ -2030,6 +2030,18 @@
             },
             "title": "Sessions",
             "type": "array"
+          },
+          "sourceVersionId": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceversionid"
           }
         },
         "title": "BulkUpsertPayload",
@@ -14272,7 +14284,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "77a42635d9d15ed03df9b84efe1ce57cc7ae3f05",
+    "x-be-commit": "bc6caa6d3e5df9570ef7def5c82eedda1d447343",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
