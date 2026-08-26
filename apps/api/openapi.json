@@ -963,6 +963,28 @@
         "title": "ApiDataEnvelope[TargetProjectCreateResponse]",
         "type": "object"
       },
+      "ApiDataEnvelope_TargetProjectDetailResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TargetProjectDetailResponse"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiDataEnvelope[TargetProjectDetailResponse]",
+        "type": "object"
+      },
       "ApiDataEnvelope_TargetProjectProgressionResponse_": {
         "properties": {
           "data": {
@@ -5424,176 +5446,6 @@
           "supervisors"
         ],
         "title": "ProjectCreate",
-        "type": "object"
-      },
-      "ProjectDetailResponse": {
-        "additionalProperties": true,
-        "properties": {
-          "code": {
-            "title": "Code",
-            "type": "string"
-          },
-          "group": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ProjectGroupSummary"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "majorCode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Majorcode"
-          },
-          "majorId": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Majorid"
-          },
-          "semesterCode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Semestercode"
-          },
-          "semesterId": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Semesterid"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status"
-          },
-          "supervisorCount": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Supervisorcount"
-          },
-          "supervisors": {
-            "items": {
-              "$ref": "#/components/schemas/SupervisorResponse"
-            },
-            "title": "Supervisors",
-            "type": "array"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "titleEn": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Titleen"
-          },
-          "titleVi": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Titlevi"
-          },
-          "topicType": {
-            "default": "REGULAR",
-            "enum": [
-              "APPLICATION",
-              "RESEARCH",
-              "INTEGRATED",
-              "REGULAR"
-            ],
-            "title": "Topictype",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "title"
-        ],
-        "title": "ProjectDetailResponse",
-        "type": "object"
-      },
-      "ProjectGroupSummary": {
-        "additionalProperties": true,
-        "properties": {
-          "code": {
-            "title": "Code",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status"
-          }
-        },
-        "required": [
-          "id",
-          "code"
-        ],
-        "title": "ProjectGroupSummary",
         "type": "object"
       },
       "ProjectMutationResponse": {
@@ -11623,6 +11475,131 @@
         "title": "TargetProjectCreateResponse",
         "type": "object"
       },
+      "TargetProjectDetailGroupSummaryResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "leader": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetPersonSummaryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memberCount": {
+            "title": "Membercount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "memberCount",
+          "leader"
+        ],
+        "title": "TargetProjectDetailGroupSummaryResponse",
+        "type": "object"
+      },
+      "TargetProjectDetailResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "coSupervisor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetPersonSummaryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetProjectDetailGroupSummaryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mainSupervisor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetPersonSummaryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "nameEn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nameen"
+          },
+          "nameVi": {
+            "title": "Namevi",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "topicType": {
+            "enum": [
+              "APPLICATION",
+              "RESEARCH",
+              "INTEGRATED",
+              "REGULAR"
+            ],
+            "title": "Topictype",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "nameVi",
+          "nameEn",
+          "topicType",
+          "status",
+          "mainSupervisor",
+          "coSupervisor",
+          "group"
+        ],
+        "title": "TargetProjectDetailResponse",
+        "type": "object"
+      },
       "TargetProjectGroupSummaryResponse": {
         "additionalProperties": true,
         "properties": {
@@ -14502,7 +14479,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "5e4460babf625aec6febb5e3d9cf78f1b12eabab",
+    "x-be-commit": "7a4edf8eb2caf927c0abdfc30717c31a85411f63",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -18589,7 +18566,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectDetailResponse"
+                  "$ref": "#/components/schemas/ApiDataEnvelope_TargetProjectDetailResponse_"
                 }
               }
             },
@@ -18618,7 +18595,8 @@
         },
         "summary": "Get Project Detail",
         "tags": [
-          "manager-ui-compatibility"
+          "manager-ui-compatibility",
+          "target-groups-projects"
         ]
       },
       "patch": {

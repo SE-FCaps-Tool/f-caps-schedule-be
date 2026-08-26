@@ -909,6 +909,24 @@ class TargetProjectListItemResponse(TargetResponseModel):
     group: TargetProjectGroupSummaryResponse | None
 
 
+class TargetProjectDetailGroupSummaryResponse(TargetProjectGroupSummaryResponse):
+    member_count: int
+    leader: TargetPersonSummaryResponse | None
+
+
+class TargetProjectDetailResponse(TargetResponseModel):
+    id: str
+    code: str
+    name: str
+    name_vi: str
+    name_en: str | None
+    topic_type: Literal["APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"]
+    status: str
+    main_supervisor: TargetPersonSummaryResponse | None
+    co_supervisor: TargetPersonSummaryResponse | None
+    group: TargetProjectDetailGroupSummaryResponse | None
+
+
 class TargetWarningResponse(TargetResponseModel):
     code: str
     message: str

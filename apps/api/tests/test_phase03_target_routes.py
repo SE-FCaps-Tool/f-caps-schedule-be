@@ -33,3 +33,12 @@ def test_project_get_routes_accept_public_project_identifier_in_openapi():
     ):
         parameter = next(item for item in paths[path][method]["parameters"] if item["name"] == "projectId")
         assert {item["type"] for item in parameter["schema"]["anyOf"]} == {"string", "integer"}
+
+
+def test_project_detail_uses_target_envelope_and_detail_shape_in_openapi():
+    operation = create_app().openapi()["paths"]["/api/v1/projects/{projectId}"]["get"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    assert response_schema["$ref"].endswith("ApiDataEnvelope_TargetProjectDetailResponse_")
+
+    detail_schema = create_app().openapi()["components"]["schemas"]["TargetProjectDetailResponse"]
+    assert {"nameVi", "nameEn", "mainSupervisor", "coSupervisor", "group"}.issubset(detail_schema["properties"])
