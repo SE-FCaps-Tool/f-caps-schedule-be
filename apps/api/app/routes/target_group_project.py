@@ -120,6 +120,18 @@ def _parse_group_id(value: str | int) -> int:
         ) from exc
 
 
+def _parse_project_id(value: str | int) -> int:
+    """Accept the public ``prj_<id>`` form and legacy numeric path IDs."""
+
+    try:
+        return parse_external_id(value, prefix="prj")
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "VALIDATION_ERROR", "message": "project_id must be a valid project identifier."},
+        ) from exc
+
+
 @router.get(
     "/semesters/{semesterId}/groups",
     response_model=ApiDataEnvelope[list[TargetGroupListItemResponse]],
@@ -468,7 +480,8 @@ def create_semester_project(semester_id: Annotated[int, Path(alias="semesterId")
     response_model=ApiDataEnvelope[TargetProjectProgressionResponse],
     response_model_exclude_unset=True,
 )
-def project_progression(project_id: Annotated[int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
+def project_progression(project_id: Annotated[str | int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
+    project_id = _parse_project_id(project_id)
     if user.role not in {"ADMIN", "MANAGER", "LECTURER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Project access is not available."})
     row = db.execute(
@@ -495,7 +508,8 @@ def project_progression(project_id: Annotated[int, Path(alias="projectId")], db:
     response_model=ApiDataEnvelope[list[TargetProjectResultResponse]],
     response_model_exclude_unset=True,
 )
-def project_results(project_id: Annotated[int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
+def project_results(project_id: Annotated[str | int, Path(alias="projectId")], db: Db, user: User) -> dict[str, Any]:
+    project_id = _parse_project_id(project_id)
     if user.role not in {"ADMIN", "MANAGER", "LECTURER", "STUDENT"}:
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Project access is not available."})
     rows = db.execute(
