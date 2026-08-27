@@ -1365,6 +1365,32 @@
         "title": "ApiDataEnvelope[list[TargetLecturerResponse]]",
         "type": "object"
       },
+      "ApiDataEnvelope_list_TargetLecturerSemesterResponse__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TargetLecturerSemesterResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiDataEnvelope[list[TargetLecturerSemesterResponse]]",
+        "type": "object"
+      },
       "ApiDataEnvelope_list_TargetPortalInvitationResponse__": {
         "properties": {
           "data": {
@@ -10828,6 +10854,14 @@
             "title": "Roundtype",
             "type": "string"
           },
+          "semesterCode": {
+            "title": "Semestercode",
+            "type": "string"
+          },
+          "semesterId": {
+            "title": "Semesterid",
+            "type": "integer"
+          },
           "startAt": {
             "format": "date-time",
             "title": "Startat",
@@ -10849,6 +10883,8 @@
           "projectCode",
           "roomCode",
           "roundType",
+          "semesterId",
+          "semesterCode",
           "roomId"
         ],
         "title": "TargetLeaderPortalSessionResponse",
@@ -10986,6 +11022,14 @@
             "title": "Roundtype",
             "type": "string"
           },
+          "semesterCode": {
+            "title": "Semestercode",
+            "type": "string"
+          },
+          "semesterId": {
+            "title": "Semesterid",
+            "type": "integer"
+          },
           "startAt": {
             "format": "date-time",
             "title": "Startat",
@@ -11006,7 +11050,9 @@
           "groupCode",
           "projectCode",
           "roomCode",
-          "roundType"
+          "roundType",
+          "semesterId",
+          "semesterCode"
         ],
         "title": "TargetLecturerPortalSessionResponse",
         "type": "object"
@@ -11074,6 +11120,53 @@
           "conflicts"
         ],
         "title": "TargetLecturerResponse",
+        "type": "object"
+      },
+      "TargetLecturerSemesterResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "endDate": {
+            "format": "date",
+            "title": "Enddate",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "startDate": {
+            "format": "date",
+            "title": "Startdate",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PLANNING",
+              "ACTIVE",
+              "CLOSED",
+              "ARCHIVED"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status",
+          "startDate",
+          "endDate"
+        ],
+        "title": "TargetLecturerSemesterResponse",
         "type": "object"
       },
       "TargetPersonSummaryResponse": {
@@ -11166,6 +11259,9 @@
             ],
             "title": "Registrationdeadline"
           },
+          "semester": {
+            "$ref": "#/components/schemas/TargetLecturerSemesterResponse"
+          },
           "type": {
             "title": "Type",
             "type": "string"
@@ -11175,7 +11271,8 @@
           "id",
           "name",
           "type",
-          "registrationDeadline"
+          "registrationDeadline",
+          "semester"
         ],
         "title": "TargetPortalInvitationRoundResponse",
         "type": "object"
@@ -11330,6 +11427,14 @@
             "title": "Roundtype",
             "type": "string"
           },
+          "semesterCode": {
+            "title": "Semestercode",
+            "type": "string"
+          },
+          "semesterId": {
+            "title": "Semesterid",
+            "type": "integer"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -11354,7 +11459,9 @@
           "dueAt",
           "verifierLecturerId",
           "note",
-          "roundType"
+          "roundType",
+          "semesterId",
+          "semesterCode"
         ],
         "title": "TargetPortalRemediationResponse",
         "type": "object"
@@ -14475,7 +14582,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "4d910a63e8bd1ca654aa6477bc90067f2803ddc0",
+    "x-be-commit": "64166ba91d880428e0fb689bfc8cc55b5697555c",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -17184,6 +17291,23 @@
         "operationId": "lecturer_invitations_api_v1_lecturer_me_invitations_get",
         "parameters": [
           {
+            "in": "query",
+            "name": "semesterId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semesterid"
+            }
+          },
+          {
             "in": "header",
             "name": "X-Test-Session",
             "required": false,
@@ -17243,6 +17367,23 @@
         "operationId": "lecturer_remediations_api_v1_lecturer_me_remediations_get",
         "parameters": [
           {
+            "in": "query",
+            "name": "semesterId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semesterid"
+            }
+          },
+          {
             "in": "header",
             "name": "X-Test-Session",
             "required": false,
@@ -17297,10 +17438,86 @@
         ]
       }
     },
+    "/api/v1/lecturer/me/semesters": {
+      "get": {
+        "operationId": "lecturer_semesters_api_v1_lecturer_me_semesters_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiDataEnvelope_list_TargetLecturerSemesterResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Lecturer Semesters",
+        "tags": [
+          "target-portals"
+        ]
+      }
+    },
     "/api/v1/lecturer/me/sessions": {
       "get": {
         "operationId": "lecturer_sessions_api_v1_lecturer_me_sessions_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "semesterId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semesterid"
+            }
+          },
           {
             "in": "header",
             "name": "X-Test-Session",
@@ -17360,6 +17577,23 @@
       "get": {
         "operationId": "lecturer_supervised_projects_api_v1_lecturer_me_supervised_projects_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "semesterId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semesterid"
+            }
+          },
           {
             "in": "header",
             "name": "X-Test-Session",

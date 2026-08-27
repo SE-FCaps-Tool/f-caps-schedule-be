@@ -37,8 +37,15 @@ uv run --directory apps/api python ../../tools/check_openapi_spec.py
 ```
 
 The BE contract workflow runs this drift check as a blocking gate. The FE workflow
-also fails when its committed generated artifact differs from BE `main`; regenerate
-with `npm run typegen` before merging either repository.
+checks out the contract from BE `main`, regenerates both committed FE artifacts, and
+fails if the generated result is not committed. Run this locally before merging:
+
+```powershell
+npm run typegen:check -- .contract-be/apps/api/openapi.json
+```
+
+The explicit backend path is important in CI because the backend is checked out into
+`.contract-be`; local development may use the default sibling backend path instead.
 
 ## Exceptions and invariants
 
