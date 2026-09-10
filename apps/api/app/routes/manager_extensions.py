@@ -1120,9 +1120,6 @@ def list_results(
     ).mappings().all()
     return [dict(row) for row in rows]
 
-
-import unicodedata
-
 def _strip_accents(text: str) -> str:
     text = unicodedata.normalize('NFKD', text)
     return "".join(c for c in text if not unicodedata.combining(c))
