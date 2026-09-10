@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+import re
+import secrets
+import unicodedata
 from datetime import UTC, date, datetime, timedelta
+from io import BytesIO
 from typing import Annotated, Any, Literal, Self
 from zoneinfo import ZoneInfo
 
 from argon2 import PasswordHasher
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
+from openpyxl import load_workbook
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -40,6 +47,7 @@ from app.domain.seed import seed_fixture_v1
 from app.domain.status_compat import project_from_legacy
 from app.domain.transitions import transition_round
 from app.response_models import (
+    AccountImportResponse,
     AccountResponse,
     AccountRoleResponse,
     ActionResponse,
@@ -521,6 +529,195 @@ def update_account_status(account_id: Annotated[int, Path(alias="accountId")], p
         db.execute(text("UPDATE accounts SET status = CAST(:status AS account_status) WHERE id = :id"), {"status": payload.status, "id": account_id})
         db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, before_json, after_json) VALUES (:actor_id, 'ACCOUNT_STATUS_CHANGED', 'account', :entity_id, :reason, CAST(:before_json AS JSONB), CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(account_id), "reason": require_change_reason, "before_json": _json({"status": row["status"]}), "after_json": _json({"status": payload.status})})
     return {"id": account_id, "status": payload.status}
+
+_ACCOUNT_IMPORT_MAX_FILE_BYTES = 5 * 1024 * 1024
+_ACCOUNT_IMPORT_MAX_ROWS = 2000
+
+def _strip_accents(text: str) -> str:
+    text = unicodedata.normalize('NFKD', text)
+    return "".join(c for c in text if not unicodedata.combining(c))
+
+def _normalise_header(value: Any) -> str:
+    s = _strip_accents(str(value or "").strip().lower())
+    s = s.replace("\u0111", "d")
+    return re.sub(r"[^a-z0-9]", "", s)
+
+def _accounts_import_rows(upload: UploadFile) -> list[tuple[int, dict[str, Any]]]:
+    raw = upload.file.read(_ACCOUNT_IMPORT_MAX_FILE_BYTES + 1)
+    if len(raw) > _ACCOUNT_IMPORT_MAX_FILE_BYTES:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_FILE_TOO_LARGE", "message": "File exceeds the 5MB import limit."})
+    try:
+        workbook = load_workbook(BytesIO(raw), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_INVALID_FILE", "message": "Only a readable .xlsx file is supported."}) from exc
+    sheet = workbook.worksheets[0]
+    header_row: int | None = None
+    header_map: dict[str, int] = {}
+    result: list[tuple[int, dict[str, Any]]] = []
+    
+    for row_number, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        if header_row is None:
+            if not row:
+                continue
+            norm_cells = [_normalise_header(c) for c in row]
+            if any("email" in c for c in norm_cells):
+                header_row = row_number
+                for idx, c in enumerate(norm_cells):
+                    if "email" in c:
+                        header_map["email"] = idx
+                    elif any(k in c for k in ("fullname", "hoten", "name", "ten", "displayname", "hovaten")):
+                        header_map["display_name"] = idx
+                    elif any(k in c for k in ("role", "vaitro")):
+                        header_map["role"] = idx
+                    elif any(k in c for k in ("code", "maso", "magv", "masv", "magiangvien", "masinhvien")):
+                        header_map["code"] = idx
+                    elif any(k in c for k in ("seniority", "kinhnghiem", "mucdo")):
+                        header_map["seniority_level"] = idx
+                    elif any(k in c for k in ("password", "matkhau")):
+                        header_map["password"] = idx
+            continue
+        if not row or not any(cell is not None for cell in row):
+            continue
+        if len(result) >= _ACCOUNT_IMPORT_MAX_ROWS:
+            raise HTTPException(status_code=422, detail={"code": "IMPORT_TOO_MANY_ROWS", "message": f"Import is limited to {_ACCOUNT_IMPORT_MAX_ROWS} data rows."})
+        
+        email_val = row[header_map["email"]] if "email" in header_map and len(row) > header_map["email"] else None
+        name_val = row[header_map["display_name"]] if "display_name" in header_map and len(row) > header_map["display_name"] else None
+        role_val = row[header_map["role"]] if "role" in header_map and len(row) > header_map["role"] else None
+        code_val = row[header_map["code"]] if "code" in header_map and len(row) > header_map["code"] else None
+        seniority_val = row[header_map["seniority_level"]] if "seniority_level" in header_map and len(row) > header_map["seniority_level"] else None
+        pwd_val = row[header_map["password"]] if "password" in header_map and len(row) > header_map["password"] else None
+        
+        result.append((row_number, {
+            "email": email_val,
+            "display_name": name_val,
+            "role": role_val,
+            "code": code_val,
+            "seniority_level": seniority_val,
+            "password": pwd_val,
+        }))
+        
+    if header_row is None:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_INVALID_FILE", "message": "Expected header row containing at least Email and Họ tên."})
+    return result
+
+
+ROLE_MAP = {
+    "admin": "ADMIN",
+    "quantrivien": "ADMIN",
+    "quantri": "ADMIN",
+    "manager": "MANAGER",
+    "quanly": "MANAGER",
+    "bomon": "MANAGER",
+    "chubomon": "MANAGER",
+    "lecturer": "LECTURER",
+    "giangvien": "LECTURER",
+    "gv": "LECTURER",
+    "student": "STUDENT",
+    "sinhvien": "STUDENT",
+    "sv": "STUDENT",
+}
+
+SENIORITY_MAP = {
+    "senior": "Senior",
+    "midlevel": "MidLevel",
+    "mid": "MidLevel",
+    "junior": "Junior",
+    "rookie": "Rookie",
+}
+
+
+@router.post("/accounts/import", status_code=status.HTTP_201_CREATED, response_model=AccountImportResponse)
+async def import_accounts(
+    file: Annotated[UploadFile, File(...)],
+    db: Db,
+    user: User,
+) -> dict[str, Any]:
+    _require(user, "ADMIN")
+    rows = _accounts_import_rows(file)
+    created = 0
+    errors: list[dict[str, Any]] = []
+    accounts: list[dict[str, Any]] = []
+    with db.begin():
+        for row_number, row in rows:
+            email = str(row.get("email") or "").strip().lower()
+            display_name = str(row.get("display_name") or "").strip()
+            raw_role = _normalise_header(row.get("role") or "")
+            role = ROLE_MAP.get(raw_role) or "LECTURER" if not raw_role else ROLE_MAP.get(raw_role)
+            raw_code = str(row.get("code") or "").strip()
+            code = raw_code if raw_code else None
+            raw_seniority = _normalise_header(row.get("seniority_level") or "")
+            seniority_level = SENIORITY_MAP.get(raw_seniority)
+            raw_pwd = str(row.get("password") or "").strip()
+            password = raw_pwd if len(raw_pwd) >= 8 else secrets.token_urlsafe(9)
+            
+            if not email or not display_name:
+                errors.append({"row": row_number, "code": "REQUIRED_FIELD_MISSING", "message": "Email và Họ tên là bắt buộc."})
+                continue
+            if len(email) > 320 or "@" not in email:
+                errors.append({"row": row_number, "code": "EMAIL_INVALID", "message": "Email không hợp lệ."})
+                continue
+            if not role or role not in {r.value for r in SystemRole}:
+                errors.append({"row": row_number, "code": "ROLE_INVALID", "message": "Vai trò không hợp lệ (hỗ trợ: ADMIN, MANAGER, LECTURER, STUDENT)."})
+                continue
+            if role == "LECTURER" and not code:
+                errors.append({"row": row_number, "code": "LECTURER_CODE_REQUIRED", "message": "Mã giảng viên là bắt buộc đối với vai trò LECTURER."})
+                continue
+            if role == "STUDENT" and not code:
+                errors.append({"row": row_number, "code": "STUDENT_CODE_REQUIRED", "message": "Mã sinh viên là bắt buộc đối với vai trò STUDENT."})
+                continue
+
+            try:
+                with db.begin_nested():
+                    account_id = db.execute(
+                        text("INSERT INTO accounts (email, display_name, password_hash) VALUES (:email, :display_name, :password_hash) RETURNING id"),
+                        {"email": email, "display_name": display_name, "password_hash": password_hasher.hash(password)},
+                    ).scalar_one()
+                    db.execute(
+                        text("INSERT INTO account_roles (account_id, role) VALUES (:account_id, CAST(:role AS system_role))"),
+                        {"account_id": account_id, "role": role},
+                    )
+                    if role == "LECTURER":
+                        db.execute(
+                            text(
+                                "INSERT INTO lecturers (account_id, lecturer_code, seniority_level) "
+                                "VALUES (:account_id, :code, CAST(:seniority_level AS lecturer_seniority_level))"
+                            ),
+                            {
+                                "account_id": account_id,
+                                "code": normalize_code(code),
+                                "seniority_level": seniority_level,
+                            },
+                        )
+                    elif role == "STUDENT":
+                        db.execute(
+                            text("INSERT INTO students (account_id, student_code) VALUES (:account_id, :code)"),
+                            {"account_id": account_id, "code": normalize_code(code)},
+                        )
+            except IntegrityError:
+                errors.append({"row": row_number, "code": "ACCOUNT_DUPLICATE", "message": "Email hoặc mã số đã tồn tại trong hệ thống."})
+                continue
+
+            created += 1
+            accounts.append({
+                "row": row_number,
+                "account_id": account_id,
+                "email": email,
+                "display_name": display_name,
+                "role": role,
+                "code": code,
+                "seniority_level": seniority_level,
+                "temp_password": password,
+            })
+
+        db.execute(
+            text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'ACCOUNTS_IMPORTED', 'account', :entity_id, CAST(:after_json AS JSONB))"),
+            {"actor_id": _actor_id(db, user), "entity_id": "bulk", "after_json": _json({"created": created, "skipped": len(errors)})},
+        )
+
+    return {"created": created, "skipped": len(errors), "errors": errors, "accounts": accounts}
+
+
 
 
 @router.post("/accounts/{accountId}/roles", response_model=AccountRoleResponse, response_model_exclude_none=True)

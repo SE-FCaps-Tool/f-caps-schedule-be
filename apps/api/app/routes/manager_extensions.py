@@ -1121,8 +1121,16 @@ def list_results(
     return [dict(row) for row in rows]
 
 
+import unicodedata
+
+def _strip_accents(text: str) -> str:
+    text = unicodedata.normalize('NFKD', text)
+    return "".join(c for c in text if not unicodedata.combining(c))
+
 def _normalise_header(value: Any) -> str:
-    return re.sub(r"[^a-z0-9]", "", str(value or "").strip().lower())
+    s = _strip_accents(str(value or "").strip().lower())
+    s = s.replace("\u0111", "d")
+    return re.sub(r"[^a-z0-9]", "", s)
 
 
 def _workbook_rows(upload: UploadFile) -> dict[str, list[dict[str, Any]]]:
@@ -1487,8 +1495,9 @@ def export_round_council(round_id: Annotated[int, Path(alias="roundId")], db: Db
     council_ids = [int(row["council_id"]) for row in sessions]
     member_rows = db.execute(
         text(
-            "SELECT council_id, lecturer_id, snapshot_name FROM council_members "
-            "WHERE council_id = ANY(:council_ids) ORDER BY council_id, lecturer_id"
+            "SELECT cm.council_id, cm.lecturer_id, cm.snapshot_name, l.lecturer_code FROM council_members cm "
+            "JOIN lecturers l ON l.id = cm.lecturer_id "
+            "WHERE cm.council_id = ANY(:council_ids) ORDER BY cm.council_id, cm.lecturer_id"
         ),
         {"council_ids": council_ids or [0]},
     ).mappings().all()
@@ -1514,9 +1523,16 @@ def export_round_council(round_id: Annotated[int, Path(alias="roundId")], db: Db
     def _seat_names(council_id: int) -> list[str]:
         members = members_by_council.get(council_id, [])
         lecturer_ids = [int(member["lecturer_id"]) for member in members]
+        codes_by_id = {int(member["lecturer_id"]): member["lecturer_code"] for member in members}
         names_by_id = {int(member["lecturer_id"]): str(member["snapshot_name"]) for member in members}
         seat_order = committee_seat_order.get(frozenset(lecturer_ids), lecturer_ids)
-        names = [_lecturer_export_name(names_by_id.get(lecturer_id, "")) for lecturer_id in seat_order]
+        names = []
+        for lecturer_id in seat_order:
+            code = codes_by_id.get(lecturer_id)
+            if code and not code.startswith("CEXP"):
+                names.append(code)
+            else:
+                names.append(_lecturer_export_name(names_by_id.get(lecturer_id, "")))
         names += [""] * (seat_count - len(names))
         return names[:seat_count]
 
