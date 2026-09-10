@@ -77,6 +77,41 @@
         "title": "AccountCreate",
         "type": "object"
       },
+      "AccountImportResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "accounts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "skipped"
+        ],
+        "title": "AccountImportResponse",
+        "type": "object"
+      },
       "AccountResponse": {
         "additionalProperties": true,
         "properties": {
@@ -1935,6 +1970,20 @@
           "capacity"
         ],
         "title": "AvailableRoomResponse",
+        "type": "object"
+      },
+      "Body_import_accounts_api_v1_accounts_import_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_accounts_api_v1_accounts_import_post",
         "type": "object"
       },
       "Body_import_groups_api_v1_groups_import_post": {
@@ -12414,9 +12463,16 @@
             "type": "boolean"
           },
           "maxGroupsPerTimeslot": {
-            "exclusiveMinimum": 0.0,
-            "title": "Maxgroupspertimeslot",
-            "type": "integer"
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxgroupspertimeslot"
           },
           "name": {
             "maxLength": 255,
@@ -12480,7 +12536,6 @@
           "type",
           "durationMinutes",
           "reviewerCount",
-          "maxGroupsPerTimeslot",
           "registrationDeadline",
           "groupSelectionMode",
           "resultOwnerMode",
@@ -14582,7 +14637,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "64166ba91d880428e0fb689bfc8cc55b5697555c",
+    "x-be-commit": "36902691305d06af991fe395c40aedcb0b836ead",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -14712,6 +14767,75 @@
           }
         },
         "summary": "Create Account",
+        "tags": [
+          "management"
+        ]
+      }
+    },
+    "/api/v1/accounts/import": {
+      "post": {
+        "operationId": "import_accounts_api_v1_accounts_import_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_accounts_api_v1_accounts_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Import Accounts",
         "tags": [
           "management"
         ]
