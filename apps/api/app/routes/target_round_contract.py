@@ -134,7 +134,7 @@ class TargetRoundCreate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     duration_minutes: int = Field(alias="durationMinutes", gt=0, le=480)
     reviewer_count: int = Field(alias="reviewerCount", gt=0)
-    max_groups_per_timeslot: int = Field(alias="maxGroupsPerTimeslot", gt=0)
+    max_groups_per_timeslot: int | None = Field(default=None, alias="maxGroupsPerTimeslot", gt=0)
     registration_deadline: datetime = Field(alias="registrationDeadline")
     group_selection_mode: bool = Field(alias="groupSelectionMode")
     group_preference_deadline: datetime | None = Field(default=None, alias="groupPreferenceDeadline")
