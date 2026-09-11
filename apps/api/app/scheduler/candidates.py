@@ -52,6 +52,7 @@ def generate_candidates(
             for reviewer_ids in _reviewer_tuples(
                 context,
                 available,
+                day=day,
                 rotation_seed=group_id * 1_000_003 + timeslot_id,
             ):
                 candidates.append(
@@ -68,10 +69,89 @@ def generate_candidates(
     return candidates
 
 
+def _council_config_reviewer_tuples(
+    context: RoundInput,
+    available: list[int],
+    *,
+    day: str = "",
+    rotation_seed: int = 0,
+) -> list[tuple[int, ...]] | None:
+    config = context.council_config or {}
+    chairs = config.get("chairs", [])
+    secretaries = config.get("secretaries", [])
+    if not chairs and not secretaries:
+        return None
+
+    reviewer_count = context.expected_reviewer_count
+    avail_set = set(available)
+
+    # 1. Determine eligible chairs
+    chair_ids = [c["lecturer_id"] for c in chairs if "lecturer_id" in c]
+    if chair_ids:
+        valid_chairs = []
+        for c in chairs:
+            cid = c.get("lecturer_id")
+            if cid in avail_set:
+                daily = c.get("daily_quota")
+                if daily and day:
+                    if daily.get(day, 0) > 0:
+                        valid_chairs.append(cid)
+                else:
+                    valid_chairs.append(cid)
+        if not valid_chairs:
+            valid_chairs = [cid for cid in chair_ids if cid in avail_set]
+    else:
+        valid_chairs = list(available)
+
+    if not valid_chairs:
+        return []
+
+    # 2. Determine eligible secretaries
+    sec_ids = [s["lecturer_id"] for s in secretaries if "lecturer_id" in s]
+    valid_secretaries = [sid for sid in sec_ids if sid in avail_set]
+
+    tuples: list[tuple[int, ...]] = []
+    seen: set[tuple[int, ...]] = set()
+
+    for cid in valid_chairs:
+        remaining_for_sec = [r for r in available if r != cid]
+        sec_candidates = [s for s in valid_secretaries if s != cid]
+        if not sec_candidates:
+            sec_candidates = remaining_for_sec
+
+        for sid in sec_candidates:
+            other_avail = [r for r in remaining_for_sec if r != sid]
+            needed = reviewer_count - 2
+            if needed < 0:
+                needed = 0
+            if needed == 0:
+                t = (cid, sid)
+                if t not in seen:
+                    seen.add(t)
+                    tuples.append(t)
+            else:
+                if len(other_avail) < needed:
+                    continue
+                for other_members in combinations(other_avail, needed):
+                    t = (cid, sid, *other_members)
+                    if t not in seen:
+                        seen.add(t)
+                        tuples.append(t)
+                    if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
+                        break
+            if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
+                break
+        if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
+            break
+
+    return tuples
+
+
 def _reviewer_tuples(
     context: RoundInput,
     available: list[int],
     *,
+    day: str = "",
     rotation_seed: int = 0,
 ) -> list[tuple[int, ...]]:
     """Reviewer sets allowed for one (group, timeslot) after the hard filters.
@@ -82,6 +162,12 @@ def _reviewer_tuples(
     """
 
     if not context.has_assigned_committees:
+        council_tuples = _council_config_reviewer_tuples(
+            context, available, day=day, rotation_seed=rotation_seed
+        )
+        if council_tuples is not None:
+            return council_tuples
+
         reviewer_count = context.expected_reviewer_count
         total = comb(len(available), reviewer_count)
         if total <= FREE_POOL_REVIEWER_TUPLE_CAP:

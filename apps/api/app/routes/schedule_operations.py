@@ -281,7 +281,7 @@ def _round_input(
         db.execute(
             text(
                 "SELECT semester_id, type, reviewer_count, result_owner_mode, group_selection_mode, h12_sessions_per_part, h12_sessions_per_day, "
-                "h12_semester_quota, max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights FROM rounds WHERE id = :id"
+                "council_config, h12_semester_quota, max_groups_per_timeslot, max_minutes_per_part, max_minutes_per_day, soft_weights FROM rounds WHERE id = :id"
             ),
             {"id": round_id},
         )
@@ -456,6 +456,7 @@ def _round_input(
         max_minutes_per_part=round_row["max_minutes_per_part"],
         max_minutes_per_day=round_row["max_minutes_per_day"],
         soft_weights=round_row["soft_weights"] or {},
+        council_config=round_row.get("council_config") or {},
         h11_waiver_actors={row["group_id"]: "MANAGER" for row in waiver_rows},
         h11_waiver_reasons={row["group_id"]: row["reason"] for row in waiver_rows},
     )

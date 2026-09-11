@@ -404,9 +404,8 @@ class GroupCreate(RequestModel):
     )
     code: str = Field(min_length=1, max_length=64, description="Mã nhóm, ví dụ G001.")
     members: list[MemberPayload] = Field(
-        min_length=4,
-        max_length=5,
-        description="Danh sách 4–5 sinh viên; phải có đúng một LEADER.",
+        min_length=1,
+        description="Danh sách sinh viên; phải có đúng một LEADER.",
     )
 
     model_config = ConfigDict(
