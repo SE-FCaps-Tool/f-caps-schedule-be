@@ -249,31 +249,32 @@ def _add_resource_overlap_constraints(
     resource: str,
     resource_id: int | None = None,
 ) -> None:
-    buckets: dict[int, list[int]] = defaultdict(list)
+    intervals: dict[tuple[datetime, datetime], list[int]] = defaultdict(list)
     for index, candidate in enumerate(candidates):
         if resource == "reviewer" and resource_id in candidate.reviewer_ids:
-            key = resource_id
-        else:
-            continue
-        buckets[key].append(index)
-    for indexes in buckets.values():
-        active: list[int] = []
-        for index in sorted(indexes, key=lambda item: (candidates[item].start_at, item)):
-            current = candidates[index]
-            active = [
-                other_index
-                for other_index in active
-                if candidates[other_index].end_at > current.start_at
-            ]
-            for other_index in active:
-                if _overlap(
-                    candidates[other_index].start_at,
-                    candidates[other_index].end_at,
-                    current.start_at,
-                    current.end_at,
-                ):
-                    model.add(variables[other_index] + variables[index] <= 1)
-            active.append(index)
+            intervals[(candidate.start_at, candidate.end_at)].append(index)
+
+    if not intervals:
+        return
+
+    for slot_indexes in intervals.values():
+        if len(slot_indexes) > 1:
+            model.add_at_most_one(variables[index] for index in slot_indexes)
+
+    sorted_intervals = sorted(intervals.keys())
+    active_intervals: list[tuple[datetime, datetime]] = []
+    for current in sorted_intervals:
+        active_intervals = [
+            other for other in active_intervals if other[1] > current[0]
+        ]
+        for other in active_intervals:
+            if _overlap(other[0], other[1], current[0], current[1]):
+                # If two distinct intervals overlap, at most one candidate across both can be chosen
+                model.add_at_most_one(
+                    [variables[idx] for idx in intervals[other]]
+                    + [variables[idx] for idx in intervals[current]]
+                )
+        active_intervals.append(current)
 
 
 def _empty_soft_scores() -> dict[str, int]:
