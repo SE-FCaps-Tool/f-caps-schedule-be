@@ -27,6 +27,7 @@ from .database import get_engine
 from .response_models import HealthResponse, PublicMeResponse
 from .routes.auth_routes import router as auth_router
 from .routes.committee_contract import router as committee_contract_router
+from .routes.council_role_config import router as council_role_config_router
 from .routes.manager_extensions import router as manager_extensions_router
 from .routes.manual_scheduling import router as manual_scheduling_router
 from .routes.master_data import router as master_data_router
@@ -43,7 +44,6 @@ from .routes.target_room_publish import router as target_room_publish_router
 from .routes.target_round_contract import router as target_round_contract_router
 from .routes.target_schedule_contract import router as target_schedule_contract_router
 from .routes.target_timeframe_contract import router as target_timeframe_contract_router
-from .routes.council_role_config import router as council_role_config_router
 from .services.route_telemetry import record_route_usage
 
 VALIDATION_ERROR_FIELDS = ("type", "loc", "msg")
