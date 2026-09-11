@@ -122,8 +122,7 @@ def _council_config_reviewer_tuples(
         for sid in sec_candidates:
             other_avail = [r for r in remaining_for_sec if r != sid]
             needed = reviewer_count - 2
-            if needed < 0:
-                needed = 0
+            needed = max(needed, 0)
             if needed == 0:
                 t = (cid, sid)
                 if t not in seen:
