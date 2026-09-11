@@ -63,6 +63,13 @@ def solve_schedule(
         sum(context.soft_weights.get(rule, 0) * score for rule, score in scores.items())
         for scores in candidate_soft_scores
     ]
+    if context.council_config:
+        sec_ids = {s.get("lecturer_id") for s in context.council_config.get("secretaries", []) if "lecturer_id" in s}
+        if sec_ids:
+            for index, candidate in enumerate(candidates):
+                if len(candidate.reviewer_ids) > 1 and candidate.reviewer_ids[1] in sec_ids:
+                    weighted_scores[index] += 100
+
     by_group: dict[int, list[int]] = defaultdict(list)
     for index, candidate in enumerate(candidates):
         by_group[candidate.group_id].append(index)
@@ -108,7 +115,42 @@ def solve_schedule(
                 if indexes:
                     model.add(sum(max(0, int((candidates[index].end_at - candidates[index].start_at).total_seconds() // 60)) * variables[index] for index in indexes) <= context.max_minutes_per_day)
 
+    if context.council_config:
+        for chair in context.council_config.get("chairs", []):
+            cid = chair.get("lecturer_id")
+            if not cid:
+                continue
+            daily_quota = chair.get("daily_quota") or {}
+            for day, d_limit in daily_quota.items():
+                if d_limit is not None and d_limit >= 0:
+                    day_indexes = [
+                        i for i, c in enumerate(candidates)
+                        if c.reviewer_ids and c.reviewer_ids[0] == cid and c.day == day
+                    ]
+                    if day_indexes:
+                        model.add(sum(variables[i] for i in day_indexes) <= d_limit)
+            quota = chair.get("quota")
+            if quota is not None and quota >= 0:
+                chair_indexes = [
+                    i for i, c in enumerate(candidates)
+                    if c.reviewer_ids and c.reviewer_ids[0] == cid
+                ]
+                if chair_indexes:
+                    model.add(sum(variables[i] for i in chair_indexes) <= quota)
+
+        for sec in context.council_config.get("secretaries", []):
+            sid = sec.get("lecturer_id")
+            max_sessions = sec.get("max_sessions")
+            if sid and max_sessions is not None and max_sessions >= 0:
+                sec_indexes = [
+                    i for i, c in enumerate(candidates)
+                    if len(c.reviewer_ids) > 1 and c.reviewer_ids[1] == sid
+                ]
+                if sec_indexes:
+                    model.add(sum(variables[i] for i in sec_indexes) <= max_sessions)
+
     secondary_bound = sum(abs(score) for score in weighted_scores)
+
     balance_weight = (
         max(0, context.soft_weights.get("S1", 1))
         if context.h12_semester_quota is not None and objective_profile == "LEGACY"
@@ -249,31 +291,32 @@ def _add_resource_overlap_constraints(
     resource: str,
     resource_id: int | None = None,
 ) -> None:
-    buckets: dict[int, list[int]] = defaultdict(list)
+    intervals: dict[tuple[datetime, datetime], list[int]] = defaultdict(list)
     for index, candidate in enumerate(candidates):
         if resource == "reviewer" and resource_id in candidate.reviewer_ids:
-            key = resource_id
-        else:
-            continue
-        buckets[key].append(index)
-    for indexes in buckets.values():
-        active: list[int] = []
-        for index in sorted(indexes, key=lambda item: (candidates[item].start_at, item)):
-            current = candidates[index]
-            active = [
-                other_index
-                for other_index in active
-                if candidates[other_index].end_at > current.start_at
-            ]
-            for other_index in active:
-                if _overlap(
-                    candidates[other_index].start_at,
-                    candidates[other_index].end_at,
-                    current.start_at,
-                    current.end_at,
-                ):
-                    model.add(variables[other_index] + variables[index] <= 1)
-            active.append(index)
+            intervals[(candidate.start_at, candidate.end_at)].append(index)
+
+    if not intervals:
+        return
+
+    for slot_indexes in intervals.values():
+        if len(slot_indexes) > 1:
+            model.add_at_most_one(variables[index] for index in slot_indexes)
+
+    sorted_intervals = sorted(intervals.keys())
+    active_intervals: list[tuple[datetime, datetime]] = []
+    for current in sorted_intervals:
+        active_intervals = [
+            other for other in active_intervals if other[1] > current[0]
+        ]
+        for other in active_intervals:
+            if _overlap(other[0], other[1], current[0], current[1]):
+                # If two distinct intervals overlap, at most one candidate across both can be chosen
+                model.add_at_most_one(
+                    [variables[idx] for idx in intervals[other]]
+                    + [variables[idx] for idx in intervals[current]]
+                )
+        active_intervals.append(current)
 
 
 def _empty_soft_scores() -> dict[str, int]:

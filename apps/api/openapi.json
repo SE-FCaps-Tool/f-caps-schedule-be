@@ -2164,6 +2164,42 @@
         "title": "BulkUpsertPayload",
         "type": "object"
       },
+      "ChairConfig": {
+        "properties": {
+          "dailyQuota": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quota theo ngày: {'2026-10-04': 8, ...}",
+            "title": "Daily Quota"
+          },
+          "lecturerId": {
+            "exclusiveMinimum": 0.0,
+            "title": "Lecturer Id",
+            "type": "integer"
+          },
+          "quota": {
+            "description": "Tổng số phiên làm chủ tịch",
+            "minimum": 0.0,
+            "title": "Quota",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lecturerId",
+          "quota"
+        ],
+        "title": "ChairConfig",
+        "type": "object"
+      },
       "ChangeRoomPayload": {
         "properties": {
           "reason": {
@@ -2816,6 +2852,26 @@
         "title": "ControlledChangeResponse",
         "type": "object"
       },
+      "CouncilRoleConfigPayload": {
+        "properties": {
+          "chairs": {
+            "items": {
+              "$ref": "#/components/schemas/ChairConfig"
+            },
+            "title": "Chairs",
+            "type": "array"
+          },
+          "secretaries": {
+            "items": {
+              "$ref": "#/components/schemas/SecretaryConfig"
+            },
+            "title": "Secretaries",
+            "type": "array"
+          }
+        },
+        "title": "CouncilRoleConfigPayload",
+        "type": "object"
+      },
       "DashboardLecturerLoadResponse": {
         "additionalProperties": true,
         "properties": {
@@ -3041,12 +3097,11 @@
             "type": "string"
           },
           "members": {
-            "description": "Danh sách 4–5 sinh viên; phải có đúng một LEADER.",
+            "description": "Danh sách sinh viên; phải có đúng một LEADER.",
             "items": {
               "$ref": "#/components/schemas/MemberPayload"
             },
-            "maxItems": 5,
-            "minItems": 4,
+            "minItems": 1,
             "title": "Members",
             "type": "array"
           },
@@ -8576,6 +8631,27 @@
           "status"
         ],
         "title": "ScheduleRunResponse",
+        "type": "object"
+      },
+      "SecretaryConfig": {
+        "properties": {
+          "lecturerId": {
+            "exclusiveMinimum": 0.0,
+            "title": "Lecturer Id",
+            "type": "integer"
+          },
+          "maxSessions": {
+            "default": 10,
+            "description": "Số phiên tối đa làm thư ký",
+            "minimum": 0.0,
+            "title": "Max Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lecturerId"
+        ],
+        "title": "SecretaryConfig",
         "type": "object"
       },
       "SeedFixtureResponse": {
@@ -14637,7 +14713,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "36902691305d06af991fe395c40aedcb0b836ead",
+    "x-be-commit": "4f6d7b5be6420c60556986b2e94a9d6433bda2d7",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -24025,6 +24101,156 @@
         "summary": "Attach Round Resources",
         "tags": [
           "management"
+        ]
+      }
+    },
+    "/api/v1/rounds/{roundId}/role-config": {
+      "get": {
+        "description": "Return the current council role configuration for a round.",
+        "operationId": "get_role_config_api_v1_rounds__roundId__role_config_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "roundId",
+            "required": true,
+            "schema": {
+              "title": "Roundid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Role Config Api V1 Rounds  Roundid  Role Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get Role Config",
+        "tags": [
+          "council-role-config"
+        ]
+      },
+      "put": {
+        "description": "Save the council role configuration for a round.",
+        "operationId": "put_role_config_api_v1_rounds__roundId__role_config_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "roundId",
+            "required": true,
+            "schema": {
+              "title": "Roundid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouncilRoleConfigPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Put Role Config Api V1 Rounds  Roundid  Role Config Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Put Role Config",
+        "tags": [
+          "council-role-config"
         ]
       }
     },
