@@ -767,6 +767,10 @@ class LecturerImportResponse(ImportResponse):
     accounts: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class AccountImportResponse(ImportResponse):
+    accounts: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class UnscheduledReportResponse(ResponseModel):
     round_id: int
     generated_at: datetime
@@ -1196,6 +1200,7 @@ class TargetPortalInvitationRoundResponse(TargetResponseModel):
     name: str
     type: str
     registration_deadline: datetime | None
+    semester: TargetLecturerSemesterResponse
 
 
 class TargetPortalInvitationResponse(TargetResponseModel):
@@ -1216,6 +1221,17 @@ class TargetLecturerPortalSessionResponse(TargetResponseModel):
     project_code: str
     room_code: str | None
     round_type: str
+    semester_id: int
+    semester_code: str
+
+
+class TargetLecturerSemesterResponse(TargetResponseModel):
+    id: int
+    code: str
+    name: str
+    status: Literal["PLANNING", "ACTIVE", "CLOSED", "ARCHIVED"]
+    start_date: date
+    end_date: date
 
 
 class TargetLeaderPortalSessionResponse(TargetLecturerPortalSessionResponse):
@@ -1267,6 +1283,8 @@ class TargetPortalRemediationResponse(TargetResponseModel):
     verifier_lecturer_id: int | None
     note: str | None
     round_type: str
+    semester_id: int
+    semester_code: str
 
 
 class TargetLeaderDashboardGroupResponse(TargetResponseModel):

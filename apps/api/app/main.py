@@ -43,6 +43,7 @@ from .routes.target_room_publish import router as target_room_publish_router
 from .routes.target_round_contract import router as target_round_contract_router
 from .routes.target_schedule_contract import router as target_schedule_contract_router
 from .routes.target_timeframe_contract import router as target_timeframe_contract_router
+from .routes.council_role_config import router as council_role_config_router
 from .services.route_telemetry import record_route_usage
 
 VALIDATION_ERROR_FIELDS = ("type", "loc", "msg")
@@ -154,6 +155,7 @@ def create_app() -> FastAPI:
     app.include_router(room_assignment_router)
     app.include_router(operations_router)
     app.include_router(auth_router)
+    app.include_router(council_role_config_router)
 
     @app.exception_handler(HTTPException)
     async def _http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:

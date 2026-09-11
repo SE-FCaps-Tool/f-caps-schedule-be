@@ -77,6 +77,41 @@
         "title": "AccountCreate",
         "type": "object"
       },
+      "AccountImportResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "accounts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "skipped"
+        ],
+        "title": "AccountImportResponse",
+        "type": "object"
+      },
       "AccountResponse": {
         "additionalProperties": true,
         "properties": {
@@ -1365,6 +1400,32 @@
         "title": "ApiDataEnvelope[list[TargetLecturerResponse]]",
         "type": "object"
       },
+      "ApiDataEnvelope_list_TargetLecturerSemesterResponse__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TargetLecturerSemesterResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiDataEnvelope[list[TargetLecturerSemesterResponse]]",
+        "type": "object"
+      },
       "ApiDataEnvelope_list_TargetPortalInvitationResponse__": {
         "properties": {
           "data": {
@@ -1911,6 +1972,20 @@
         "title": "AvailableRoomResponse",
         "type": "object"
       },
+      "Body_import_accounts_api_v1_accounts_import_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_accounts_api_v1_accounts_import_post",
+        "type": "object"
+      },
       "Body_import_groups_api_v1_groups_import_post": {
         "properties": {
           "file": {
@@ -2087,6 +2162,42 @@
           }
         },
         "title": "BulkUpsertPayload",
+        "type": "object"
+      },
+      "ChairConfig": {
+        "properties": {
+          "dailyQuota": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quota theo ngày: {'2026-10-04': 8, ...}",
+            "title": "Daily Quota"
+          },
+          "lecturerId": {
+            "exclusiveMinimum": 0.0,
+            "title": "Lecturer Id",
+            "type": "integer"
+          },
+          "quota": {
+            "description": "Tổng số phiên làm chủ tịch",
+            "minimum": 0.0,
+            "title": "Quota",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lecturerId",
+          "quota"
+        ],
+        "title": "ChairConfig",
         "type": "object"
       },
       "ChangeRoomPayload": {
@@ -2741,6 +2852,26 @@
         "title": "ControlledChangeResponse",
         "type": "object"
       },
+      "CouncilRoleConfigPayload": {
+        "properties": {
+          "chairs": {
+            "items": {
+              "$ref": "#/components/schemas/ChairConfig"
+            },
+            "title": "Chairs",
+            "type": "array"
+          },
+          "secretaries": {
+            "items": {
+              "$ref": "#/components/schemas/SecretaryConfig"
+            },
+            "title": "Secretaries",
+            "type": "array"
+          }
+        },
+        "title": "CouncilRoleConfigPayload",
+        "type": "object"
+      },
       "DashboardLecturerLoadResponse": {
         "additionalProperties": true,
         "properties": {
@@ -2966,12 +3097,11 @@
             "type": "string"
           },
           "members": {
-            "description": "Danh sách 4–5 sinh viên; phải có đúng một LEADER.",
+            "description": "Danh sách sinh viên; phải có đúng một LEADER.",
             "items": {
               "$ref": "#/components/schemas/MemberPayload"
             },
-            "maxItems": 5,
-            "minItems": 4,
+            "minItems": 1,
             "title": "Members",
             "type": "array"
           },
@@ -8503,6 +8633,27 @@
         "title": "ScheduleRunResponse",
         "type": "object"
       },
+      "SecretaryConfig": {
+        "properties": {
+          "lecturerId": {
+            "exclusiveMinimum": 0.0,
+            "title": "Lecturer Id",
+            "type": "integer"
+          },
+          "maxSessions": {
+            "default": 10,
+            "description": "Số phiên tối đa làm thư ký",
+            "minimum": 0.0,
+            "title": "Max Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lecturerId"
+        ],
+        "title": "SecretaryConfig",
+        "type": "object"
+      },
       "SeedFixtureResponse": {
         "additionalProperties": true,
         "properties": {
@@ -10828,6 +10979,14 @@
             "title": "Roundtype",
             "type": "string"
           },
+          "semesterCode": {
+            "title": "Semestercode",
+            "type": "string"
+          },
+          "semesterId": {
+            "title": "Semesterid",
+            "type": "integer"
+          },
           "startAt": {
             "format": "date-time",
             "title": "Startat",
@@ -10849,6 +11008,8 @@
           "projectCode",
           "roomCode",
           "roundType",
+          "semesterId",
+          "semesterCode",
           "roomId"
         ],
         "title": "TargetLeaderPortalSessionResponse",
@@ -10986,6 +11147,14 @@
             "title": "Roundtype",
             "type": "string"
           },
+          "semesterCode": {
+            "title": "Semestercode",
+            "type": "string"
+          },
+          "semesterId": {
+            "title": "Semesterid",
+            "type": "integer"
+          },
           "startAt": {
             "format": "date-time",
             "title": "Startat",
@@ -11006,7 +11175,9 @@
           "groupCode",
           "projectCode",
           "roomCode",
-          "roundType"
+          "roundType",
+          "semesterId",
+          "semesterCode"
         ],
         "title": "TargetLecturerPortalSessionResponse",
         "type": "object"
@@ -11074,6 +11245,53 @@
           "conflicts"
         ],
         "title": "TargetLecturerResponse",
+        "type": "object"
+      },
+      "TargetLecturerSemesterResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "endDate": {
+            "format": "date",
+            "title": "Enddate",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "startDate": {
+            "format": "date",
+            "title": "Startdate",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PLANNING",
+              "ACTIVE",
+              "CLOSED",
+              "ARCHIVED"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status",
+          "startDate",
+          "endDate"
+        ],
+        "title": "TargetLecturerSemesterResponse",
         "type": "object"
       },
       "TargetPersonSummaryResponse": {
@@ -11166,6 +11384,9 @@
             ],
             "title": "Registrationdeadline"
           },
+          "semester": {
+            "$ref": "#/components/schemas/TargetLecturerSemesterResponse"
+          },
           "type": {
             "title": "Type",
             "type": "string"
@@ -11175,7 +11396,8 @@
           "id",
           "name",
           "type",
-          "registrationDeadline"
+          "registrationDeadline",
+          "semester"
         ],
         "title": "TargetPortalInvitationRoundResponse",
         "type": "object"
@@ -11330,6 +11552,14 @@
             "title": "Roundtype",
             "type": "string"
           },
+          "semesterCode": {
+            "title": "Semestercode",
+            "type": "string"
+          },
+          "semesterId": {
+            "title": "Semesterid",
+            "type": "integer"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -11354,7 +11584,9 @@
           "dueAt",
           "verifierLecturerId",
           "note",
-          "roundType"
+          "roundType",
+          "semesterId",
+          "semesterCode"
         ],
         "title": "TargetPortalRemediationResponse",
         "type": "object"
@@ -12307,9 +12539,16 @@
             "type": "boolean"
           },
           "maxGroupsPerTimeslot": {
-            "exclusiveMinimum": 0.0,
-            "title": "Maxgroupspertimeslot",
-            "type": "integer"
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxgroupspertimeslot"
           },
           "name": {
             "maxLength": 255,
@@ -12373,7 +12612,6 @@
           "type",
           "durationMinutes",
           "reviewerCount",
-          "maxGroupsPerTimeslot",
           "registrationDeadline",
           "groupSelectionMode",
           "resultOwnerMode",
@@ -14475,7 +14713,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "4d910a63e8bd1ca654aa6477bc90067f2803ddc0",
+    "x-be-commit": "4f6d7b5be6420c60556986b2e94a9d6433bda2d7",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -14605,6 +14843,75 @@
           }
         },
         "summary": "Create Account",
+        "tags": [
+          "management"
+        ]
+      }
+    },
+    "/api/v1/accounts/import": {
+      "post": {
+        "operationId": "import_accounts_api_v1_accounts_import_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_accounts_api_v1_accounts_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Import Accounts",
         "tags": [
           "management"
         ]
@@ -17184,6 +17491,23 @@
         "operationId": "lecturer_invitations_api_v1_lecturer_me_invitations_get",
         "parameters": [
           {
+            "in": "query",
+            "name": "semesterId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semesterid"
+            }
+          },
+          {
             "in": "header",
             "name": "X-Test-Session",
             "required": false,
@@ -17243,6 +17567,23 @@
         "operationId": "lecturer_remediations_api_v1_lecturer_me_remediations_get",
         "parameters": [
           {
+            "in": "query",
+            "name": "semesterId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semesterid"
+            }
+          },
+          {
             "in": "header",
             "name": "X-Test-Session",
             "required": false,
@@ -17297,10 +17638,86 @@
         ]
       }
     },
+    "/api/v1/lecturer/me/semesters": {
+      "get": {
+        "operationId": "lecturer_semesters_api_v1_lecturer_me_semesters_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiDataEnvelope_list_TargetLecturerSemesterResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Lecturer Semesters",
+        "tags": [
+          "target-portals"
+        ]
+      }
+    },
     "/api/v1/lecturer/me/sessions": {
       "get": {
         "operationId": "lecturer_sessions_api_v1_lecturer_me_sessions_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "semesterId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semesterid"
+            }
+          },
           {
             "in": "header",
             "name": "X-Test-Session",
@@ -17360,6 +17777,23 @@
       "get": {
         "operationId": "lecturer_supervised_projects_api_v1_lecturer_me_supervised_projects_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "semesterId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Semesterid"
+            }
+          },
           {
             "in": "header",
             "name": "X-Test-Session",
@@ -23667,6 +24101,156 @@
         "summary": "Attach Round Resources",
         "tags": [
           "management"
+        ]
+      }
+    },
+    "/api/v1/rounds/{roundId}/role-config": {
+      "get": {
+        "description": "Return the current council role configuration for a round.",
+        "operationId": "get_role_config_api_v1_rounds__roundId__role_config_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "roundId",
+            "required": true,
+            "schema": {
+              "title": "Roundid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Role Config Api V1 Rounds  Roundid  Role Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get Role Config",
+        "tags": [
+          "council-role-config"
+        ]
+      },
+      "put": {
+        "description": "Save the council role configuration for a round.",
+        "operationId": "put_role_config_api_v1_rounds__roundId__role_config_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "roundId",
+            "required": true,
+            "schema": {
+              "title": "Roundid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouncilRoleConfigPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Put Role Config Api V1 Rounds  Roundid  Role Config Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Put Role Config",
+        "tags": [
+          "council-role-config"
         ]
       }
     },

@@ -15,11 +15,11 @@ def test_master_data_normalizes_codes_and_rejects_blank_values():
         normalize_code("   ")
 
 
-def test_group_requires_four_to_five_members_and_one_leader():
+def test_group_requires_at_least_one_member_and_one_leader():
     members = [{"student_code": f"S{i}", "role": "LEADER" if i == 1 else "MEMBER"} for i in range(1, 5)]
     assert validate_group_members(members) is True
     with pytest.raises(DomainError, match="GROUP_SIZE_INVALID"):
-        validate_group_members(members[:3])
+        validate_group_members([])
     with pytest.raises(DomainError, match="LEADER_REQUIRED"):
         validate_group_members([{**member, "role": "MEMBER"} for member in members])
     with pytest.raises(DomainError, match="MEMBERSHIP_DUPLICATE"):

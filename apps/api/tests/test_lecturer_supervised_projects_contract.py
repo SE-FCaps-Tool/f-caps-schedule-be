@@ -66,6 +66,6 @@ def test_lecturer_supervised_projects_includes_group_leader_and_members(monkeypa
             {"id": 12, "code": "SV002", "name": "Student Two", "role": "MEMBER", "status": "ACTIVE"},
         ],
     }
-    assert db.params == {"lecturer_id": 7}
+    assert db.params == {"lecturer_id": 7, "semester_id": None}
     assert "group_memberships" in db.statement
     assert "jsonb_agg" in db.statement

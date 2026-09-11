@@ -55,6 +55,7 @@ class RoundInput:
     # Distinguishes "no Committee assigned" from "assigned but none eligible";
     # the latter must not fall back to free-pool reviewer combinations.
     has_assigned_committees: bool = False
+    council_config: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

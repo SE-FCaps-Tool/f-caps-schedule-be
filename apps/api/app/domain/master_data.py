@@ -11,8 +11,8 @@ def normalize_code(value: str) -> str:
 
 
 def validate_group_members(members: Sequence[dict[str, str]]) -> bool:
-    if not 4 <= len(members) <= 5:
-        raise DomainError("GROUP_SIZE_INVALID", "A new group must have 4 to 5 students.")
+    if len(members) == 0:
+        raise DomainError("GROUP_SIZE_INVALID", "A group must have at least one student.")
     codes = [normalize_code(member.get("student_code", "")) for member in members]
     if len(set(codes)) != len(codes):
         raise DomainError("MEMBERSHIP_DUPLICATE", "A student cannot appear twice in one group.")

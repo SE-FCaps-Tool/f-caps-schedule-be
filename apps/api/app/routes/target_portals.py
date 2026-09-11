@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from app.response_models import (
     TargetLeaderDashboardResponse,
     TargetLeaderPortalSessionResponse,
     TargetLecturerPortalSessionResponse,
+    TargetLecturerSemesterResponse,
     TargetPortalInvitationResponse,
     TargetPortalRemediationResponse,
     TargetSupervisedProjectResponse,
@@ -53,23 +54,81 @@ def _student_id(db: Session, user: CurrentUser) -> int:
     return int(student_id)
 
 
+def _lecturer_semester_exists_sql() -> str:
+    """Return the relation predicate used by the Lecturer semester catalog."""
+    return """
+        EXISTS (
+            SELECT 1 FROM round_invitations ri
+            JOIN rounds invitation_round ON invitation_round.id = ri.round_id
+            WHERE ri.lecturer_id = :lecturer_id AND invitation_round.semester_id = s.id
+        )
+        OR EXISTS (
+            SELECT 1 FROM sessions session_row
+            JOIN schedule_versions session_version ON session_version.id = session_row.schedule_version_id
+            JOIN rounds session_round ON session_round.id = session_version.round_id
+            JOIN council_members session_member ON session_member.council_id = session_row.council_id
+            WHERE session_member.lecturer_id = :lecturer_id AND session_round.semester_id = s.id
+        )
+        OR EXISTS (
+            SELECT 1 FROM project_supervisors supervised
+            JOIN projects supervised_project ON supervised_project.id = supervised.project_id
+            WHERE supervised.lecturer_id = :lecturer_id AND supervised_project.semester_id = s.id
+        )
+        OR EXISTS (
+            SELECT 1 FROM remediation_cases remediation
+            JOIN session_results remediation_result ON remediation_result.id = remediation.session_result_id
+            JOIN sessions remediation_session ON remediation_session.id = remediation_result.session_id
+            JOIN schedule_versions remediation_version ON remediation_version.id = remediation_session.schedule_version_id
+            JOIN rounds remediation_round ON remediation_round.id = remediation_version.round_id
+            WHERE remediation.verifier_lecturer_id = :lecturer_id AND remediation_round.semester_id = s.id
+        )
+    """
+
+
+@router.get(
+    "/lecturer/me/semesters",
+    response_model=ApiDataEnvelope[list[TargetLecturerSemesterResponse]],
+    response_model_exclude_unset=True,
+)
+def lecturer_semesters(db: Db, user: User) -> dict[str, Any]:
+    lecturer_id = _lecturer_id(db, user)
+    rows = db.execute(
+        text(
+            "SELECT s.id, s.code, s.name, s.status::text AS status, s.start_date, s.end_date "
+            "FROM semesters s WHERE " + _lecturer_semester_exists_sql() + " "
+            "ORDER BY (s.status::text = 'ACTIVE') DESC, s.start_date DESC, s.id DESC"
+        ),
+        {"lecturer_id": lecturer_id},
+    ).mappings().all()
+    return success_payload([dict(row) for row in rows])
+
+
 @router.get(
     "/lecturer/me/invitations",
     response_model=ApiDataEnvelope[list[TargetPortalInvitationResponse]],
     response_model_exclude_unset=True,
 )
-def lecturer_invitations(db: Db, user: User) -> dict[str, Any]:
+def lecturer_invitations(
+    db: Db,
+    user: User,
+    semester_id: Annotated[int | None, Query(alias="semesterId", gt=0)] = None,
+) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
         text(
             "SELECT ri.round_id, ri.lecturer_id, ri.status::text AS status, ri.responded_at, "
             "r.name AS round_name, r.type::text AS round_type, "
-            "r.registration_deadline, r.group_preference_deadline "
+            "r.registration_deadline, r.group_preference_deadline, "
+            "s.id AS semester_id, s.code AS semester_code, s.name AS semester_name, "
+            "s.status::text AS semester_status, s.start_date AS semester_start_date, "
+            "s.end_date AS semester_end_date "
             "FROM round_invitations ri JOIN rounds r ON r.id = ri.round_id "
+            "JOIN semesters s ON s.id = r.semester_id "
             "WHERE ri.lecturer_id = :lecturer_id "
+            "AND (:semester_id IS NULL OR r.semester_id = :semester_id) "
             "ORDER BY r.id DESC"
         ),
-        {"lecturer_id": lecturer_id},
+        {"lecturer_id": lecturer_id, "semester_id": semester_id},
     ).mappings().all()
     invitations = [
         {
@@ -83,6 +142,14 @@ def lecturer_invitations(db: Db, user: User) -> dict[str, Any]:
                 "registrationDeadline": effective_registration_deadline(
                     row["registration_deadline"], row["group_preference_deadline"]
                 ) if row["registration_deadline"] is not None else None,
+                "semester": {
+                    "id": row["semester_id"],
+                    "code": row["semester_code"],
+                    "name": row["semester_name"],
+                    "status": row["semester_status"],
+                    "startDate": row["semester_start_date"],
+                    "endDate": row["semester_end_date"],
+                },
             },
             "status": _invitation_status(
                 row["status"],
@@ -102,21 +169,27 @@ def lecturer_invitations(db: Db, user: User) -> dict[str, Any]:
     response_model=ApiDataEnvelope[list[TargetLecturerPortalSessionResponse]],
     response_model_exclude_unset=True,
 )
-def lecturer_sessions(db: Db, user: User) -> dict[str, Any]:
+def lecturer_sessions(
+    db: Db,
+    user: User,
+    semester_id: Annotated[int | None, Query(alias="semesterId", gt=0)] = None,
+) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
         text(
             "SELECT DISTINCT s.id, sv.round_id, s.start_at, s.end_at, s.status, "
             "g.id AS group_id, g.code AS group_code, p.code AS project_code, "
-            "rm.code AS room_code, r.type AS round_type "
+            "rm.code AS room_code, r.type AS round_type, r.semester_id, srm.code AS semester_code "
             "FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
-            "JOIN rounds r ON r.id = sv.round_id JOIN groups g ON g.id = s.group_id "
+            "JOIN rounds r ON r.id = sv.round_id JOIN semesters srm ON srm.id = r.semester_id "
+            "JOIN groups g ON g.id = s.group_id "
             "JOIN projects p ON p.id = g.project_id LEFT JOIN rooms rm ON rm.id = s.room_id "
             "JOIN council_members cm ON cm.council_id = s.council_id "
             "WHERE cm.lecturer_id = :lecturer_id AND sv.status IN ('ACTIVE', 'PUBLISHED') "
+            "AND (:semester_id IS NULL OR r.semester_id = :semester_id) "
             "ORDER BY s.start_at, s.id"
         ),
-        {"lecturer_id": lecturer_id},
+        {"lecturer_id": lecturer_id, "semester_id": semester_id},
     ).mappings().all()
     return success_payload([dict(row) for row in rows], meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
@@ -126,7 +199,11 @@ def lecturer_sessions(db: Db, user: User) -> dict[str, Any]:
     response_model=ApiDataEnvelope[list[TargetSupervisedProjectResponse]],
     response_model_exclude_unset=True,
 )
-def lecturer_supervised_projects(db: Db, user: User) -> dict[str, Any]:
+def lecturer_supervised_projects(
+    db: Db,
+    user: User,
+    semester_id: Annotated[int | None, Query(alias="semesterId", gt=0)] = None,
+) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
         text(
@@ -160,9 +237,10 @@ def lecturer_supervised_projects(db: Db, user: User) -> dict[str, Any]:
             "  WHERE g.project_id = p.id ORDER BY g.id LIMIT 1 "
             ") grp ON TRUE "
             "WHERE ps.lecturer_id = :lecturer_id "
+            "AND (:semester_id IS NULL OR p.semester_id = :semester_id) "
             "ORDER BY s.id DESC, p.code"
         ),
-        {"lecturer_id": lecturer_id},
+        {"lecturer_id": lecturer_id, "semester_id": semester_id},
     ).mappings().all()
     projects = []
     for row in rows:
@@ -195,18 +273,26 @@ def lecturer_supervised_projects(db: Db, user: User) -> dict[str, Any]:
     response_model=ApiDataEnvelope[list[TargetPortalRemediationResponse]],
     response_model_exclude_unset=True,
 )
-def lecturer_remediations(db: Db, user: User) -> dict[str, Any]:
+def lecturer_remediations(
+    db: Db,
+    user: User,
+    semester_id: Annotated[int | None, Query(alias="semesterId", gt=0)] = None,
+) -> dict[str, Any]:
     lecturer_id = _lecturer_id(db, user)
     rows = db.execute(
         text(
             "SELECT rc.id, rc.group_id, g.code AS group_code, rc.status, rc.due_at, "
-            "rc.verifier_lecturer_id, rc.note, r.type AS round_type "
+            "rc.verifier_lecturer_id, rc.note, r.type AS round_type, r.semester_id, "
+            "sem.code AS semester_code "
             "FROM remediation_cases rc JOIN groups g ON g.id = rc.group_id "
             "JOIN session_results sr ON sr.id = rc.session_result_id JOIN sessions s ON s.id = sr.session_id "
             "JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN rounds r ON r.id = sv.round_id "
-            "WHERE rc.verifier_lecturer_id = :lecturer_id ORDER BY rc.due_at, rc.id"
+            "JOIN semesters sem ON sem.id = r.semester_id "
+            "WHERE rc.verifier_lecturer_id = :lecturer_id "
+            "AND (:semester_id IS NULL OR r.semester_id = :semester_id) "
+            "ORDER BY rc.due_at, rc.id"
         ),
-        {"lecturer_id": lecturer_id},
+        {"lecturer_id": lecturer_id, "semester_id": semester_id},
     ).mappings().all()
     return success_payload([dict(row) for row in rows], meta={"page": 1, "pageSize": len(rows), "total": len(rows)})
 
