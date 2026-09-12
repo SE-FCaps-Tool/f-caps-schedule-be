@@ -45,16 +45,20 @@ def generate_candidates(
                 for reviewer_id in allowed_reviewers
                 if (reviewer_id, timeslot_id) in context.lecturer_availability
             ]
-            if context.round_type in DEFENSE_1_2_TYPES and not valid_h11_waiver(context, group_id):
+            continuity = None
+            if context.round_type in (DEFENSE_1_2_TYPES | {"DEFENSE_2"}) and not valid_h11_waiver(context, group_id):
                 continuity = set(context.prior_reviewer_ids.get(group_id, set()))
-                continuity.update(context.remediation_verifier_ids.get(group_id, set()))
-                available = [reviewer_id for reviewer_id in available if reviewer_id in continuity]
+                if context.has_assigned_committees:
+                    available = [reviewer_id for reviewer_id in available if reviewer_id in continuity]
+
             for reviewer_ids in _reviewer_tuples(
                 context,
                 available,
                 day=day,
                 rotation_seed=group_id * 1_000_003 + timeslot_id,
             ):
+                if continuity is not None and not continuity.intersection(reviewer_ids):
+                    continue
                 candidates.append(
                     Candidate(
                         group_id=group_id,
@@ -287,20 +291,19 @@ def reason_for_unscheduled(
             "No eligible Reviewer has availability in the usable group slots.",
             "Invite more Reviewers or collect availability for the round slots.",
         )
-    if context.round_type in DEFENSE_1_2_TYPES and not valid_h11_waiver(context, group_id):
+    if context.round_type in (DEFENSE_1_2_TYPES | {"DEFENSE_2"}) and not valid_h11_waiver(context, group_id):
         continuity = set(context.prior_reviewer_ids.get(group_id, set()))
-        continuity.update(context.remediation_verifier_ids.get(group_id, set()))
         if not continuity.intersection(reviewers):
             return UnscheduledReason(
                 "H11_CONTINUITY",
-                "No available Reviewer satisfies Defense 1.2 continuity.",
-                "Assign a prior Reviewer, the Verifier, or record an approved H11 waiver.",
+                "No available Reviewer satisfies Review 1.1 continuity.",
+                "Assign a prior Reviewer from Review 1.1, or record an approved H11 waiver.",
             )
         if not continuity.intersection(available_reviewers):
             return UnscheduledReason(
                 "H11_CONTINUITY",
-                "No available Reviewer satisfies Defense 1.2 continuity.",
-                "Assign a prior Reviewer, the Verifier, or record an approved H11 waiver.",
+                "No available Reviewer satisfies Review 1.1 continuity.",
+                "Assign a prior Reviewer from Review 1.1, or record an approved H11 waiver.",
             )
     return UnscheduledReason(
         "NO_TIMESLOT",
