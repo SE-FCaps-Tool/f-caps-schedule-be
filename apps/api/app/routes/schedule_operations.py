@@ -538,10 +538,7 @@ def _assignment_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
     
     ordered_reviewers = {}
     if version_row and version_row.get("algorithm_parameters"):
-        ordered_reviewers = version_row["algorithm_parameters"].get(
-            "assigned_reviewers", 
-            version_row["algorithm_parameters"].get("session_reviewers", {})
-        )
+        ordered_reviewers = version_row["algorithm_parameters"].get("assigned_reviewers", {})
 
     result = []
     for row in rows:
