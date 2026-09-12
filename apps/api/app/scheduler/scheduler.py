@@ -116,13 +116,15 @@ def solve_schedule(
                     model.add(sum(max(0, int((candidates[index].end_at - candidates[index].start_at).total_seconds() // 60)) * variables[index] for index in indexes) <= context.max_minutes_per_day)
 
     if context.council_config:
+        round_days = {c.day for c in candidates if c.day}
         for chair in context.council_config.get("chairs", []):
             cid = chair.get("lecturer_id")
             if not cid:
                 continue
-            daily_quota = chair.get("daily_quota") or {}
-            for day, d_limit in daily_quota.items():
-                if d_limit is not None and d_limit >= 0:
+            daily_quota = chair.get("daily_quota")
+            if daily_quota is not None and len(daily_quota) > 0:
+                for day in round_days:
+                    d_limit = daily_quota.get(day, 0)
                     day_indexes = [
                         i for i, c in enumerate(candidates)
                         if c.reviewer_ids and c.reviewer_ids[0] == cid and c.day == day
@@ -202,7 +204,7 @@ def solve_schedule(
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_seconds
     solver.parameters.random_seed = random_seed
-    solver.parameters.num_search_workers = 1
+    solver.parameters.num_search_workers = 4
     status = solver.solve(model)
     status_name = solver.status_name(status)
     if status_name not in {"OPTIMAL", "FEASIBLE"}:
