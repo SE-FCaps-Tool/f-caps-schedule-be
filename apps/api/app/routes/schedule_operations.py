@@ -59,7 +59,6 @@ from app.services.room_assignment import (
     allowed_room,
     find_room_conflict,
     lock_room_ids,
-    validate_assignment_batch,
     validate_publish_room_readiness,
 )
 from app.services.semester_queries import ensure_round_semester_writable
