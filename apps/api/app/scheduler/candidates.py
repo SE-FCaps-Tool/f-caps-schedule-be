@@ -11,7 +11,7 @@ from app.scheduler.validator import _eligible, valid_h11_waiver
 # combinations for one group/slot) dominate the scheduler before CP-SAT starts.
 # Keep a deterministic, diverse sample when the full pool is too large. Assigned
 # Committees remain exact and are not subject to this cap.
-FREE_POOL_REVIEWER_TUPLE_CAP = 40
+FREE_POOL_REVIEWER_TUPLE_CAP = 16
 
 
 def generate_candidates(
@@ -93,11 +93,13 @@ def _council_config_reviewer_tuples(
             cid = c.get("lecturer_id")
             if cid in avail_set:
                 daily = c.get("daily_quota")
-                if daily is not None and len(daily) > 0:
-                    if day and daily.get(day, 0) > 0:
+                if daily and day:
+                    if daily.get(day, 0) > 0:
                         valid_chairs.append(cid)
                 else:
                     valid_chairs.append(cid)
+        if not valid_chairs:
+            valid_chairs = [cid for cid in chair_ids if cid in avail_set]
     else:
         valid_chairs = list(available)
 
@@ -106,59 +108,40 @@ def _council_config_reviewer_tuples(
 
     # 2. Determine eligible secretaries
     sec_ids = [s["lecturer_id"] for s in secretaries if "lecturer_id" in s]
-    valid_secretaries = [sid for sid in sec_ids if sid in avail_set and sid not in chair_ids]
+    valid_secretaries = [sid for sid in sec_ids if sid in avail_set]
 
     tuples: list[tuple[int, ...]] = []
     seen: set[tuple[int, ...]] = set()
 
-    tuples_per_chair = max(4, FREE_POOL_REVIEWER_TUPLE_CAP // len(valid_chairs))
-
-    for chair_idx, cid in enumerate(valid_chairs):
-        chair_tuples_count = 0
-        remaining_for_sec = [r for r in available if r != cid and r not in chair_ids]
+    for cid in valid_chairs:
+        remaining_for_sec = [r for r in available if r != cid]
         sec_candidates = [s for s in valid_secretaries if s != cid]
         if not sec_candidates:
             sec_candidates = remaining_for_sec
 
-        for sid_offset in range(len(sec_candidates)):
-            sid = sec_candidates[(rotation_seed + chair_idx + sid_offset) % len(sec_candidates)]
+        for sid in sec_candidates:
             other_avail = [r for r in remaining_for_sec if r != sid]
-            needed = max(reviewer_count - 2, 0)
+            needed = reviewer_count - 2
+            needed = max(needed, 0)
             if needed == 0:
                 t = (cid, sid)
                 if t not in seen:
                     seen.add(t)
                     tuples.append(t)
-                    chair_tuples_count += 1
-                    if chair_tuples_count >= tuples_per_chair:
-                        break
             else:
-                total_other = len(other_avail)
-                if total_other < needed:
+                if len(other_avail) < needed:
                     continue
-                member_base_offset = (rotation_seed + chair_idx * 7) % total_other
-                for step in range(1, total_other + 1):
-                    for member_offset in range(total_other):
-                        offset = (member_base_offset + member_offset) % total_other
-                        other_members = tuple(
-                            sorted(
-                                other_avail[(offset + step * pos) % total_other]
-                                for pos in range(needed)
-                            )
-                        )
-                        if len(set(other_members)) != needed:
-                            continue
-                        t = (cid, sid, *other_members)
-                        if t not in seen:
-                            seen.add(t)
-                            tuples.append(t)
-                            chair_tuples_count += 1
-                            if chair_tuples_count >= tuples_per_chair:
-                                break
-                    if chair_tuples_count >= tuples_per_chair:
+                for other_members in combinations(other_avail, needed):
+                    t = (cid, sid, *other_members)
+                    if t not in seen:
+                        seen.add(t)
+                        tuples.append(t)
+                    if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
                         break
-            if chair_tuples_count >= tuples_per_chair:
+            if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
                 break
+        if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
+            break
 
     return tuples
 
