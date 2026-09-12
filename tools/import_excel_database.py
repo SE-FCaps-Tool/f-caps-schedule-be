@@ -24,7 +24,7 @@ DEMO_PASSWORD_HASH = (
     "$argon2id$v=19$m=65536,t=3,p=4$V6pAiT9HmR/z0IItWjtNuA$"
     "skwmr/puZ9G53gYN9UBRlHgGHXIVk2nNuIh9OunS00Y"
 )
-SEMESTER_CODE = "SE-2026-2027"
+SEMESTER_CODE = "SU26"
 MAJOR_CODE = "SE"
 
 
@@ -256,7 +256,7 @@ def main() -> None:
     add_sql(
         lines,
         "INSERT INTO semesters (code, name, note, start_date, end_date, academic_year, status) VALUES "
-        f"({sql(SEMESTER_CODE)}, {sql('Excel import: SE_CapstoneProject_SP26_ReviewDefense_New')}, "
+        f"({sql(SEMESTER_CODE)}, {sql('Summer 2026')}, "
         f"{sql('Excel import seed')}, DATE '2026-05-11', DATE '2026-08-23', {sql('2026-2027')}, 'ACTIVE')",
     )
     add_sql(
