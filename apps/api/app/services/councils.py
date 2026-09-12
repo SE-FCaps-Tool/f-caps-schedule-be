@@ -185,6 +185,25 @@ def validate_council_change(
 
     normalized_ids = sorted({int(value) for value in reviewer_ids})
     lock_reviewer_ids(db, normalized_ids)
+    
+    invalid_roles = db.execute(
+        text(
+            "SELECT l.id FROM lecturers l "
+            "JOIN accounts a ON a.id = l.account_id "
+            "WHERE l.id = ANY(:reviewer_ids) "
+            "AND (NOT EXISTS (SELECT 1 FROM account_roles ar WHERE ar.account_id = a.id AND ar.role = 'LECTURER') "
+            "     OR a.email NOT LIKE '%%@fpt.edu.vn' "
+            "     OR EXISTS (SELECT 1 FROM account_roles ar2 WHERE ar2.account_id = a.id AND ar2.role IN ('ADMIN', 'MANAGER')))"
+        ),
+        {"reviewer_ids": normalized_ids or [0]},
+    ).all()
+    if invalid_roles:
+        raise CouncilError(
+            "INVALID_REVIEWER_ROLE",
+            "Only accounts with the LECTURER role and @fpt.edu.vn email can be assigned to a council.",
+            422,
+            {"invalid_lecturer_ids": [r[0] for r in invalid_roles]},
+        )
     conflicts = find_reviewer_conflicts(
         db,
         normalized_ids,

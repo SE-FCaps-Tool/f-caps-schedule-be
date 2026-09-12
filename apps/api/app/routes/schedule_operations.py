@@ -193,8 +193,13 @@ def _validate_scheduler_inputs(db: Session, round_id: int, required_reviewer_cou
     accepted_reviewers = set(
         db.execute(
             text(
-                "SELECT lecturer_id FROM round_invitations "
-                "WHERE round_id = :round_id AND status = 'ACCEPTED'"
+                "SELECT ri.lecturer_id FROM round_invitations ri "
+                "JOIN lecturers l ON l.id = ri.lecturer_id "
+                "JOIN accounts a ON a.id = l.account_id "
+                "JOIN account_roles ar ON ar.account_id = a.id "
+                "WHERE ri.round_id = :round_id AND ri.status = 'ACCEPTED' AND ar.role = 'LECTURER' "
+                "AND a.email LIKE '%%@fpt.edu.vn' "
+                "AND NOT EXISTS (SELECT 1 FROM account_roles ar2 WHERE ar2.account_id = a.id AND ar2.role IN ('ADMIN', 'MANAGER'))"
             ),
             {"round_id": round_id},
         ).scalars()
@@ -202,9 +207,14 @@ def _validate_scheduler_inputs(db: Session, round_id: int, required_reviewer_cou
     available_reviewers = set(
         db.execute(
             text(
-                "SELECT DISTINCT lecturer_id FROM lecturer_availabilities "
-                "WHERE round_id = :round_id AND state = 'AVAILABLE' "
-                "AND timeslot_id = ANY(:timeslot_ids)"
+                "SELECT DISTINCT la.lecturer_id FROM lecturer_availabilities la "
+                "JOIN lecturers l ON l.id = la.lecturer_id "
+                "JOIN accounts a ON a.id = l.account_id "
+                "JOIN account_roles ar ON ar.account_id = a.id "
+                "WHERE la.round_id = :round_id AND la.state = 'AVAILABLE' "
+                "AND la.timeslot_id = ANY(:timeslot_ids) AND ar.role = 'LECTURER' "
+                "AND a.email LIKE '%%@fpt.edu.vn' "
+                "AND NOT EXISTS (SELECT 1 FROM account_roles ar2 WHERE ar2.account_id = a.id AND ar2.role IN ('ADMIN', 'MANAGER'))"
             ),
             {"round_id": round_id, "timeslot_ids": timeslot_ids},
         ).scalars()
@@ -341,16 +351,27 @@ def _round_input(
         row[0]
         for row in db.execute(
             text(
-                "SELECT lecturer_id FROM round_invitations "
-                "WHERE round_id = :round_id AND status = 'ACCEPTED' ORDER BY lecturer_id"
+                "SELECT ri.lecturer_id FROM round_invitations ri "
+                "JOIN lecturers l ON l.id = ri.lecturer_id "
+                "JOIN accounts a ON a.id = l.account_id "
+                "JOIN account_roles ar ON ar.account_id = a.id "
+                "WHERE ri.round_id = :round_id AND ri.status = 'ACCEPTED' AND ar.role = 'LECTURER' "
+                "AND a.email LIKE '%%@fpt.edu.vn' "
+                "AND NOT EXISTS (SELECT 1 FROM account_roles ar2 WHERE ar2.account_id = a.id AND ar2.role IN ('ADMIN', 'MANAGER')) "
+                "ORDER BY ri.lecturer_id"
             ),
             {"round_id": round_id},
         ).all()
     ]
     availability_rows = db.execute(
         text(
-            "SELECT lecturer_id, timeslot_id FROM lecturer_availabilities "
-            "WHERE round_id = :round_id AND state = 'AVAILABLE'"
+            "SELECT la.lecturer_id, la.timeslot_id FROM lecturer_availabilities la "
+            "JOIN lecturers l ON l.id = la.lecturer_id "
+            "JOIN accounts a ON a.id = l.account_id "
+            "JOIN account_roles ar ON ar.account_id = a.id "
+            "WHERE la.round_id = :round_id AND la.state = 'AVAILABLE' AND ar.role = 'LECTURER' "
+            "AND a.email LIKE '%%@fpt.edu.vn' "
+            "AND NOT EXISTS (SELECT 1 FROM account_roles ar2 WHERE ar2.account_id = a.id AND ar2.role IN ('ADMIN', 'MANAGER'))"
         ),
         {"round_id": round_id},
     ).all()
@@ -387,14 +408,14 @@ def _round_input(
         .all()
     )
     prior_rows: list[Any] = []
-    if round_row["type"] in {"DEFENSE_1", "DEFENSE_1_2"}:
+    if round_row["type"] in {"DEFENSE_1", "DEFENSE_1_2", "DEFENSE_2"}:
         prior_rows = db.execute(
             text(
                 "SELECT s.group_id, cm.lecturer_id FROM sessions s "
                 "JOIN council_members cm ON cm.council_id = s.council_id "
                 "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
                 "JOIN rounds previous_round ON previous_round.id = sv.round_id "
-                "WHERE s.group_id = ANY(:group_ids) AND previous_round.type IN ('DEFENSE_1_1', 'REVIEW_3') "
+                "WHERE s.group_id = ANY(:group_ids) AND previous_round.type IN ('REVIEW_1', 'REVIEW_1_1') "
                 "AND sv.status IN ('ACTIVE', 'PUBLISHED')"
             ),
             {"group_ids": [row["id"] for row in group_rows] or [0]},
@@ -420,7 +441,13 @@ def _round_input(
                 "FROM round_committees rc "
                 "JOIN committees c ON c.id = rc.committee_id "
                 "JOIN committee_members cm ON cm.committee_id = c.id "
-                "WHERE rc.round_id = :round_id GROUP BY c.id ORDER BY c.id"
+                "JOIN lecturers l ON l.id = cm.lecturer_id "
+                "JOIN accounts a ON a.id = l.account_id "
+                "JOIN account_roles ar ON ar.account_id = a.id "
+                "WHERE rc.round_id = :round_id AND ar.role = 'LECTURER' "
+                "AND a.email LIKE '%%@fpt.edu.vn' "
+                "AND NOT EXISTS (SELECT 1 FROM account_roles ar2 WHERE ar2.account_id = a.id AND ar2.role IN ('ADMIN', 'MANAGER')) "
+                "GROUP BY c.id ORDER BY c.id"
             ),
             {"round_id": round_id},
         ).all()
@@ -429,6 +456,26 @@ def _round_input(
     committee_reviewer_sets = tuple(
         member_ids for member_ids in committee_member_lists if eligible_pool.issuperset(member_ids)
     )
+    council_cfg = round_row.get("council_config") or {}
+    if council_cfg:
+        valid_lecturer_ids = {
+            row[0]
+            for row in db.execute(
+                text(
+                    "SELECT l.id FROM lecturers l "
+                    "JOIN accounts a ON a.id = l.account_id "
+                    "JOIN account_roles ar ON ar.account_id = a.id "
+                    "WHERE ar.role = 'LECTURER' "
+                    "AND a.email LIKE '%%@fpt.edu.vn' "
+                    "AND NOT EXISTS (SELECT 1 FROM account_roles ar2 WHERE ar2.account_id = a.id AND ar2.role IN ('ADMIN', 'MANAGER'))"
+                )
+            ).all()
+        }
+        if "chairs" in council_cfg:
+            council_cfg["chairs"] = [c for c in council_cfg["chairs"] if c.get("lecturer_id") in valid_lecturer_ids]
+        if "secretaries" in council_cfg:
+            council_cfg["secretaries"] = [s for s in council_cfg["secretaries"] if s.get("lecturer_id") in valid_lecturer_ids]
+
     input_data = RoundInput(
         round_type=str(round_row["type"]),
         expected_reviewer_count=round_row["reviewer_count"],
@@ -456,7 +503,7 @@ def _round_input(
         max_minutes_per_part=round_row["max_minutes_per_part"],
         max_minutes_per_day=round_row["max_minutes_per_day"],
         soft_weights=round_row["soft_weights"] or {},
-        council_config=round_row.get("council_config") or {},
+        council_config=council_cfg,
         h11_waiver_actors={row["group_id"]: "MANAGER" for row in waiver_rows},
         h11_waiver_reasons={row["group_id"]: row["reason"] for row in waiver_rows},
     )

@@ -1468,7 +1468,7 @@ def export_round_council(round_id: Annotated[int, Path(alias="roundId")], db: Db
     """
     _require(user, "ADMIN", "MANAGER")
     round_row = db.execute(
-        text("SELECT id, reviewer_count FROM rounds WHERE id = :round_id"), {"round_id": round_id}
+        text("SELECT id, reviewer_count, council_config FROM rounds WHERE id = :round_id"), {"round_id": round_id}
     ).mappings().one_or_none()
     if round_row is None:
         raise HTTPException(status_code=404, detail={"code": "ROUND_NOT_FOUND", "message": "Round does not exist."})
@@ -1517,12 +1517,26 @@ def export_round_council(round_id: Annotated[int, Path(alias="roundId")], db: Db
         for members in committees_by_id.values()
     }
 
+    round_cfg = round_row.get("council_config") or {}
+    chairs = {int(c.get("lecturer_id")) for c in round_cfg.get("chairs", []) if c.get("lecturer_id")}
+    secretaries = {int(s.get("lecturer_id")) for s in round_cfg.get("secretaries", []) if s.get("lecturer_id")}
+
     def _seat_names(council_id: int) -> list[str]:
         members = members_by_council.get(council_id, [])
         lecturer_ids = [int(member["lecturer_id"]) for member in members]
         codes_by_id = {int(member["lecturer_id"]): member["lecturer_code"] for member in members}
         names_by_id = {int(member["lecturer_id"]): str(member["snapshot_name"]) for member in members}
-        seat_order = committee_seat_order.get(frozenset(lecturer_ids), lecturer_ids)
+        fset = frozenset(lecturer_ids)
+        if fset in committee_seat_order:
+            seat_order = committee_seat_order[fset]
+        else:
+            seat_order = sorted(
+                lecturer_ids,
+                key=lambda lid: (
+                    0 if lid in chairs else 1 if lid in secretaries else 2,
+                    lid,
+                ),
+            )
         names = []
         for lecturer_id in seat_order:
             code = codes_by_id.get(lecturer_id)
