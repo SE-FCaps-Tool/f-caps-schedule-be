@@ -11,7 +11,7 @@ from app.scheduler.validator import _eligible, valid_h11_waiver
 # combinations for one group/slot) dominate the scheduler before CP-SAT starts.
 # Keep a deterministic, diverse sample when the full pool is too large. Assigned
 # Committees remain exact and are not subject to this cap.
-FREE_POOL_REVIEWER_TUPLE_CAP = 40
+FREE_POOL_REVIEWER_TUPLE_CAP = 12
 
 
 def generate_candidates(
@@ -54,11 +54,10 @@ def generate_candidates(
             for reviewer_ids in _reviewer_tuples(
                 context,
                 available,
+                continuity=continuity,
                 day=day,
-                rotation_seed=group_id * 1_000_003 + timeslot_id,
+                rotation_seed=(timeslot_id // 2) * 17,
             ):
-                if continuity is not None and not continuity.intersection(reviewer_ids):
-                    continue
                 candidates.append(
                     Candidate(
                         group_id=group_id,
@@ -77,6 +76,7 @@ def _council_config_reviewer_tuples(
     context: RoundInput,
     available: list[int],
     *,
+    continuity: set[int] | None = None,
     day: str = "",
     rotation_seed: int = 0,
 ) -> list[tuple[int, ...]] | None:
@@ -106,6 +106,8 @@ def _council_config_reviewer_tuples(
         valid_chairs = list(available)
 
     if not valid_chairs:
+        valid_chairs = list(available)
+    if not valid_chairs:
         return []
 
     # 2. Determine eligible secretaries
@@ -115,54 +117,54 @@ def _council_config_reviewer_tuples(
     tuples: list[tuple[int, ...]] = []
     seen: set[tuple[int, ...]] = set()
 
-    tuples_per_chair = max(4, FREE_POOL_REVIEWER_TUPLE_CAP // len(valid_chairs))
-
-    for chair_idx, cid in enumerate(valid_chairs):
-        chair_tuples_count = 0
-        remaining_for_sec = [r for r in available if r != cid and r not in chair_ids]
-        sec_candidates = [s for s in valid_secretaries if s != cid]
-        if not sec_candidates:
-            sec_candidates = remaining_for_sec
-
-        for sid_offset in range(len(sec_candidates)):
-            sid = sec_candidates[(rotation_seed + chair_idx + sid_offset) % len(sec_candidates)]
-            other_avail = [r for r in remaining_for_sec if r != sid]
-            needed = max(reviewer_count - 2, 0)
-            if needed == 0:
-                t = (cid, sid)
+    # Stable, non-overlapping base assignment for each chair in this shift.
+    # Keeps the council fixed for the chair while allowing 1 continuity swap when needed.
+    needed = max(reviewer_count - 2, 0)
+    for shift in range(1):
+        seed = rotation_seed + shift * 7
+        
+        # Pick N distinct secretaries
+        sec_pool = list(valid_secretaries)
+        if len(sec_pool) < len(valid_chairs):
+            sec_pool += [r for r in available if r not in chair_ids and r not in sec_pool]
+            
+        if len(sec_pool) < len(valid_chairs):
+            break
+            
+        start_sec = seed % len(sec_pool)
+        chosen_secs = [sec_pool[(start_sec + i) % len(sec_pool)] for i in range(len(valid_chairs))]
+        
+        remaining_for_mems = [r for r in available if r not in chair_ids and r not in chosen_secs]
+        start_mem = seed % max(1, len(remaining_for_mems)) if remaining_for_mems else 0
+        
+        for idx, cid in enumerate(valid_chairs):
+            sid = chosen_secs[idx]
+            
+            if len(remaining_for_mems) >= len(valid_chairs) * needed:
+                base_mems = [remaining_for_mems[(start_mem + idx * needed + i) % len(remaining_for_mems)] for i in range(needed)]
+            else:
+                base_mems = [remaining_for_mems[(start_mem + idx * needed + i) % max(1, len(remaining_for_mems))] for i in range(needed)] if remaining_for_mems else []
+            
+            if len(set(base_mems)) < needed:
+                continue
+                
+            sat_by_cs = continuity is None or cid in continuity or sid in continuity
+            if sat_by_cs or any(m in continuity for m in base_mems):
+                t = (cid, sid, *sorted(base_mems))
                 if t not in seen:
                     seen.add(t)
                     tuples.append(t)
-                    chair_tuples_count += 1
-                    if chair_tuples_count >= tuples_per_chair:
-                        break
             else:
-                total_other = len(other_avail)
-                if total_other < needed:
-                    continue
-                member_base_offset = (rotation_seed + chair_idx * 7) % total_other
-                for step in range(1, total_other + 1):
-                    for member_offset in range(total_other):
-                        offset = (member_base_offset + member_offset) % total_other
-                        other_members = tuple(
-                            sorted(
-                                other_avail[(offset + step * pos) % total_other]
-                                for pos in range(needed)
-                            )
-                        )
-                        if len(set(other_members)) != needed:
-                            continue
-                        t = (cid, sid, *other_members)
-                        if t not in seen:
-                            seen.add(t)
-                            tuples.append(t)
-                            chair_tuples_count += 1
-                            if chair_tuples_count >= tuples_per_chair:
-                                break
-                    if chair_tuples_count >= tuples_per_chair:
-                        break
-            if chair_tuples_count >= tuples_per_chair:
-                break
+                # Swap 1 member to satisfy continuity
+                cont_avail = [r for r in remaining_for_mems if r in continuity and r not in base_mems]
+                for cont_r in cont_avail[:2]:
+                    new_mems = base_mems.copy()
+                    new_mems[0] = cont_r
+                    t = (cid, sid, *sorted(new_mems))
+                    if t not in seen:
+                        seen.add(t)
+                        tuples.append(t)
+                    break
 
     return tuples
 
@@ -171,6 +173,7 @@ def _reviewer_tuples(
     context: RoundInput,
     available: list[int],
     *,
+    continuity: set[int] | None = None,
     day: str = "",
     rotation_seed: int = 0,
 ) -> list[tuple[int, ...]]:
@@ -183,7 +186,7 @@ def _reviewer_tuples(
 
     if not context.has_assigned_committees:
         council_tuples = _council_config_reviewer_tuples(
-            context, available, day=day, rotation_seed=rotation_seed
+            context, available, continuity=continuity, day=day, rotation_seed=rotation_seed
         )
         if council_tuples is not None:
             return council_tuples

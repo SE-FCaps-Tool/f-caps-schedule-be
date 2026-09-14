@@ -183,7 +183,7 @@ def main() -> None:
         sampled = random.Random(args.sample_seed).sample(project_rows, k=sample_size)
         project_rows = sorted(sampled, key=lambda row: row["row_number"])
 
-    project_by_review_code: dict[tuple[str, str], dict[str, Any]] = {}
+    project_by_review_code: dict[tuple[str, str], list[dict[str, Any]]] = {}
     project_by_council_code: dict[tuple[str, str], list[dict[str, Any]]] = {
         ("Defense1", ""): [],
         ("Defense2", ""): [],
@@ -193,7 +193,7 @@ def main() -> None:
         for review_type, column in (("Review1", 9), ("Review2", 19), ("Review3", 29)):
             schedule_code = clean_code(values[column])
             if schedule_code:
-                project_by_review_code[(review_type, schedule_code)] = project
+                project_by_review_code.setdefault((review_type, schedule_code), []).append(project)
         for defense_type, column in (("Defense1", 41), ("Defense2", 51)):
             council_code = clean_code(values[column])
             if council_code:
@@ -369,11 +369,11 @@ def main() -> None:
     for project in project_rows:
         values = project["values"]
         project_code = clean_code(values[2])
-        group_code = clean_code(values[3])
+        group_code = clean_code(values[1])
         if not project_code or not group_code:
             continue
-        title_en = str(values[4] or "").strip()[:255] or None
-        title_vi = str(values[5] or title_en or project_code).strip()[:255]
+        title_en = str(values[3] or "").strip()[:255] or None
+        title_vi = str(values[4] or title_en or project_code).strip()[:255]
         add_sql(
             lines,
             "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) VALUES "
@@ -393,7 +393,7 @@ def main() -> None:
             "supervisor_1_code, supervisor_2_code, canonical_project_id, canonical_group_id, raw_values) "
             "SELECT "
             f"{batch_lookup}, {project['row_number']}, {sql(project_code)}, {sql(group_code)}, "
-            f"{sql(values[4])}, {sql(title_vi)}, {sql(values[6])}, {sql(clean_code(values[7]))}, "
+            f"{sql(title_en)}, {sql(title_vi)}, {sql(values[5])}, {sql(clean_code(values[7]))}, "
             f"{sql(clean_code(values[8]))}, p.id, g.id, {json_sql(values)} "
             "FROM projects p JOIN groups g ON g.project_id = p.id "
             f"WHERE p.semester_id = {semester_lookup} AND p.code = {sql(project_code)}",
@@ -416,13 +416,13 @@ def main() -> None:
         (
             project
             for project in project_rows
-            if clean_code(project["values"][2]) and clean_code(project["values"][3])
+            if clean_code(project["values"][2]) and clean_code(project["values"][1])
         ),
         None,
     )
     if first_project:
         first_project_code = clean_code(first_project["values"][2])
-        first_group_code = clean_code(first_project["values"][3])
+        first_group_code = clean_code(first_project["values"][1])
         for student_number, membership_role in ((1, "LEADER"), (2, "MEMBER")):
             add_sql(
                 lines,
@@ -441,15 +441,25 @@ def main() -> None:
         for row in rows:
             values = row["values"]
             schedule_code = clean_code(values[0])
-            project = project_by_review_code.get((sheet_name, schedule_code or ""))
-            if not project:
+            projects = project_by_review_code.get((sheet_name, schedule_code or ""), [])
+            if not projects:
                 continue
-            project_code = clean_code(project["values"][2])
-            group_code = clean_code(project["values"][3])
+            primary_project = projects[0]
+            project_code = clean_code(primary_project["values"][2])
+            group_code = clean_code(primary_project["values"][1])
             schedule_date = date_value(values[6])
             slot_number = integer(values[3]) or 1
-            start_time = f"{schedule_date}T{8 + slot_number:02d}:00:00+07:00" if schedule_date else None
-            end_time = f"{schedule_date}T{8 + slot_number:02d}:30:00+07:00" if schedule_date else None
+            group_number = integer(values[5]) or 1
+            start_time, end_time, part = None, None, "AM"
+            if schedule_date:
+                import datetime as dt_mod
+                base_dt = dt_mod.datetime.strptime(f"{schedule_date}T{8 + slot_number:02d}:00:00+0700", "%Y-%m-%dT%H:%M:%S%z")
+                offset = dt_mod.timedelta(minutes=30 * (group_number - 1))
+                start_dt = base_dt + offset
+                end_dt = start_dt + dt_mod.timedelta(minutes=30)
+                start_time = start_dt.isoformat()
+                end_time = end_dt.isoformat()
+                part = "AM" if start_dt.hour < 13 else "PM"
             round_lookup = f"(SELECT id FROM rounds WHERE semester_id = {semester_lookup} AND type = {sql(round_type)}::round_type)"
             if schedule_date and start_time and end_time:
                 add_sql(
@@ -459,8 +469,8 @@ def main() -> None:
                 )
                 add_sql(
                     lines,
-                    "INSERT INTO timeslots (round_day_id, start_at, end_at) SELECT rd.id, "
-                    f"{sql(start_time)}::timestamptz, {sql(end_time)}::timestamptz FROM round_days rd "
+                    "INSERT INTO timeslots (round_day_id, start_at, end_at, part) SELECT rd.id, "
+                    f"{sql(start_time)}::timestamptz, {sql(end_time)}::timestamptz, {sql(part)} FROM round_days rd "
                     f"WHERE rd.round_id = {round_lookup} AND rd.day_date = {sql(schedule_date)} "
                     "ON CONFLICT (round_day_id, start_at, end_at) DO NOTHING",
                 )
@@ -471,13 +481,15 @@ def main() -> None:
                     f"{round_lookup}, room_type FROM rooms WHERE code = {sql(clean_code(values[8]))} "
                     "ON CONFLICT DO NOTHING",
                 )
-            add_sql(
-                lines,
-                "INSERT INTO round_groups (round_id, group_id) SELECT "
-                f"{round_lookup}, g.id FROM groups g JOIN projects p ON p.id = g.project_id "
-                f"WHERE p.semester_id = {semester_lookup} AND p.code = {sql(project_code)} "
-                "ON CONFLICT DO NOTHING",
-            )
+            for prj in projects:
+                p_c = clean_code(prj["values"][2])
+                add_sql(
+                    lines,
+                    "INSERT INTO round_groups (round_id, group_id) SELECT "
+                    f"{round_lookup}, g.id FROM groups g JOIN projects p ON p.id = g.project_id "
+                    f"WHERE p.semester_id = {semester_lookup} AND p.code = {sql(p_c)} "
+                    "ON CONFLICT DO NOTHING",
+                )
             if schedule_date and start_time and end_time:
                 add_sql(
                     lines,
@@ -527,6 +539,42 @@ def main() -> None:
                     f"WHERE sv.round_id = {round_lookup} AND sv.version_no = 1 "
                     "ON CONFLICT (schedule_version_id, group_id) DO NOTHING",
                 )
+                session_lookup = f"(SELECT s.id FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id JOIN groups g ON g.id = s.group_id WHERE sv.round_id = {round_lookup} AND g.code = {sql(group_code)} LIMIT 1)"
+                for pos, prj in enumerate(projects, start=1):
+                    g_c = clean_code(prj["values"][1])
+                    p_c = clean_code(prj["values"][2])
+                    add_sql(
+                        lines,
+                        "INSERT INTO session_groups (session_id, group_id, position) "
+                        f"SELECT {session_lookup}, g.id, {pos} FROM groups g "
+                        f"JOIN projects p ON p.id = g.project_id "
+                        f"WHERE p.semester_id = {semester_lookup} AND g.code = {sql(g_c)} "
+                        "ON CONFLICT (session_id, group_id) DO NOTHING",
+                    )
+                    add_sql(
+                        lines,
+                        "INSERT INTO schedule_assignments (schedule_version_id, group_id, project_id, timeslot_id, room_id, start_at, end_at) "
+                        "SELECT sv.id, g.id, p.id, ts.id, rm.id, "
+                        f"{sql(start_time)}::timestamptz, {sql(end_time)}::timestamptz "
+                        "FROM schedule_versions sv "
+                        f"JOIN groups g ON g.code = {sql(g_c)} "
+                        f"JOIN projects p ON p.id = g.project_id AND p.code = {sql(p_c)} AND p.semester_id = {semester_lookup} "
+                        f"JOIN round_days rd ON rd.round_id = sv.round_id AND rd.day_date = {sql(schedule_date)} "
+                        f"JOIN timeslots ts ON ts.round_day_id = rd.id AND ts.start_at = {sql(start_time)}::timestamptz AND ts.end_at = {sql(end_time)}::timestamptz "
+                        f"JOIN rooms rm ON rm.code = {sql(clean_code(values[8]))} "
+                        f"WHERE sv.round_id = {round_lookup} AND sv.version_no = 1 "
+                        "ON CONFLICT (schedule_version_id, group_id) DO NOTHING",
+                    )
+                    assignment_lookup = f"(SELECT id FROM schedule_assignments WHERE schedule_version_id = (SELECT id FROM schedule_versions WHERE round_id = {round_lookup} AND version_no = 1) AND group_id = (SELECT g.id FROM groups g JOIN projects p ON p.id = g.project_id WHERE p.semester_id = {semester_lookup} AND g.code = {sql(g_c)}))"
+                    for lecturer_code in (clean_code(values[9]), clean_code(values[10])):
+                        if lecturer_code:
+                            add_sql(
+                                lines,
+                                "INSERT INTO schedule_assignment_reviewers (assignment_id, lecturer_id, is_result_owner, snapshot_name) "
+                                f"SELECT {assignment_lookup}, l.id, FALSE, l.lecturer_code "
+                                f"FROM lecturers l WHERE l.lecturer_code = {sql(lecturer_code)} "
+                                "ON CONFLICT (assignment_id, lecturer_id) DO NOTHING",
+                            )
             add_sql(
                 lines,
                 "INSERT INTO excel_review_schedule_rows "
@@ -570,7 +618,7 @@ def main() -> None:
             )
             for project in project_by_council_code.get((sheet_name, council_code or ""), []):
                 project_code = clean_code(project["values"][2])
-                group_code = clean_code(project["values"][3])
+                group_code = clean_code(project["values"][1])
                 if not project_code or not group_code:
                     continue
                 add_sql(
