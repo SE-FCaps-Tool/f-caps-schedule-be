@@ -54,11 +54,10 @@ def generate_candidates(
             for reviewer_ids in _reviewer_tuples(
                 context,
                 available,
+                continuity=continuity,
                 day=day,
-                rotation_seed=group_id * 1_000_003 + timeslot_id,
+                rotation_seed=(timeslot_id // 2) * 17,
             ):
-                if continuity is not None and not continuity.intersection(reviewer_ids):
-                    continue
                 candidates.append(
                     Candidate(
                         group_id=group_id,
@@ -77,6 +76,7 @@ def _council_config_reviewer_tuples(
     context: RoundInput,
     available: list[int],
     *,
+    continuity: set[int] | None = None,
     day: str = "",
     rotation_seed: int = 0,
 ) -> list[tuple[int, ...]] | None:
@@ -107,6 +107,8 @@ def _council_config_reviewer_tuples(
     else:
         valid_chairs = list(available)
 
+    if not valid_chairs:
+        valid_chairs = list(available)
     if not valid_chairs:
         return []
 
@@ -154,6 +156,7 @@ def _reviewer_tuples(
     context: RoundInput,
     available: list[int],
     *,
+    continuity: set[int] | None = None,
     day: str = "",
     rotation_seed: int = 0,
 ) -> list[tuple[int, ...]]:
@@ -166,7 +169,7 @@ def _reviewer_tuples(
 
     if not context.has_assigned_committees:
         council_tuples = _council_config_reviewer_tuples(
-            context, available, day=day, rotation_seed=rotation_seed
+            context, available, continuity=continuity, day=day, rotation_seed=rotation_seed
         )
         if council_tuples is not None:
             return council_tuples

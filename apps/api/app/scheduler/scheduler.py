@@ -21,41 +21,15 @@ def _overlap(left_start: datetime, left_end: datetime, right_start: datetime, ri
     return left_start < right_end and right_start < left_end
 
 
-def solve_schedule(
+def _build_model(
     context: RoundInput,
-    *,
     groups: list[int],
     timeslots: list[tuple[int, datetime, datetime, str, str]],
     reviewers: list[int],
-    time_limit_seconds: float = 10,
-    random_seed: int = 0,
-    objective_profile: SchedulerObjectiveProfile = "LEGACY",
-    candidate_pool: list[Candidate] | None = None,
-) -> SolverResult:
-    candidates = candidate_pool if candidate_pool is not None else generate_candidates(
-        context, groups=groups, timeslots=timeslots, reviewers=reviewers
-    )
-    if not candidates:
-        unscheduled = tuple(
-            reason_for_unscheduled(
-                group_id,
-                context,
-                reviewers=reviewers,
-                timeslots=[timeslot[0] for timeslot in timeslots],
-            )
-            for group_id in sorted(groups)
-        )
-        return SolverResult(
-            "PARTIAL",
-            (),
-            unscheduled,
-            _empty_soft_scores(),
-            random_seed,
-            0,
-            objective_profile,
-            _schedule_metrics(()),
-        )
-
+    candidates: list[Candidate],
+    objective_profile: SchedulerObjectiveProfile,
+    require_all: bool = False,
+) -> tuple[cp_model.CpModel, list[cp_model.IntVar], list[int]]:
     model = cp_model.CpModel()
     variables = [model.new_bool_var(f"candidate_{index}") for index in range(len(candidates))]
     candidate_soft_scores = [_candidate_soft_scores(candidate, context) for candidate in candidates]
@@ -74,7 +48,10 @@ def solve_schedule(
     for index, candidate in enumerate(candidates):
         by_group[candidate.group_id].append(index)
     for indexes in by_group.values():
-        model.add_at_most_one(variables[index] for index in indexes)
+        if require_all:
+            model.add(sum(variables[index] for index in indexes) == 1)
+        else:
+            model.add_at_most_one(variables[index] for index in indexes)
 
     if context.max_groups_per_timeslot is not None:
         by_timeslot: dict[int, list[int]] = defaultdict(list)
@@ -115,6 +92,24 @@ def solve_schedule(
                 if indexes:
                     model.add(sum(max(0, int((candidates[index].end_at - candidates[index].start_at).total_seconds() // 60)) * variables[index] for index in indexes) <= context.max_minutes_per_day)
 
+    # HARD CONSTRAINT: Each reviewer must be assigned an even number of slots on any given day (when scheduling 2 or more groups).
+    # This prevents the lecturer from participating in just 1 slot per day ("đi 1 buổi rồi về").
+    # We only enforce this strictly in Phase 1 (require_all=True) to avoid dropping groups.
+    if require_all and len(groups) >= 2:
+        for reviewer_id in reviewers:
+            round_days = {candidate.day for candidate in candidates if reviewer_id in candidate.reviewer_ids and candidate.day}
+            for day in round_days:
+                day_indexes = [
+                    index for index, candidate in enumerate(candidates) 
+                    if reviewer_id in candidate.reviewer_ids and candidate.day == day
+                ]
+                if day_indexes:
+                    assigned_day = model.new_int_var(0, len(day_indexes), f"assigned_{reviewer_id}_{day}")
+                    model.add(assigned_day == sum(variables[i] for i in day_indexes))
+                    half_day = model.new_int_var(0, len(day_indexes) // 2, f"half_{reviewer_id}_{day}")
+                    model.add(assigned_day == 2 * half_day)
+
+
     if context.council_config:
         for chair in context.council_config.get("chairs", []):
             cid = chair.get("lecturer_id")
@@ -149,7 +144,8 @@ def solve_schedule(
                 if sec_indexes:
                     model.add(sum(variables[i] for i in sec_indexes) <= max_sessions)
 
-    secondary_bound = sum(abs(score) for score in weighted_scores)
+    max_candidate_score = max((abs(score) for score in weighted_scores), default=0)
+    secondary_bound = max_candidate_score * len(groups)
 
     balance_weight = (
         max(0, context.soft_weights.get("S1", 1))
@@ -190,21 +186,74 @@ def solve_schedule(
         )
     elif objective_profile == "EARLY_FINISH":
         profile_expression, profile_bound = _add_early_finish_objective(
-            model, variables, candidates
+            model, variables, candidates, reviewers
         )
 
-    primary_bonus = secondary_bound + balance_bound + profile_bound + 1
-    model.maximize(
-        sum((primary_bonus + weighted_scores[index]) * variables[index] for index in range(len(candidates)))
-        + balance_expression
-        + profile_expression
+    if require_all:
+        model.maximize(
+            sum(weighted_scores[index] * variables[index] for index in range(len(candidates)))
+            + profile_expression
+        )
+    else:
+        primary_bonus = secondary_bound + balance_bound + profile_bound + 1
+        model.maximize(
+            sum((primary_bonus + weighted_scores[index]) * variables[index] for index in range(len(candidates)))
+            + balance_expression
+            + profile_expression
+        )
+    return model, variables, candidate_soft_scores
+
+
+def solve_schedule(
+    context: RoundInput,
+    *,
+    groups: list[int],
+    timeslots: list[tuple[int, datetime, datetime, str, str]],
+    reviewers: list[int],
+    time_limit_seconds: float = 10,
+    random_seed: int = 0,
+    objective_profile: SchedulerObjectiveProfile = "LEGACY",
+    candidate_pool: list[Candidate] | None = None,
+) -> SolverResult:
+    candidates = candidate_pool if candidate_pool is not None else generate_candidates(
+        context, groups=groups, timeslots=timeslots, reviewers=reviewers
+    )
+    if not candidates:
+        unscheduled = tuple(
+            reason_for_unscheduled(
+                group_id,
+                context,
+                reviewers=reviewers,
+                timeslots=[timeslot[0] for timeslot in timeslots],
+            )
+            for group_id in sorted(groups)
+        )
+        return SolverResult(
+            "PARTIAL", (), unscheduled, _empty_soft_scores(), random_seed, 0, objective_profile, _schedule_metrics(())
+        )
+
+    # Phase 1: Try to schedule 100% of groups (much faster if feasible due to tight constraints)
+    model, variables, candidate_soft_scores = _build_model(
+        context, groups, timeslots, reviewers, candidates, objective_profile, require_all=True
     )
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = time_limit_seconds
+    solver.parameters.max_time_in_seconds = max(28.0, time_limit_seconds)
     solver.parameters.random_seed = random_seed
     solver.parameters.num_search_workers = 1
     status = solver.solve(model)
     status_name = solver.status_name(status)
+
+    if status_name not in {"OPTIMAL", "FEASIBLE"}:
+        # Phase 2: Fallback to partial scheduling (Max-SAT) if Phase 1 fails or times out
+        model, variables, candidate_soft_scores = _build_model(
+            context, groups, timeslots, reviewers, candidates, objective_profile, require_all=False
+        )
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = 8.0
+        solver.parameters.random_seed = random_seed
+        solver.parameters.num_search_workers = 8
+        status = solver.solve(model)
+        status_name = solver.status_name(status)
     if status_name not in {"OPTIMAL", "FEASIBLE"}:
         # CpSolver.value() is undefined for UNKNOWN/INFEASIBLE/MODEL_INVALID.
         # Reading those values can fabricate overlapping sessions that the
@@ -436,19 +485,20 @@ def _add_early_finish_objective(
     model: cp_model.CpModel,
     variables: list[cp_model.IntVar],
     candidates: list[Candidate],
+    reviewers: list[int],
 ) -> tuple[cp_model.LinearExpr, int]:
     if not candidates:
         return 0, 0
     origin = min(candidate.start_at for candidate in candidates)
-    end_offsets = [max(0, int((candidate.end_at - origin).total_seconds() // 60)) for candidate in candidates]
     start_offsets = [max(0, int((candidate.start_at - origin).total_seconds() // 60)) for candidate in candidates]
-    latest_end = model.new_int_var(0, max(end_offsets), "profile_latest_end")
-    for variable, end_offset in zip(variables, end_offsets):
-        model.add(latest_end >= end_offset).only_enforce_if(variable)
-    expression = -1000 * latest_end - sum(
-        start_offsets[index] * variables[index] for index in range(len(candidates))
+    compactness_expression, compactness_bound = _add_compactness_objective(
+        model, variables, candidates, reviewers
     )
-    return expression, max(end_offsets) * 1000 + max(start_offsets) * len(candidates)
+    expression = -sum(
+        start_offsets[index] * variables[index] for index in range(len(candidates))
+    ) + compactness_expression
+    return expression, max(start_offsets) * 100 + compactness_bound
+
 
 
 def _schedule_metrics(sessions: tuple[ScheduledSession, ...]) -> dict[str, Any]:

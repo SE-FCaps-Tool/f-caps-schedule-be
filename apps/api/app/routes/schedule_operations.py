@@ -377,6 +377,107 @@ def _round_input(
     ).all()
     available_reviewer_ids = sorted({row[0] for row in availability_rows})
     reviewer_ids = accepted_reviewer_ids or available_reviewer_ids
+
+    if round_row["type"] == "DEFENSE_2":
+        d11_reviewer_ids = set(
+            db.execute(
+                text(
+                    """
+                    SELECT DISTINCT cm.lecturer_id
+                    FROM sessions s
+                    JOIN council_members cm ON cm.council_id = s.council_id
+                    JOIN schedule_versions sv ON sv.id = s.schedule_version_id
+                    JOIN rounds r ON r.id = sv.round_id
+                    WHERE r.type IN ('DEFENSE_1_1', 'DEFENSE_1')
+                      AND sv.status IN ('ACTIVE', 'PUBLISHED')
+                    """
+                )
+            ).scalars()
+        )
+        council_cfg = round_row.get("council_config") or {}
+        setup_lecturer_ids = set()
+        for c in council_cfg.get("chairs", []):
+            if "lecturer_id" in c:
+                setup_lecturer_ids.add(c["lecturer_id"])
+        for s in council_cfg.get("secretaries", []):
+            if "lecturer_id" in s:
+                setup_lecturer_ids.add(s["lecturer_id"])
+        
+        replacements = council_cfg.get("replacements", [])
+        replacement_map: dict[int, int] = {}
+        added_reviewer_ids: set[int] = set()
+        removed_reviewer_ids: set[int] = set()
+        
+        for r in replacements:
+            old_id = int(r.get("old_lecturer_id") or r.get("oldId") or r.get("old_id") or 0)
+            new_id = int(r.get("new_lecturer_id") or r.get("newId") or r.get("new_id") or 0)
+            if old_id > 0 and new_id > 0:
+                replacement_map[old_id] = new_id
+            elif old_id == 0 and new_id > 0:
+                added_reviewer_ids.add(new_id)
+            elif old_id > 0 and new_id == 0:
+                removed_reviewer_ids.add(old_id)
+
+        all_removed = set(replacement_map.keys()) | removed_reviewer_ids
+        all_added = set(replacement_map.values()) | added_reviewer_ids | setup_lecturer_ids
+
+        allowed_defense2_reviewers = (d11_reviewer_ids - all_removed) | all_added
+        if allowed_defense2_reviewers:
+            reviewer_ids = [rid for rid in reviewer_ids if rid in allowed_defense2_reviewers]
+            for aid in all_added:
+                if aid not in reviewer_ids:
+                    reviewer_ids.append(aid)
+
+    else:
+        # For non-DEFENSE_2, we still read replacements
+        council_cfg = round_row.get("council_config") or {}
+        replacements = council_cfg.get("replacements", [])
+        replacement_map: dict[int, int] = {}
+        added_reviewer_ids: set[int] = set()
+        removed_reviewer_ids: set[int] = set()
+        
+        for r in replacements:
+            old_id = int(r.get("old_lecturer_id") or r.get("oldId") or r.get("old_id") or 0)
+            new_id = int(r.get("new_lecturer_id") or r.get("newId") or r.get("new_id") or 0)
+            if old_id > 0 and new_id > 0:
+                replacement_map[old_id] = new_id
+            elif old_id == 0 and new_id > 0:
+                added_reviewer_ids.add(new_id)
+            elif old_id > 0 and new_id == 0:
+                removed_reviewer_ids.add(old_id)
+
+        all_removed = set(replacement_map.keys()) | removed_reviewer_ids
+        all_added = set(replacement_map.values()) | added_reviewer_ids
+        
+    if all_removed or all_added:
+        # Update reviewer_ids: remove excluded/replaced old_ids, add new_ids
+        for old_id in all_removed:
+            if old_id in reviewer_ids:
+                reviewer_ids.remove(old_id)
+        for new_id in all_added:
+            if new_id not in reviewer_ids:
+                reviewer_ids.append(new_id)
+        reviewer_ids = list(dict.fromkeys(reviewer_ids))
+
+        # Update availabilities for the new replacements by merging the old lecturer's slots
+        avail_set = set(availability_rows)
+        for old_id, new_id in replacement_map.items():
+            old_avails = {ts for lid, ts in avail_set if lid == old_id}
+            for ts in old_avails:
+                avail_set.add((new_id, ts))
+                
+        # For added lecturers without availability: give them all round timeslots
+        all_round_ts_ids = {ts[0] for ts in timeslots}
+        for aid in all_added:
+            if not any(lid == aid for lid, _ in avail_set):
+                for ts in all_round_ts_ids:
+                    avail_set.add((aid, ts))
+                    
+        # Remove replaced/excluded lecturers' availabilities
+        for old_id in all_removed:
+            avail_set = {(lid, ts) for lid, ts in avail_set if lid != old_id}
+        availability_rows = list(avail_set)
+
     existing_load_rows = db.execute(
         text(
             "SELECT cm.lecturer_id, COUNT(*) AS session_count "
@@ -409,20 +510,21 @@ def _round_input(
     )
     prior_rows: list[Any] = []
     if round_row["type"] in {"DEFENSE_1", "DEFENSE_1_2", "DEFENSE_2"}:
+        target_prior_types = ('DEFENSE_1_1', 'DEFENSE_1') if round_row["type"] == "DEFENSE_2" else ('REVIEW_1', 'REVIEW_1_1')
         prior_rows = db.execute(
             text(
                 "SELECT s.group_id, cm.lecturer_id FROM sessions s "
                 "JOIN council_members cm ON cm.council_id = s.council_id "
                 "JOIN schedule_versions sv ON sv.id = s.schedule_version_id "
                 "JOIN rounds previous_round ON previous_round.id = sv.round_id "
-                "WHERE s.group_id = ANY(:group_ids) AND previous_round.type IN ('REVIEW_1', 'REVIEW_1_1') "
+                "WHERE s.group_id = ANY(:group_ids) AND previous_round.type = ANY(:prior_types) "
                 "AND sv.status IN ('ACTIVE', 'PUBLISHED')"
             ),
-            {"group_ids": [row["id"] for row in group_rows] or [0]},
+            {"group_ids": [row["id"] for row in group_rows] or [0], "prior_types": list(target_prior_types)},
         ).all()
     prior: dict[int, set[int]] = {}
     for row in prior_rows:
-        prior.setdefault(row[0], set()).add(row[1])
+        prior.setdefault(int(row[0]), set()).add(int(row[1]))
     remediation_verifiers: dict[int, set[int]] = {}
     for group_id, verifier_id in db.execute(
         text(
@@ -1016,7 +1118,7 @@ def run_scheduler(round_id: Annotated[int, Path(alias="roundId")], payload: Sche
                     groups=groups,
                     timeslots=timeslots,
                     reviewers=reviewers,
-                    time_limit_seconds=payload.time_limit_seconds,
+                    time_limit_seconds=max(28.0, payload.time_limit_seconds),
                     random_seed=payload.random_seed + variant_index,
                     objective_profile=profile,
                     candidate_pool=candidate_pool,
