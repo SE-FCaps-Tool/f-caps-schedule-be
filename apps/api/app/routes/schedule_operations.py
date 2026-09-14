@@ -55,7 +55,6 @@ from app.services.councils import (
 )
 from app.services.room_assignment import (
     RoomAssignmentError,
-    allocate_room_assignments,
     allowed_room,
     find_room_conflict,
     lock_room_ids,
@@ -680,44 +679,19 @@ def _assignment_rows(db: Session, version_id: int) -> list[dict[str, Any]]:
         names.setdefault(aid, {})[lecturer_id] = snapshot_name
         if is_owner:
             owners.setdefault(aid, []).append(lecturer_id)
-    version_row = db.execute(
-        text("SELECT algorithm_parameters FROM schedule_versions WHERE id = :id"),
-        {"id": version_id},
-    ).mappings().one_or_none()
-    
-    ordered_reviewers = {}
-    if version_row and version_row.get("algorithm_parameters"):
-        ordered_reviewers = version_row["algorithm_parameters"].get("assigned_reviewers", {})
-
-    result = []
-    for row in rows:
-        assignment_id = row["assignment_id"]
-        group_id_str = str(row["group_id"])
-        
-        # If the exact order was persisted in algorithm_parameters, use it
-        if group_id_str in ordered_reviewers:
-            rev_ids = tuple(ordered_reviewers[group_id_str])
-        else:
-            # Fall back to putting result_owner(s) first
-            rev_ids = list(owners.get(assignment_id, []))
-            for r in by_assignment.get(assignment_id, []):
-                if r not in rev_ids:
-                    rev_ids.append(r)
-            rev_ids = tuple(rev_ids)
-
-        result.append(
-            {
-                **dict(row),
-                "status": "PLANNED",
-                "reviewer_ids": rev_ids,
-                "result_owner_ids": tuple(owners.get(assignment_id, [])),
-                "reviewer_names": {
-                    str(lecturer_id): name
-                    for lecturer_id, name in names.get(assignment_id, {}).items()
-                },
-            }
-        )
-    return result
+    return [
+        {
+            **dict(row),
+            "status": "PLANNED",
+            "reviewer_ids": tuple(by_assignment.get(row["assignment_id"], [])),
+            "result_owner_ids": tuple(owners.get(row["assignment_id"], [])),
+            "reviewer_names": {
+                str(lecturer_id): name
+                for lecturer_id, name in names.get(row["assignment_id"], {}).items()
+            },
+        }
+        for row in rows
+    ]
 
 
 def _to_domain_sessions(rows: list[dict[str, Any]]) -> list[ScheduledSession]:
@@ -988,10 +962,6 @@ def _persist_generated_schedule_draft(
             "metrics": result.metrics,
             "scheduled_count": len(result.sessions),
             "unscheduled_count": len(result.unscheduled),
-            "assigned_reviewers": {
-                str(session.group_id): list(session.reviewer_ids)
-                for session in result.sessions
-            },
         }
     )
     version_id = db.execute(
@@ -1014,54 +984,7 @@ def _persist_generated_schedule_draft(
         },
     ).scalar_one()
 
-    rooms = db.execute(
-        text(
-            """
-            SELECT r.id, r.code, r.room_type
-            FROM rooms r
-            WHERE r.active = TRUE
-              AND (
-                  EXISTS (SELECT 1 FROM round_room_types rrt
-                          WHERE rrt.round_id = :round_id AND rrt.room_type = r.room_type)
-                  OR NOT EXISTS (SELECT 1 FROM round_room_types rrt WHERE rrt.round_id = :round_id)
-              )
-            ORDER BY r.code, r.id
-            """
-        ),
-        {"round_id": round_id},
-    ).mappings().all()
-
-    room_by_group: dict[int, int | None] = {}
-    if rooms and result.sessions:
-        live = db.execute(
-            text(
-                """
-                SELECT s.id AS session_id, s.room_id, s.start_at, s.end_at
-                FROM sessions s JOIN schedule_versions sv ON sv.id = s.schedule_version_id
-                WHERE s.room_id IS NOT NULL
-                  AND sv.status IN ('ACTIVE', 'PUBLISHED')
-                  AND sv.round_id <> :round_id
-                """
-            ),
-            {"round_id": round_id},
-        ).mappings().all()
-        session_dicts = [
-            {
-                "group_id": s.group_id,
-                "timeslot_id": s.timeslot_id,
-                "start_at": s.start_at,
-                "end_at": s.end_at,
-                "day": s.day,
-                "session_id": s.group_id,
-            }
-            for s in result.sessions
-        ]
-        allocated = allocate_room_assignments(session_dicts, rooms, live)
-        for item in allocated:
-            room_by_group[item["group_id"]] = item.get("room_id")
-
     for session in result.sessions:
-        assigned_room_id = room_by_group.get(session.group_id, session.room_id)
         assignment_id = db.execute(
             text(
                 "INSERT INTO schedule_assignments(schedule_version_id,group_id,project_id,timeslot_id,room_id,start_at,end_at) "
@@ -1072,7 +995,7 @@ def _persist_generated_schedule_draft(
                 "group_id": session.group_id,
                 "project_id": context.group_project[session.group_id],
                 "timeslot_id": session.timeslot_id,
-                "room_id": assigned_room_id,
+                "room_id": session.room_id,
                 "start_at": session.start_at,
                 "end_at": session.end_at,
             },
@@ -1094,10 +1017,8 @@ def _persist_generated_schedule_draft(
                 {
                     "assignment_id": assignment_id,
                     "lecturer_id": lecturer_id,
-                    "is_owner": (
-                        (context.result_owner_mode and context.round_type in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"})
-                        or bool(context.council_config and context.council_config.get("chairs"))
-                    )
+                    "is_owner": context.result_owner_mode
+                    and context.round_type in {"DEFENSE_1_1", "REVIEW_3", "DEFENSE_2"}
                     and reviewer_index == 0,
                     "snapshot_name": name_map.get(lecturer_id, str(lecturer_id)),
                 },

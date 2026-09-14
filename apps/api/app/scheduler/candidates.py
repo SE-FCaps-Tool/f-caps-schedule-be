@@ -11,7 +11,7 @@ from app.scheduler.validator import _eligible, valid_h11_waiver
 # combinations for one group/slot) dominate the scheduler before CP-SAT starts.
 # Keep a deterministic, diverse sample when the full pool is too large. Assigned
 # Committees remain exact and are not subject to this cap.
-FREE_POOL_REVIEWER_TUPLE_CAP = 12
+FREE_POOL_REVIEWER_TUPLE_CAP = 16
 
 
 def generate_candidates(
@@ -97,11 +97,13 @@ def _council_config_reviewer_tuples(
             cid = c.get("lecturer_id")
             if cid in avail_set:
                 daily = c.get("daily_quota")
-                if daily is not None and len(daily) > 0:
-                    if day and daily.get(day, 0) > 0:
+                if daily and day:
+                    if daily.get(day, 0) > 0:
                         valid_chairs.append(cid)
                 else:
                     valid_chairs.append(cid)
+        if not valid_chairs:
+            valid_chairs = [cid for cid in chair_ids if cid in avail_set]
     else:
         valid_chairs = list(available)
 
@@ -112,59 +114,40 @@ def _council_config_reviewer_tuples(
 
     # 2. Determine eligible secretaries
     sec_ids = [s["lecturer_id"] for s in secretaries if "lecturer_id" in s]
-    valid_secretaries = [sid for sid in sec_ids if sid in avail_set and sid not in chair_ids]
+    valid_secretaries = [sid for sid in sec_ids if sid in avail_set]
 
     tuples: list[tuple[int, ...]] = []
     seen: set[tuple[int, ...]] = set()
 
-    # Stable, non-overlapping base assignment for each chair in this shift.
-    # Keeps the council fixed for the chair while allowing 1 continuity swap when needed.
-    needed = max(reviewer_count - 2, 0)
-    for shift in range(1):
-        seed = rotation_seed + shift * 7
-        
-        # Pick N distinct secretaries
-        sec_pool = list(valid_secretaries)
-        if len(sec_pool) < len(valid_chairs):
-            sec_pool += [r for r in available if r not in chair_ids and r not in sec_pool]
-            
-        if len(sec_pool) < len(valid_chairs):
-            break
-            
-        start_sec = seed % len(sec_pool)
-        chosen_secs = [sec_pool[(start_sec + i) % len(sec_pool)] for i in range(len(valid_chairs))]
-        
-        remaining_for_mems = [r for r in available if r not in chair_ids and r not in chosen_secs]
-        start_mem = seed % max(1, len(remaining_for_mems)) if remaining_for_mems else 0
-        
-        for idx, cid in enumerate(valid_chairs):
-            sid = chosen_secs[idx]
-            
-            if len(remaining_for_mems) >= len(valid_chairs) * needed:
-                base_mems = [remaining_for_mems[(start_mem + idx * needed + i) % len(remaining_for_mems)] for i in range(needed)]
-            else:
-                base_mems = [remaining_for_mems[(start_mem + idx * needed + i) % max(1, len(remaining_for_mems))] for i in range(needed)] if remaining_for_mems else []
-            
-            if len(set(base_mems)) < needed:
-                continue
-                
-            sat_by_cs = continuity is None or cid in continuity or sid in continuity
-            if sat_by_cs or any(m in continuity for m in base_mems):
-                t = (cid, sid, *sorted(base_mems))
+    for cid in valid_chairs:
+        remaining_for_sec = [r for r in available if r != cid]
+        sec_candidates = [s for s in valid_secretaries if s != cid]
+        if not sec_candidates:
+            sec_candidates = remaining_for_sec
+
+        for sid in sec_candidates:
+            other_avail = [r for r in remaining_for_sec if r != sid]
+            needed = reviewer_count - 2
+            needed = max(needed, 0)
+            if needed == 0:
+                t = (cid, sid)
                 if t not in seen:
                     seen.add(t)
                     tuples.append(t)
             else:
-                # Swap 1 member to satisfy continuity
-                cont_avail = [r for r in remaining_for_mems if r in continuity and r not in base_mems]
-                for cont_r in cont_avail[:2]:
-                    new_mems = base_mems.copy()
-                    new_mems[0] = cont_r
-                    t = (cid, sid, *sorted(new_mems))
+                if len(other_avail) < needed:
+                    continue
+                for other_members in combinations(other_avail, needed):
+                    t = (cid, sid, *other_members)
                     if t not in seen:
                         seen.add(t)
                         tuples.append(t)
-                    break
+                    if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
+                        break
+            if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
+                break
+        if len(tuples) >= FREE_POOL_REVIEWER_TUPLE_CAP:
+            break
 
     return tuples
 
