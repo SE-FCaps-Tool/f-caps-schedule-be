@@ -140,11 +140,12 @@ def validate_schedule(
         if context.round_type in (DEFENSE_1_2_TYPES | {"DEFENSE_2"}) and not valid_h11_waiver(context, current.group_id):
             continuity = set(context.prior_reviewer_ids.get(current.group_id, set()))
             if not continuity.intersection(current.reviewer_ids):
+                source = "Defense 1.1" if context.round_type == "DEFENSE_2" else "Review 1.1"
                 violations.append(
                     _violation(
                         "H11",
-                        "The council has no Reviewer with continuity from Review 1.1.",
-                        "Assign a prior Reviewer from Review 1.1, or obtain an audited H11 waiver.",
+                        f"The council has no Reviewer with continuity from {source}.",
+                        f"Assign a prior Reviewer from {source}, or obtain an audited H11 waiver.",
                         current.group_id,
                     )
                 )

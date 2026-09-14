@@ -14,7 +14,7 @@ _ROUND_TRANSITIONS: dict[RoundStatus, frozenset[RoundStatus]] = {
     ),
     RoundStatus.REGISTRATION_CLOSED: frozenset({RoundStatus.SCHEDULING, RoundStatus.CANCELLED}),
     RoundStatus.SCHEDULING: frozenset({RoundStatus.SCHEDULED, RoundStatus.CANCELLED}),
-    RoundStatus.SCHEDULED: frozenset({RoundStatus.PUBLISHED, RoundStatus.CANCELLED}),
+    RoundStatus.SCHEDULED: frozenset({RoundStatus.PUBLISHED, RoundStatus.SCHEDULING, RoundStatus.CANCELLED}),
     RoundStatus.PUBLISHED: frozenset(
         {RoundStatus.ONGOING, RoundStatus.POSTPONED, RoundStatus.CANCELLED}
     ),

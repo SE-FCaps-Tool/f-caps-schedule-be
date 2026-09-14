@@ -2861,6 +2861,13 @@
             "title": "Chairs",
             "type": "array"
           },
+          "replacements": {
+            "items": {
+              "$ref": "#/components/schemas/LecturerReplacementConfig"
+            },
+            "title": "Replacements",
+            "type": "array"
+          },
           "secretaries": {
             "items": {
               "$ref": "#/components/schemas/SecretaryConfig"
@@ -4484,6 +4491,26 @@
           "lecturerCode"
         ],
         "title": "LecturerLoadResponse",
+        "type": "object"
+      },
+      "LecturerReplacementConfig": {
+        "properties": {
+          "newLecturerId": {
+            "minimum": 0.0,
+            "title": "New Lecturer Id",
+            "type": "integer"
+          },
+          "oldLecturerId": {
+            "minimum": 0.0,
+            "title": "Old Lecturer Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "oldLecturerId",
+          "newLecturerId"
+        ],
+        "title": "LecturerReplacementConfig",
         "type": "object"
       },
       "LecturerResponse": {
@@ -14713,7 +14740,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "4f6d7b5be6420c60556986b2e94a9d6433bda2d7",
+    "x-be-commit": "71f0526b39f7f980dc6b97fb75c219cad575bb84",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
