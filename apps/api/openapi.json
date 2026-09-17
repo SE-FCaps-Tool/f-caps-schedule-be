@@ -14783,7 +14783,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "0d1956c184dcd92642e73334c52c3df11cd698b7",
+    "x-be-commit": "1d2173f8133540fefa49eb4a4acdb935ed9b19a3",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -18957,7 +18957,7 @@
     },
     "/api/v1/projects/import": {
       "post": {
-        "description": "Import từ sheet Mã đề tài / Mã nhóm / Tên đề tài VI-EN / GVHD-GVHD1-GVHD2.\n\nSheet không có cột Department/majorCode nên major luôn cố định SE. GVHD = GVHD1\n(MAIN), GVHD2 (CO, tùy chọn) — khớp bằng lecturer_code, không đoán theo tên hiển thị.",
+        "description": "Import từ sheet Mã đề tài / Mã nhóm / Tên đề tài VI-EN / Department / GVHD-GVHD1-GVHD2.\n\nDepartment -> major theo code (ví dụ SE, CF, ITS); tự tạo major mới nếu chưa có,\ntrống thì mặc định SE. GVHD = GVHD1 (MAIN), GVHD2 (CO, tùy chọn) — khớp bằng\nlecturer_code, không đoán theo tên hiển thị.",
         "operationId": "import_projects_api_v1_projects_import_post",
         "parameters": [
           {

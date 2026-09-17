@@ -1150,6 +1150,48 @@ def _workbook_rows(upload: UploadFile) -> dict[str, list[dict[str, Any]]]:
     return result
 
 
+_PROJECT_IMPORT_MAX_FILE_BYTES = 5 * 1024 * 1024
+_PROJECT_IMPORT_MAX_ROWS = 2000
+
+
+def _project_import_rows(upload: UploadFile) -> list[tuple[int, dict[str, Any]]]:
+    """Đọc sheet đầu tiên, tự dò dòng tiêu đề thay vì giả định luôn là dòng 1 — file thật
+    (vd. DanhSachDeTai_FA26.xlsx) có 1 dòng banner ("PROJECTS INFORMATION") phía trên tiêu đề
+    thật, khiến _workbook_rows (giả định rows[0] là tiêu đề) đọc sai toàn bộ và bỏ qua mọi dòng.
+    """
+    raw = upload.file.read(_PROJECT_IMPORT_MAX_FILE_BYTES + 1)
+    if len(raw) > _PROJECT_IMPORT_MAX_FILE_BYTES:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_FILE_TOO_LARGE", "message": "File exceeds the 5MB import limit."})
+    try:
+        workbook = load_workbook(BytesIO(raw), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_INVALID_FILE", "message": "Only a readable .xlsx file is supported."}) from exc
+    if not workbook.worksheets:
+        raise HTTPException(status_code=422, detail={"code": "IMPORT_INVALID_FILE", "message": "Workbook has no sheets."})
+    sheet = workbook.worksheets[0]
+    header_row_number: int | None = None
+    headers: list[str] = []
+    result: list[tuple[int, dict[str, Any]]] = []
+    for row_number, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        if header_row_number is None:
+            normalised = [_normalise_header(item) for item in row]
+            if "madetai" in normalised and "manhom" in normalised:
+                header_row_number = row_number
+                headers = normalised
+            continue
+        if not row or not any(value is not None for value in row):
+            continue
+        if len(result) >= _PROJECT_IMPORT_MAX_ROWS:
+            raise HTTPException(status_code=422, detail={"code": "IMPORT_TOO_MANY_ROWS", "message": f"Import is limited to {_PROJECT_IMPORT_MAX_ROWS} data rows."})
+        result.append((row_number, {headers[index]: row[index] for index in range(min(len(headers), len(row))) if headers[index]}))
+    if header_row_number is None:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "IMPORT_INVALID_FILE", "message": "Không tìm thấy dòng tiêu đề — cần có cột Mã đề tài và Mã nhóm."},
+        )
+    return result
+
+
 _LECTURER_IMPORT_MAX_FILE_BYTES = 5 * 1024 * 1024
 _LECTURER_IMPORT_MAX_ROWS = 2000
 
@@ -1243,14 +1285,14 @@ async def import_projects(
     user: User,
     semester_id: Annotated[int, Query(alias="semesterId")],
 ) -> dict[str, Any]:
-    """Import từ sheet Mã đề tài / Mã nhóm / Tên đề tài VI-EN / GVHD-GVHD1-GVHD2.
+    """Import từ sheet Mã đề tài / Mã nhóm / Tên đề tài VI-EN / Department / GVHD-GVHD1-GVHD2.
 
-    Sheet không có cột Department/majorCode nên major luôn cố định SE. GVHD = GVHD1
-    (MAIN), GVHD2 (CO, tùy chọn) — khớp bằng lecturer_code, không đoán theo tên hiển thị.
+    Department -> major theo code (ví dụ SE, CF, ITS); tự tạo major mới nếu chưa có,
+    trống thì mặc định SE. GVHD = GVHD1 (MAIN), GVHD2 (CO, tùy chọn) — khớp bằng
+    lecturer_code, không đoán theo tên hiển thị.
     """
     _require(user, "ADMIN", "MANAGER")
-    sheets = _workbook_rows(file)
-    rows = sheets.get("projects") or next(iter(sheets.values()), [])
+    rows = _project_import_rows(file)
     created = 0
     updated = 0
     errors: list[dict[str, Any]] = []
@@ -1260,22 +1302,29 @@ async def import_projects(
     # InvalidRequestError("A transaction is already begun on this Session").
     with db.begin():
         ensure_semester_writable(db, semester_id)  # 404 SEMESTER_NOT_FOUND nếu semester_id sai
-        major_id = db.execute(text("SELECT id FROM majors WHERE code = 'SE'")).scalar_one_or_none()
-        if major_id is None:
-            raise HTTPException(status_code=500, detail={"code": "MAJOR_SE_MISSING", "message": "Default major SE is missing from master data."})
 
-        # Preload toàn bộ mã GV thay vì query từng dòng (N+1) — sheet có thể vài trăm dòng.
+        # Preload toàn bộ mã GV và major thay vì query từng dòng (N+1) — sheet có thể vài trăm dòng.
         lecturer_by_code = {
             str(code).upper(): lecturer_id
             for lecturer_id, code in db.execute(text("SELECT id, lecturer_code FROM lecturers")).all()
         }
+        major_by_code = {
+            str(code).upper(): major_id
+            for major_id, code in db.execute(text("SELECT id, code FROM majors")).all()
+        }
 
-        for index, row in enumerate(rows, start=2):
+        for index, row in rows:
             raw_code = str(row.get("madetai") or row.get("code") or row.get("projectcode") or "").strip()
             raw_group_code = str(row.get("manhom") or "").strip()
             title_vi = str(row.get("tendetaitiengviet") or row.get("titlevi") or "").strip() or None
             title_en = str(row.get("tendetaitienganhtiengnhat") or row.get("titleen") or "").strip() or None
             title = title_en or title_vi
+            # dept_provided = false khi cột Department trống/không có trong sheet (đúng với
+            # template FE hiện tại — TEMPLATE_COLUMNS chưa có Department) — trong trường hợp đó
+            # đề tài đã tồn tại giữ nguyên major cũ khi upsert, không bị reset về SE mặc định.
+            dept_raw = str(row.get("department") or row.get("majorcode") or "").strip().upper()
+            dept_provided = bool(dept_raw)
+            dept_code = dept_raw or "SE"
             gvhd1_raw = str(row.get("gvhd1") or row.get("gvhd") or "").strip()
             gvhd2_raw = str(row.get("gvhd2") or "").strip()
             code = normalize_code(raw_code) if raw_code else None
@@ -1284,6 +1333,9 @@ async def import_projects(
             gvhd2_code = normalize_code(gvhd2_raw) if gvhd2_raw else None
             if not code or not group_code or not title or not gvhd1_code:
                 errors.append({"row": index, "code": "REQUIRED_FIELD_MISSING", "message": "Mã đề tài, Mã nhóm, tên đề tài và GVHD đều bắt buộc."})
+                continue
+            if len(dept_code) > 32:
+                errors.append({"row": index, "code": "PROJECT_ROW_INVALID", "message": f"Mã Department '{dept_code[:40]}' vượt quá 32 ký tự."})
                 continue
 
             gvhd1_id = lecturer_by_code.get(gvhd1_code)
@@ -1302,17 +1354,41 @@ async def import_projects(
 
             try:
                 with db.begin_nested():
+                    # Resolve major TRONG savepoint của dòng — một mã Department bị trùng đua
+                    # (2 import chạy đồng thời tạo cùng 1 mã mới) chỉ làm hỏng dòng này, không
+                    # 500 + rollback cả batch như INSERT không ON CONFLICT trước đây.
+                    major_id = major_by_code.get(dept_code)
+                    if major_id is None:
+                        major_id = db.execute(
+                            text(
+                                "INSERT INTO majors (code, name) VALUES (:code, :code) "
+                                "ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code "
+                                "RETURNING id"
+                            ),
+                            {"code": dept_code},
+                        ).scalar_one()
+                        major_by_code[dept_code] = major_id
+
                     project_row = db.execute(
                         text(
                             "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) "
                             "VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en) "
                             "ON CONFLICT (semester_id, code) DO UPDATE SET "
+                            "major_id = CASE WHEN :dept_provided THEN EXCLUDED.major_id ELSE projects.major_id END, "
                             "title = COALESCE(EXCLUDED.title, projects.title), "
                             "title_vi = COALESCE(EXCLUDED.title_vi, projects.title_vi), "
                             "title_en = COALESCE(EXCLUDED.title_en, projects.title_en) "
                             "RETURNING id, (xmax = 0) AS inserted"
                         ),
-                        {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title, "title_vi": title_vi, "title_en": title_en},
+                        {
+                            "semester_id": semester_id,
+                            "major_id": major_id,
+                            "code": code,
+                            "title": title,
+                            "title_vi": title_vi,
+                            "title_en": title_en,
+                            "dept_provided": dept_provided,
+                        },
                     ).mappings().one()
                     project_id = project_row["id"]
                     is_new = bool(project_row["inserted"])
