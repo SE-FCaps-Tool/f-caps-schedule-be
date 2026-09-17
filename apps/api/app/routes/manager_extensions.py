@@ -1357,10 +1357,7 @@ async def import_projects(
         current: dict[str, Any] | None = None
         for index, row in rows:
             has_group_code = bool(str(row.get("manhom") or "").strip())
-            if not is_student_format:
-                current = {"index": index, "row": row, "members": []}
-                blocks.append(current)
-            elif has_group_code:
+            if not is_student_format or has_group_code:
                 current = {"index": index, "row": row, "members": []}
                 blocks.append(current)
             if current is None:
@@ -1379,11 +1376,16 @@ async def import_projects(
             index = block["index"]
             row = block["row"]
 
-            def _reject_block(err_code: str, message: str) -> None:
+            def _reject_block(
+                err_code: str,
+                message: str,
+                block_index: int,
+                members: list[dict[str, Any]],
+            ) -> None:
                 # Header của block lỗi thì mọi dòng thành viên theo sau cũng không được xử lý
                 # — báo rõ từng dòng thay vì để "biến mất" khỏi cả created/updated/skipped.
-                errors.append({"row": index, "code": err_code, "message": message})
-                for member in block["members"]:
+                errors.append({"row": block_index, "code": err_code, "message": message})
+                for member in members:
                     errors.append({"row": member["row"], "code": "MEMBER_ROW_SKIPPED", "message": "Bỏ qua vì dòng đề tài của nhóm này lỗi."})
 
             raw_code = str(row.get("madetai") or row.get("code") or row.get("projectcode") or "").strip()
@@ -1402,10 +1404,10 @@ async def import_projects(
             code = normalize_code(raw_code) if raw_code else None
             group_code = normalize_code(raw_group_code) if raw_group_code else None
             if not code or not group_code or not title or not gvhd1_raw:
-                _reject_block("REQUIRED_FIELD_MISSING", "Mã đề tài, Mã nhóm, tên đề tài và GVHD đều bắt buộc.")
+                _reject_block("REQUIRED_FIELD_MISSING", "Mã đề tài, Mã nhóm, tên đề tài và GVHD đều bắt buộc.", index, block["members"])
                 continue
             if len(dept_code) > 32:
-                _reject_block("PROJECT_ROW_INVALID", f"Mã Department '{dept_code[:40]}' vượt quá 32 ký tự.")
+                _reject_block("PROJECT_ROW_INVALID", f"Mã Department '{dept_code[:40]}' vượt quá 32 ký tự.", index, block["members"])
                 continue
 
             if is_student_format:
@@ -1423,14 +1425,14 @@ async def import_projects(
                 gvhd1_label, gvhd2_label = gvhd1_code, gvhd2_code
 
             if gvhd1_id is None:
-                _reject_block("GVHD_NOT_FOUND", f"Không tìm thấy giảng viên khớp với '{gvhd1_label}'.")
+                _reject_block("GVHD_NOT_FOUND", f"Không tìm thấy giảng viên khớp với '{gvhd1_label}'.", index, block["members"])
                 continue
             if gvhd2_raw:
                 if gvhd2_key == gvhd1_key:
-                    _reject_block("GVHD_DUPLICATE", "GVHD và GVHD2 không được trùng nhau.")
+                    _reject_block("GVHD_DUPLICATE", "GVHD và GVHD2 không được trùng nhau.", index, block["members"])
                     continue
                 if gvhd2_id is None:
-                    _reject_block("GVHD_NOT_FOUND", f"Không tìm thấy giảng viên khớp với '{gvhd2_label}'.")
+                    _reject_block("GVHD_NOT_FOUND", f"Không tìm thấy giảng viên khớp với '{gvhd2_label}'.", index, block["members"])
                     continue
 
             try:
@@ -1501,11 +1503,11 @@ async def import_projects(
                 else:
                     updated += 1
             except DomainError as exc:
-                _reject_block(exc.code, str(exc))
+                _reject_block(exc.code, str(exc), index, block["members"])
                 continue
             except Exception:
                 logging.getLogger(__name__).exception("projects/import row %s (code=%s) failed", index, code)
-                _reject_block("PROJECT_ROW_INVALID", f"Không import được dòng {index} (mã {code}).")
+                _reject_block("PROJECT_ROW_INVALID", f"Không import được dòng {index} (mã {code}).", index, block["members"])
                 continue
 
             seen_member_codes: set[str] = set()
