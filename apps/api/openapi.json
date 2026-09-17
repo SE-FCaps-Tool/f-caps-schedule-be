@@ -139,6 +139,17 @@
             "title": "Id",
             "type": "integer"
           },
+          "lecturerCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lecturercode"
+          },
           "role": {
             "anyOf": [
               {
@@ -14740,7 +14751,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "71f0526b39f7f980dc6b97fb75c219cad575bb84",
+    "x-be-commit": "beb1198f60db5fe7603035829f563c4175c800c3",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
