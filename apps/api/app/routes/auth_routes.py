@@ -249,12 +249,12 @@ def logout(response: Response, request: Request, db: Db, settings: SettingsDep) 
     response.delete_cookie("scheduler_csrf")
     if cookie_domain:
         response.delete_cookie("scheduler_csrf", domain=cookie_domain)
-    response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
+    _clear_login_challenge_cookie(response, settings)
     return {"status": "signed_out"}
 
 
 @router.get("/pending", response_model=RoleSelectionResponse)
-def pending_role_selection(request: Request, response: Response, db: Db) -> dict[str, list[str]]:
+def pending_role_selection(request: Request, response: Response, db: Db, settings: SettingsDep) -> dict[str, list[str]]:
     challenge = _get_login_challenge(db, request.cookies.get(LOGIN_CHALLENGE_COOKIE))
     if challenge is None:
         raise HTTPException(
@@ -263,7 +263,7 @@ def pending_role_selection(request: Request, response: Response, db: Db) -> dict
         )
     roles = _roles_for_account(db, int(challenge["account_id"]))
     if not roles:
-        response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
+        _clear_login_challenge_cookie(response, settings)
         raise HTTPException(
             status_code=401,
             detail={"code": "ACCOUNT_ROLE_MISSING", "message": "No active role is assigned to this account."},
@@ -290,7 +290,7 @@ def select_role(
     session_row = lookup_session_row(db, settings, session_token) if session_token else None
 
     if challenge is None and session_row is None:
-        response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
+        _clear_login_challenge_cookie(response, settings)
         raise HTTPException(
             status_code=401,
             detail={"code": "ROLE_SELECTION_EXPIRED", "message": "Role selection has expired. Please sign in again."},
@@ -340,7 +340,7 @@ def select_role(
     # _create_session — a failure partway through must not leave the account
     # with zero valid sessions.
     expires = _create_session(db, account_id, role, response, settings, provider=provider)
-    response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
+    _clear_login_challenge_cookie(response, settings)
     account = db.execute(
         text("SELECT email, display_name FROM accounts WHERE id = :account_id"),
         {"account_id": account_id},
@@ -518,6 +518,11 @@ def _create_login_challenge(db: Session, account_id: int, *, provider: str) -> s
 
 
 def _set_login_challenge_cookie(response: Response, token: str, settings: Settings) -> None:
+    cookie_domain = settings.cookie_domain or None
+    # Remove both cookie variants during the rollout from host-only cookies to
+    # the shared parent domain. Without this, browsers can retain two cookies
+    # with the same name and send the stale host-only value first.
+    _clear_login_challenge_cookie(response, settings)
     secure = settings.app_env not in {"development", "test"}
     response.set_cookie(
         LOGIN_CHALLENGE_COOKIE,
@@ -527,7 +532,21 @@ def _set_login_challenge_cookie(response: Response, token: str, settings: Settin
         samesite="lax",
         max_age=LOGIN_CHALLENGE_MAX_AGE,
         path=LOGIN_CHALLENGE_COOKIE_PATH,
+        domain=cookie_domain,
     )
+
+
+def _clear_login_challenge_cookie(response: Response, settings: Settings) -> None:
+    """Clear both legacy host-only and shared-domain role challenge cookies."""
+
+    response.delete_cookie(LOGIN_CHALLENGE_COOKIE, path=LOGIN_CHALLENGE_COOKIE_PATH)
+    cookie_domain = settings.cookie_domain or None
+    if cookie_domain:
+        response.delete_cookie(
+            LOGIN_CHALLENGE_COOKIE,
+            path=LOGIN_CHALLENGE_COOKIE_PATH,
+            domain=cookie_domain,
+        )
 
 
 def _get_login_challenge(db: Session, token: str | None, *, for_update: bool = False):

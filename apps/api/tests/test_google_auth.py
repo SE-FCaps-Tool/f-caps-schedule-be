@@ -3,10 +3,13 @@ from __future__ import annotations
 import base64
 import hashlib
 
+from starlette.responses import Response
+
 from app.config import Settings
 from app.routes.auth_routes import (
     _frontend_redirect,
     _pkce_challenge,
+    _set_login_challenge_cookie,
     google_callback,
     google_start,
 )
@@ -64,6 +67,39 @@ def test_google_start_scopes_flow_cookies_to_shared_parent_domain(monkeypatch) -
     assert len(set_cookie_headers) == 3
     assert all("Domain=.f-caps.net" in header for header in set_cookie_headers)
     assert all("Path=/api/v1/auth/google" in header for header in set_cookie_headers)
+
+
+def test_login_challenge_cookie_scopes_to_shared_parent_domain_and_clears_legacy_cookie() -> None:
+    response = Response()
+
+    _set_login_challenge_cookie(
+        response,
+        "challenge-token",
+        Settings(app_env="production", cookie_domain=".f-caps.net"),
+    )
+
+    set_cookie_headers = response.headers.getlist("set-cookie")
+
+    assert any(
+        'scheduler_login_challenge=""' in header
+        and "Path=/api/v1/auth" in header
+        and "Domain=.f-caps.net" not in header
+        for header in set_cookie_headers
+    )
+    assert any(
+        'scheduler_login_challenge=""' in header
+        and "Domain=.f-caps.net" in header
+        and "Path=/api/v1/auth" in header
+        for header in set_cookie_headers
+    )
+    assert any(
+        "scheduler_login_challenge=challenge-token" in header
+        and "Domain=.f-caps.net" in header
+        and "Path=/api/v1/auth" in header
+        and "Max-Age=600" in header
+        and "HttpOnly" in header
+        for header in set_cookie_headers
+    )
 
 
 def test_google_callback_success_path_passes_settings_to_cookie_cleanup(monkeypatch) -> None:
