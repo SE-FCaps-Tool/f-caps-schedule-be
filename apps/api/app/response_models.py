@@ -772,6 +772,10 @@ class AccountImportResponse(ImportResponse):
     accounts: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ProjectImportResponse(ImportResponse):
+    updated: int = 0
+
+
 class UnscheduledReportResponse(ResponseModel):
     round_id: int
     generated_at: datetime

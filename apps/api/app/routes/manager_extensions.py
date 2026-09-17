@@ -7,6 +7,7 @@ schedule state machine remains unchanged.
 
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 import unicodedata
@@ -52,6 +53,7 @@ from app.response_models import (
     ImportResponse,
     InvitationResponse,
     LecturerImportResponse,
+    ProjectImportResponse,
     ProjectMutationResponse,
     QuotaResponse,
     RescheduleRequestResponse,
@@ -1234,58 +1236,121 @@ async def import_lecturers(
     return {"created": created, "skipped": len(errors), "errors": errors, "accounts": accounts}
 
 
-@router.post("/projects/import", status_code=status.HTTP_201_CREATED, response_model=ImportResponse)
+@router.post("/projects/import", status_code=status.HTTP_201_CREATED, response_model=ProjectImportResponse)
 async def import_projects(
     file: ImportFile,
     db: Db,
     user: User,
+    semester_id: Annotated[int, Query(alias="semesterId")],
 ) -> dict[str, Any]:
+    """Import từ sheet Mã đề tài / Mã nhóm / Tên đề tài VI-EN / GVHD-GVHD1-GVHD2.
+
+    Sheet không có cột Department/majorCode nên major luôn cố định SE. GVHD = GVHD1
+    (MAIN), GVHD2 (CO, tùy chọn) — khớp bằng lecturer_code, không đoán theo tên hiển thị.
+    """
     _require(user, "ADMIN", "MANAGER")
     sheets = _workbook_rows(file)
     rows = sheets.get("projects") or next(iter(sheets.values()), [])
     created = 0
+    updated = 0
     errors: list[dict[str, Any]] = []
+    # Mọi lookup phải nằm TRONG with db.begin(): get_current_user đã đóng transaction
+    # trước khi trả về CurrentUser, nhưng SQLAlchemy Session autobegin ngay ở lệnh
+    # execute() kế tiếp — gọi db.begin() sau khi đã execute() ít nhất 1 lần sẽ raise
+    # InvalidRequestError("A transaction is already begun on this Session").
     with db.begin():
+        ensure_semester_writable(db, semester_id)  # 404 SEMESTER_NOT_FOUND nếu semester_id sai
+        major_id = db.execute(text("SELECT id FROM majors WHERE code = 'SE'")).scalar_one_or_none()
+        if major_id is None:
+            raise HTTPException(status_code=500, detail={"code": "MAJOR_SE_MISSING", "message": "Default major SE is missing from master data."})
+
+        # Preload toàn bộ mã GV thay vì query từng dòng (N+1) — sheet có thể vài trăm dòng.
+        lecturer_by_code = {
+            str(code).upper(): lecturer_id
+            for lecturer_id, code in db.execute(text("SELECT id, lecturer_code FROM lecturers")).all()
+        }
+
         for index, row in enumerate(rows, start=2):
-            code = str(row.get("code") or row.get("projectcode") or "").strip()
-            title_vi = str(
-                row.get("titlevi")
-                or row.get("namevi")
-                or row.get("tendetaitiengviet")
-                or row.get("title")
-                or row.get("project")
-                or row.get("name")
-                or code
-            ).strip()
-            title_en = str(
-                row.get("titleen")
-                or row.get("nameen")
-                or row.get("tendetaitienganhtiengnhat")
-                or ""
-            ).strip() or None
+            raw_code = str(row.get("madetai") or row.get("code") or row.get("projectcode") or "").strip()
+            raw_group_code = str(row.get("manhom") or "").strip()
+            title_vi = str(row.get("tendetaitiengviet") or row.get("titlevi") or "").strip() or None
+            title_en = str(row.get("tendetaitienganhtiengnhat") or row.get("titleen") or "").strip() or None
             title = title_en or title_vi
-            semester_code = str(row.get("semestercode") or row.get("semester") or "").strip()
-            major_code = str(row.get("majorcode") or row.get("major") or "").strip()
-            if not code or not semester_code or not major_code:
-                errors.append({"row": index, "code": "REQUIRED_FIELD_MISSING"})
+            gvhd1_raw = str(row.get("gvhd1") or row.get("gvhd") or "").strip()
+            gvhd2_raw = str(row.get("gvhd2") or "").strip()
+            code = normalize_code(raw_code) if raw_code else None
+            group_code = normalize_code(raw_group_code) if raw_group_code else None
+            gvhd1_code = normalize_code(gvhd1_raw) if gvhd1_raw else None
+            gvhd2_code = normalize_code(gvhd2_raw) if gvhd2_raw else None
+            if not code or not group_code or not title or not gvhd1_code:
+                errors.append({"row": index, "code": "REQUIRED_FIELD_MISSING", "message": "Mã đề tài, Mã nhóm, tên đề tài và GVHD đều bắt buộc."})
                 continue
-            semester_id = db.execute(text("SELECT id FROM semesters WHERE code = :code"), {"code": semester_code}).scalar_one_or_none()
-            major_id = db.execute(text("SELECT id FROM majors WHERE code = :code"), {"code": major_code}).scalar_one_or_none()
-            if semester_id is None or major_id is None:
-                errors.append({"row": index, "code": "SEMESTER_OR_MAJOR_NOT_FOUND"})
+
+            gvhd1_id = lecturer_by_code.get(gvhd1_code)
+            if gvhd1_id is None:
+                errors.append({"row": index, "code": "GVHD_NOT_FOUND", "message": f"Không tìm thấy giảng viên với mã {gvhd1_code}."})
                 continue
-            topic_type = str(row.get("topictype") or "REGULAR").strip().upper()
-            if topic_type not in {"APPLICATION", "RESEARCH", "INTEGRATED", "REGULAR"}:
-                errors.append({"row": index, "code": "TOPIC_TYPE_INVALID", "message": "topicType must be APPLICATION, RESEARCH, INTEGRATED or REGULAR."})
-                continue
-            ensure_semester_writable(db, int(semester_id))
+            gvhd2_id = None
+            if gvhd2_code:
+                if gvhd2_code == gvhd1_code:
+                    errors.append({"row": index, "code": "GVHD_DUPLICATE", "message": "GVHD và GVHD2 không được trùng nhau."})
+                    continue
+                gvhd2_id = lecturer_by_code.get(gvhd2_code)
+                if gvhd2_id is None:
+                    errors.append({"row": index, "code": "GVHD_NOT_FOUND", "message": f"Không tìm thấy giảng viên với mã {gvhd2_code}."})
+                    continue
+
             try:
                 with db.begin_nested():
-                    db.execute(text("INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en, topic_type) VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en, CAST(:topic_type AS topic_type))"), {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title, "title_vi": title_vi, "title_en": title_en, "topic_type": topic_type})
-                created += 1
+                    project_row = db.execute(
+                        text(
+                            "INSERT INTO projects (semester_id, major_id, code, title, title_vi, title_en) "
+                            "VALUES (:semester_id, :major_id, :code, :title, :title_vi, :title_en) "
+                            "ON CONFLICT (semester_id, code) DO UPDATE SET "
+                            "title = COALESCE(EXCLUDED.title, projects.title), "
+                            "title_vi = COALESCE(EXCLUDED.title_vi, projects.title_vi), "
+                            "title_en = COALESCE(EXCLUDED.title_en, projects.title_en) "
+                            "RETURNING id, (xmax = 0) AS inserted"
+                        ),
+                        {"semester_id": semester_id, "major_id": major_id, "code": code, "title": title, "title_vi": title_vi, "title_en": title_en},
+                    ).mappings().one()
+                    project_id = project_row["id"]
+                    is_new = bool(project_row["inserted"])
+
+                    existing_group = db.execute(text("SELECT code FROM groups WHERE project_id = :project_id"), {"project_id": project_id}).mappings().one_or_none()
+                    if existing_group is None:
+                        db.execute(text("INSERT INTO groups (project_id, code) VALUES (:project_id, :code)"), {"project_id": project_id, "code": group_code})
+                    elif existing_group["code"] != group_code:
+                        raise DomainError("GROUP_CODE_MISMATCH", f"Project {code} already has group {existing_group['code']}, cannot change to {group_code}.")
+
+                    db.execute(text("DELETE FROM project_supervisors WHERE project_id = :project_id"), {"project_id": project_id})
+                    db.execute(
+                        text("INSERT INTO project_supervisors (project_id, lecturer_id, supervisor_type) VALUES (:project_id, :lecturer_id, 'MAIN'::supervisor_type)"),
+                        {"project_id": project_id, "lecturer_id": gvhd1_id},
+                    )
+                    if gvhd2_id is not None:
+                        db.execute(
+                            text("INSERT INTO project_supervisors (project_id, lecturer_id, supervisor_type) VALUES (:project_id, :lecturer_id, 'CO'::supervisor_type)"),
+                            {"project_id": project_id, "lecturer_id": gvhd2_id},
+                        )
+                if is_new:
+                    created += 1
+                else:
+                    updated += 1
+            except DomainError as exc:
+                errors.append({"row": index, "code": exc.code, "message": str(exc)})
             except Exception:
-                errors.append({"row": index, "code": "PROJECT_DUPLICATE_OR_INVALID"})
-    return {"created": created, "skipped": len(errors), "errors": errors}
+                logging.getLogger(__name__).exception("projects/import row %s (code=%s) failed", index, code)
+                errors.append({"row": index, "code": "PROJECT_ROW_INVALID", "message": f"Không import được dòng {index} (mã {code})."})
+
+        db.execute(
+            text(
+                "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
+                "VALUES (:actor_id, 'PROJECTS_IMPORTED', 'project', 'bulk', CAST(:after_json AS JSONB))"
+            ),
+            {"actor_id": _actor_id(db, user), "after_json": _json({"semesterId": semester_id, "created": created, "updated": updated, "skipped": len(errors)})},
+        )
+    return {"created": created, "updated": updated, "skipped": len(errors), "errors": errors}
 
 
 @router.post("/groups/import", status_code=status.HTTP_201_CREATED, response_model=ImportResponse)

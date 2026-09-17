@@ -5616,6 +5616,38 @@
         "title": "ProjectCreate",
         "type": "object"
       },
+      "ProjectImportResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "updated": {
+            "default": 0,
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "skipped"
+        ],
+        "title": "ProjectImportResponse",
+        "type": "object"
+      },
       "ProjectMutationResponse": {
         "additionalProperties": true,
         "properties": {
@@ -14751,7 +14783,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "beb1198f60db5fe7603035829f563c4175c800c3",
+    "x-be-commit": "0d1956c184dcd92642e73334c52c3df11cd698b7",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -18925,8 +18957,18 @@
     },
     "/api/v1/projects/import": {
       "post": {
+        "description": "Import từ sheet Mã đề tài / Mã nhóm / Tên đề tài VI-EN / GVHD-GVHD1-GVHD2.\n\nSheet không có cột Department/majorCode nên major luôn cố định SE. GVHD = GVHD1\n(MAIN), GVHD2 (CO, tùy chọn) — khớp bằng lecturer_code, không đoán theo tên hiển thị.",
         "operationId": "import_projects_api_v1_projects_import_post",
         "parameters": [
+          {
+            "in": "query",
+            "name": "semesterId",
+            "required": true,
+            "schema": {
+              "title": "Semesterid",
+              "type": "integer"
+            }
+          },
           {
             "in": "header",
             "name": "X-Test-Session",
@@ -18959,7 +19001,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportResponse"
+                  "$ref": "#/components/schemas/ProjectImportResponse"
                 }
               }
             },
