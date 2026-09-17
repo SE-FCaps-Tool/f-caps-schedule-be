@@ -160,7 +160,7 @@ def list_semester_groups(
             "p.title_vi AS project_title_vi, p.title_en AS project_title_en, p.topic_type, "
             "p.status::text AS project_status, "
             "(SELECT COUNT(*) FROM group_memberships gm WHERE gm.group_id = g.id AND gm.status = 'ACTIVE') AS member_count, "
-            "ldr.id AS leader_id, ldr.student_code AS leader_code, la.display_name AS leader_name, "
+            "ldr.id AS leader_id, ldr.student_code AS leader_code, COALESCE(la.display_name, ldr.full_name) AS leader_name, "
             "COUNT(*) OVER() AS total_count "
             "FROM groups g "
             "LEFT JOIN projects p ON p.id = g.project_id "
@@ -276,7 +276,8 @@ def list_group_members(group_id: Annotated[str, Path(alias="groupId")], db: Db, 
         raise HTTPException(status_code=403, detail={"code": "AUTH_FORBIDDEN", "message": "Group access is not available."})
     rows = db.execute(
         text(
-            "SELECT gm.id AS membership_id, st.id AS student_id, st.student_code, a.display_name, a.email, "
+            "SELECT gm.id AS membership_id, st.id AS student_id, st.student_code, "
+            "COALESCE(a.display_name, st.full_name) AS display_name, a.email, "
             "gm.membership_role AS role, gm.status "
             "FROM group_memberships gm JOIN students st ON st.id = gm.student_id "
             "LEFT JOIN accounts a ON a.id = st.account_id "

@@ -5631,8 +5631,18 @@
             "title": "Errors",
             "type": "array"
           },
+          "membersAssigned": {
+            "default": 0,
+            "title": "Membersassigned",
+            "type": "integer"
+          },
           "skipped": {
             "title": "Skipped",
+            "type": "integer"
+          },
+          "studentsCreated": {
+            "default": 0,
+            "title": "Studentscreated",
             "type": "integer"
           },
           "updated": {
@@ -14783,7 +14793,7 @@
   "info": {
     "title": "Capstone Defense Scheduler API",
     "version": "0.1.0",
-    "x-be-commit": "1d2173f8133540fefa49eb4a4acdb935ed9b19a3",
+    "x-be-commit": "f33a94ad5942d69fb53a8c4a17d40d357bb5eda0",
     "x-be-wire-case": "camelCase"
   },
   "openapi": "3.1.0",
@@ -18957,7 +18967,7 @@
     },
     "/api/v1/projects/import": {
       "post": {
-        "description": "Import từ sheet Mã đề tài / Mã nhóm / Tên đề tài VI-EN / Department / GVHD-GVHD1-GVHD2.\n\nDepartment -> major theo code (ví dụ SE, CF, ITS); tự tạo major mới nếu chưa có,\ntrống thì mặc định SE. GVHD = GVHD1 (MAIN), GVHD2 (CO, tùy chọn) — khớp bằng\nlecturer_code, không đoán theo tên hiển thị.",
+        "description": "Import từ sheet Mã đề tài / Mã nhóm / Tên đề tài VI-EN / Department / GVHD-GVHD1-GVHD2.\n\nDepartment -> major theo code (ví dụ SE, CF, ITS); tự tạo major mới nếu chưa có,\ntrống thì mặc định SE. GVHD = GVHD1 (MAIN), GVHD2 (CO, tùy chọn) — khớp bằng\nlecturer_code, không đoán theo tên hiển thị.\n\nHỗ trợ thêm biến thể sheet có cột MSSV/Họ và tên: mỗi dòng là 1 sinh viên, chỉ dòng\nĐẦU TIÊN của mỗi nhóm có Mã nhóm/Mã đề tài/GVHD — các dòng thành viên theo sau (không\ncó Mã nhóm) thuộc về nhóm của dòng đó, tới khi gặp Mã nhóm tiếp theo. Sinh viên ở dòng\nđầu là Leader. Sheet dạng này không có mã GV nên GVHD1/GVHD2 khớp theo TÊN hiển thị\n(chuẩn hoá khoảng trắng, không đoán mờ — trùng tên chuẩn hoá giữa 2 GV thì bỏ qua như\nkhông tìm thấy, tránh gán nhầm người). Sinh viên chưa có trong hệ thống được tạo mới ở\nbảng students (không kèm tài khoản đăng nhập — tài khoản tạo sau, riêng).",
         "operationId": "import_projects_api_v1_projects_import_post",
         "parameters": [
           {

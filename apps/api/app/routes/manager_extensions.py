@@ -647,14 +647,15 @@ def get_project_detail(project_id: Annotated[str | int, Path(alias="projectId")]
     group = db.execute(
         text(
             "SELECT g.id, g.code, COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS member_count, "
-            "leader_st.id AS leader_id, leader_st.student_code AS leader_code, leader_a.display_name AS leader_full_name "
+            "leader_st.id AS leader_id, leader_st.student_code AS leader_code, "
+            "COALESCE(leader_a.display_name, leader_st.full_name) AS leader_full_name "
             "FROM groups g "
             "LEFT JOIN group_memberships gm ON gm.group_id = g.id "
             "LEFT JOIN group_memberships leader_gm ON leader_gm.group_id = g.id "
             "AND leader_gm.membership_role = 'LEADER' AND leader_gm.status = 'ACTIVE' "
             "LEFT JOIN students leader_st ON leader_st.id = leader_gm.student_id "
             "LEFT JOIN accounts leader_a ON leader_a.id = leader_st.account_id "
-            "WHERE g.project_id = :id GROUP BY g.id, g.code, leader_st.id, leader_st.student_code, leader_a.display_name"
+            "WHERE g.project_id = :id GROUP BY g.id, g.code, leader_st.id, leader_st.student_code, leader_a.display_name, leader_st.full_name"
         ),
         {"id": project_id},
     ).mappings().one_or_none()
@@ -728,7 +729,7 @@ def get_group_detail(group_id: Annotated[int, Path(alias="groupId")], db: Db, us
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "GROUP_NOT_FOUND", "message": "Group does not exist."})
     members = db.execute(
-        text("SELECT st.id AS student_id, st.student_code, a.display_name, a.email, gm.membership_role AS role, gm.status FROM group_memberships gm JOIN students st ON st.id = gm.student_id LEFT JOIN accounts a ON a.id = st.account_id WHERE gm.group_id = :id ORDER BY gm.membership_role DESC, st.student_code"),
+        text("SELECT st.id AS student_id, st.student_code, COALESCE(a.display_name, st.full_name) AS display_name, a.email, gm.membership_role AS role, gm.status FROM group_memberships gm JOIN students st ON st.id = gm.student_id LEFT JOIN accounts a ON a.id = st.account_id WHERE gm.group_id = :id ORDER BY gm.membership_role DESC, st.student_code"),
         {"id": group_id},
     ).mappings().all()
     return {**dict(row), "members": [dict(item) for item in members]}
@@ -756,7 +757,7 @@ def get_group_overview(group_id: Annotated[str | int, Path(alias="groupId")], db
     members = [dict(row) for row in db.execute(
         text(
             "SELECT gm.id AS membership_id, st.id AS student_id, st.student_code, "
-            "a.display_name AS full_name, gm.membership_role AS role, gm.status, gm.left_at "
+            "COALESCE(a.display_name, st.full_name) AS full_name, gm.membership_role AS role, gm.status, gm.left_at "
             "FROM group_memberships gm JOIN students st ON st.id = gm.student_id "
             "LEFT JOIN accounts a ON a.id = st.account_id WHERE gm.group_id = :group_id "
             "ORDER BY CASE WHEN gm.membership_role = 'LEADER' THEN 0 ELSE 1 END, st.student_code"
@@ -888,7 +889,7 @@ def list_round_groups(round_id: Annotated[int, Path(alias="roundId")], db: Db, u
             "SELECT g.id AS group_id, g.code AS group_code, g.status, p.code AS project_code, "
             "COALESCE(p.title_en, p.title_vi, p.title) AS title, p.title_vi, p.title_en, "
             "COUNT(DISTINCT gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_member_count, "
-            "MAX(a.display_name) FILTER (WHERE gm.membership_role = 'LEADER' AND gm.status = 'ACTIVE') AS leader_name, "
+            "MAX(COALESCE(a.display_name, st.full_name)) FILTER (WHERE gm.membership_role = 'LEADER' AND gm.status = 'ACTIVE') AS leader_name, "
             "COUNT(DISTINCT gsp.timeslot_id) FILTER (WHERE gsp.selected) AS selected_slot_count "
             "FROM round_groups rg JOIN groups g ON g.id = rg.group_id JOIN projects p ON p.id = g.project_id "
             "LEFT JOIN group_memberships gm ON gm.group_id = g.id LEFT JOIN students st ON st.id = gm.student_id "
@@ -1278,6 +1279,16 @@ async def import_lecturers(
     return {"created": created, "skipped": len(errors), "errors": errors, "accounts": accounts}
 
 
+def _normalise_person_name(value: Any) -> str:
+    """Chuẩn hoá tên hiển thị để so khớp GVHD theo tên (giữ dấu, chỉ gộp khoảng trắng thừa).
+
+    NFC-normalize trước — tên tiếng Việt export từ macOS/Google Sheets thường ở dạng NFD
+    (dấu tách rời), nhìn giống hệt NFC nhưng so sánh string thì khác, gây GVHD_NOT_FOUND sai.
+    """
+    normalised = unicodedata.normalize("NFC", str(value or "").strip())
+    return re.sub(r"\s+", " ", normalised).casefold()
+
+
 @router.post("/projects/import", status_code=status.HTTP_201_CREATED, response_model=ProjectImportResponse)
 async def import_projects(
     file: ImportFile,
@@ -1290,11 +1301,22 @@ async def import_projects(
     Department -> major theo code (ví dụ SE, CF, ITS); tự tạo major mới nếu chưa có,
     trống thì mặc định SE. GVHD = GVHD1 (MAIN), GVHD2 (CO, tùy chọn) — khớp bằng
     lecturer_code, không đoán theo tên hiển thị.
+
+    Hỗ trợ thêm biến thể sheet có cột MSSV/Họ và tên: mỗi dòng là 1 sinh viên, chỉ dòng
+    ĐẦU TIÊN của mỗi nhóm có Mã nhóm/Mã đề tài/GVHD — các dòng thành viên theo sau (không
+    có Mã nhóm) thuộc về nhóm của dòng đó, tới khi gặp Mã nhóm tiếp theo. Sinh viên ở dòng
+    đầu là Leader. Sheet dạng này không có mã GV nên GVHD1/GVHD2 khớp theo TÊN hiển thị
+    (chuẩn hoá khoảng trắng, không đoán mờ — trùng tên chuẩn hoá giữa 2 GV thì bỏ qua như
+    không tìm thấy, tránh gán nhầm người). Sinh viên chưa có trong hệ thống được tạo mới ở
+    bảng students (không kèm tài khoản đăng nhập — tài khoản tạo sau, riêng).
     """
     _require(user, "ADMIN", "MANAGER")
     rows = _project_import_rows(file)
+    is_student_format = any("mssv" in row for _, row in rows)
     created = 0
     updated = 0
+    students_created = 0
+    members_assigned = 0
     errors: list[dict[str, Any]] = []
     # Mọi lookup phải nằm TRONG with db.begin(): get_current_user đã đóng transaction
     # trước khi trả về CurrentUser, nhưng SQLAlchemy Session autobegin ngay ở lệnh
@@ -1303,53 +1325,112 @@ async def import_projects(
     with db.begin():
         ensure_semester_writable(db, semester_id)  # 404 SEMESTER_NOT_FOUND nếu semester_id sai
 
-        # Preload toàn bộ mã GV và major thay vì query từng dòng (N+1) — sheet có thể vài trăm dòng.
+        # Preload toàn bộ mã GV / major / MSSV thay vì query từng dòng (N+1) — sheet có thể vài trăm dòng.
         lecturer_by_code = {
             str(code).upper(): lecturer_id
             for lecturer_id, code in db.execute(text("SELECT id, lecturer_code FROM lecturers")).all()
         }
+        lecturer_by_name: dict[str, int | None] = {}
+        if is_student_format:
+            for lecturer_id, display_name in db.execute(
+                text("SELECT l.id, a.display_name FROM lecturers l JOIN accounts a ON a.id = l.account_id")
+            ).all():
+                key = _normalise_person_name(display_name)
+                # Trùng tên chuẩn hoá (VD 2 GV cùng tên khác bộ môn) -> None để báo
+                # GVHD_NOT_FOUND thay vì đoán bừa đúng người.
+                lecturer_by_name[key] = None if key in lecturer_by_name else lecturer_id
         major_by_code = {
             str(code).upper(): major_id
             for major_id, code in db.execute(text("SELECT id, code FROM majors")).all()
         }
+        student_by_code = {
+            str(code).upper(): student_id
+            for student_id, code in db.execute(text("SELECT id, student_code FROM students")).all()
+        }
 
+        # Gom dòng theo nhóm CHỈ khi sheet có cột MSSV: dòng có Mã nhóm mang dữ liệu đề
+        # tài/GVHD, các dòng thành viên theo sau (không có Mã nhóm) thuộc về block gần
+        # nhất phía trên. Sheet dạng cũ (1 dòng = 1 đề tài, không có MSSV) giữ nguyên
+        # ngữ nghĩa gốc — MỖI dòng là 1 block riêng — để 1 dòng thiếu Mã nhóm vẫn báo
+        # REQUIRED_FIELD_MISSING như trước thay vì bị bỏ qua âm thầm.
+        blocks: list[dict[str, Any]] = []
+        current: dict[str, Any] | None = None
         for index, row in rows:
+            has_group_code = bool(str(row.get("manhom") or "").strip())
+            if not is_student_format:
+                current = {"index": index, "row": row, "members": []}
+                blocks.append(current)
+            elif has_group_code:
+                current = {"index": index, "row": row, "members": []}
+                blocks.append(current)
+            if current is None:
+                errors.append({"row": index, "code": "PROJECT_ROW_INVALID", "message": "Dòng chưa thuộc nhóm nào (không có Mã nhóm ở phía trên)."})
+                continue
+            mssv = str(row.get("mssv") or "").strip()
+            if mssv:
+                current["members"].append({
+                    "row": index,
+                    "mssv": mssv,
+                    "name": str(row.get("hovaten") or "").strip() or None,
+                    "is_leader": has_group_code,
+                })
+
+        for block in blocks:
+            index = block["index"]
+            row = block["row"]
+
+            def _reject_block(err_code: str, message: str) -> None:
+                # Header của block lỗi thì mọi dòng thành viên theo sau cũng không được xử lý
+                # — báo rõ từng dòng thay vì để "biến mất" khỏi cả created/updated/skipped.
+                errors.append({"row": index, "code": err_code, "message": message})
+                for member in block["members"]:
+                    errors.append({"row": member["row"], "code": "MEMBER_ROW_SKIPPED", "message": "Bỏ qua vì dòng đề tài của nhóm này lỗi."})
+
             raw_code = str(row.get("madetai") or row.get("code") or row.get("projectcode") or "").strip()
             raw_group_code = str(row.get("manhom") or "").strip()
             title_vi = str(row.get("tendetaitiengviet") or row.get("titlevi") or "").strip() or None
             title_en = str(row.get("tendetaitienganhtiengnhat") or row.get("titleen") or "").strip() or None
             title = title_en or title_vi
-            # dept_provided = false khi cột Department trống/không có trong sheet (đúng với
-            # template FE hiện tại — TEMPLATE_COLUMNS chưa có Department) — trong trường hợp đó
-            # đề tài đã tồn tại giữ nguyên major cũ khi upsert, không bị reset về SE mặc định.
-            dept_raw = str(row.get("department") or row.get("majorcode") or "").strip().upper()
+            # dept_provided = false khi cột Department/Ngành trống/không có trong sheet (đúng
+            # với template FE hiện tại — TEMPLATE_COLUMNS chưa có Department) — trong trường
+            # hợp đó đề tài đã tồn tại giữ nguyên major cũ khi upsert, không bị reset về SE.
+            dept_raw = str(row.get("nganh") or row.get("department") or row.get("majorcode") or "").strip().upper()
             dept_provided = bool(dept_raw)
             dept_code = dept_raw or "SE"
             gvhd1_raw = str(row.get("gvhd1") or row.get("gvhd") or "").strip()
             gvhd2_raw = str(row.get("gvhd2") or "").strip()
             code = normalize_code(raw_code) if raw_code else None
             group_code = normalize_code(raw_group_code) if raw_group_code else None
-            gvhd1_code = normalize_code(gvhd1_raw) if gvhd1_raw else None
-            gvhd2_code = normalize_code(gvhd2_raw) if gvhd2_raw else None
-            if not code or not group_code or not title or not gvhd1_code:
-                errors.append({"row": index, "code": "REQUIRED_FIELD_MISSING", "message": "Mã đề tài, Mã nhóm, tên đề tài và GVHD đều bắt buộc."})
+            if not code or not group_code or not title or not gvhd1_raw:
+                _reject_block("REQUIRED_FIELD_MISSING", "Mã đề tài, Mã nhóm, tên đề tài và GVHD đều bắt buộc.")
                 continue
             if len(dept_code) > 32:
-                errors.append({"row": index, "code": "PROJECT_ROW_INVALID", "message": f"Mã Department '{dept_code[:40]}' vượt quá 32 ký tự."})
+                _reject_block("PROJECT_ROW_INVALID", f"Mã Department '{dept_code[:40]}' vượt quá 32 ký tự.")
                 continue
 
-            gvhd1_id = lecturer_by_code.get(gvhd1_code)
+            if is_student_format:
+                # Sheet MSSV không có mã GV — khớp theo tên hiển thị đã chuẩn hoá khoảng trắng.
+                gvhd1_id = lecturer_by_name.get(_normalise_person_name(gvhd1_raw))
+                gvhd2_id = lecturer_by_name.get(_normalise_person_name(gvhd2_raw)) if gvhd2_raw else None
+                gvhd1_key, gvhd2_key = _normalise_person_name(gvhd1_raw), _normalise_person_name(gvhd2_raw)
+                gvhd1_label, gvhd2_label = gvhd1_raw, gvhd2_raw
+            else:
+                gvhd1_code = normalize_code(gvhd1_raw)
+                gvhd2_code = normalize_code(gvhd2_raw) if gvhd2_raw else None
+                gvhd1_id = lecturer_by_code.get(gvhd1_code)
+                gvhd2_id = lecturer_by_code.get(gvhd2_code) if gvhd2_code else None
+                gvhd1_key, gvhd2_key = gvhd1_code, gvhd2_code
+                gvhd1_label, gvhd2_label = gvhd1_code, gvhd2_code
+
             if gvhd1_id is None:
-                errors.append({"row": index, "code": "GVHD_NOT_FOUND", "message": f"Không tìm thấy giảng viên với mã {gvhd1_code}."})
+                _reject_block("GVHD_NOT_FOUND", f"Không tìm thấy giảng viên khớp với '{gvhd1_label}'.")
                 continue
-            gvhd2_id = None
-            if gvhd2_code:
-                if gvhd2_code == gvhd1_code:
-                    errors.append({"row": index, "code": "GVHD_DUPLICATE", "message": "GVHD và GVHD2 không được trùng nhau."})
+            if gvhd2_raw:
+                if gvhd2_key == gvhd1_key:
+                    _reject_block("GVHD_DUPLICATE", "GVHD và GVHD2 không được trùng nhau.")
                     continue
-                gvhd2_id = lecturer_by_code.get(gvhd2_code)
                 if gvhd2_id is None:
-                    errors.append({"row": index, "code": "GVHD_NOT_FOUND", "message": f"Không tìm thấy giảng viên với mã {gvhd2_code}."})
+                    _reject_block("GVHD_NOT_FOUND", f"Không tìm thấy giảng viên khớp với '{gvhd2_label}'.")
                     continue
 
             try:
@@ -1367,7 +1448,6 @@ async def import_projects(
                             ),
                             {"code": dept_code},
                         ).scalar_one()
-                        major_by_code[dept_code] = major_id
 
                     project_row = db.execute(
                         text(
@@ -1393,11 +1473,13 @@ async def import_projects(
                     project_id = project_row["id"]
                     is_new = bool(project_row["inserted"])
 
-                    existing_group = db.execute(text("SELECT code FROM groups WHERE project_id = :project_id"), {"project_id": project_id}).mappings().one_or_none()
+                    existing_group = db.execute(text("SELECT id, code FROM groups WHERE project_id = :project_id"), {"project_id": project_id}).mappings().one_or_none()
                     if existing_group is None:
-                        db.execute(text("INSERT INTO groups (project_id, code) VALUES (:project_id, :code)"), {"project_id": project_id, "code": group_code})
+                        group_id = db.execute(text("INSERT INTO groups (project_id, code) VALUES (:project_id, :code) RETURNING id"), {"project_id": project_id, "code": group_code}).scalar_one()
                     elif existing_group["code"] != group_code:
                         raise DomainError("GROUP_CODE_MISMATCH", f"Project {code} already has group {existing_group['code']}, cannot change to {group_code}.")
+                    else:
+                        group_id = existing_group["id"]
 
                     db.execute(text("DELETE FROM project_supervisors WHERE project_id = :project_id"), {"project_id": project_id})
                     db.execute(
@@ -1409,24 +1491,108 @@ async def import_projects(
                             text("INSERT INTO project_supervisors (project_id, lecturer_id, supervisor_type) VALUES (:project_id, :lecturer_id, 'CO'::supervisor_type)"),
                             {"project_id": project_id, "lecturer_id": gvhd2_id},
                         )
+                # Chỉ ghi cache SAU khi savepoint của dòng đã commit thành công — nếu ghi
+                # trong savepoint mà 1 câu lệnh sau đó (VD GROUP_CODE_MISMATCH) làm rollback,
+                # cache vẫn trỏ tới 1 major đã bị hoàn tác, làm hỏng mọi dòng cùng Department
+                # phía sau (FK violation → PROJECT_ROW_INVALID) dù bản thân dòng đó hợp lệ.
+                major_by_code[dept_code] = major_id
                 if is_new:
                     created += 1
                 else:
                     updated += 1
             except DomainError as exc:
-                errors.append({"row": index, "code": exc.code, "message": str(exc)})
+                _reject_block(exc.code, str(exc))
+                continue
             except Exception:
                 logging.getLogger(__name__).exception("projects/import row %s (code=%s) failed", index, code)
-                errors.append({"row": index, "code": "PROJECT_ROW_INVALID", "message": f"Không import được dòng {index} (mã {code})."})
+                _reject_block("PROJECT_ROW_INVALID", f"Không import được dòng {index} (mã {code}).")
+                continue
+
+            seen_member_codes: set[str] = set()
+            for member in block["members"]:
+                member_code = normalize_code(member["mssv"])
+                if member_code in seen_member_codes:
+                    errors.append({"row": member["row"], "code": "MEMBERSHIP_DUPLICATE", "message": f"MSSV {member_code} xuất hiện nhiều lần trong cùng 1 nhóm."})
+                    continue
+                seen_member_codes.add(member_code)
+                try:
+                    is_new_student = False
+                    with db.begin_nested():
+                        student_id = student_by_code.get(member_code)
+                        if student_id is None:
+                            student_id = db.execute(
+                                text(
+                                    "INSERT INTO students (student_code, full_name) VALUES (:code, :name) "
+                                    "ON CONFLICT (student_code) DO UPDATE SET full_name = COALESCE(students.full_name, EXCLUDED.full_name) "
+                                    "RETURNING id"
+                                ),
+                                {"code": member_code, "name": member["name"]},
+                            ).scalar_one()
+                            is_new_student = True
+                        elif member["name"]:
+                            db.execute(text("UPDATE students SET full_name = COALESCE(full_name, :name) WHERE id = :id"), {"name": member["name"], "id": student_id})
+
+                        role = "LEADER" if member["is_leader"] else "MEMBER"
+                        # LIMIT 1 nên .scalar_one_or_none() không bao giờ gặp MultipleResultsFound
+                        # kể cả khi (hiếm) 1 sinh viên active ở >1 nhóm cùng lúc từ đường khác.
+                        in_other_group = db.execute(
+                            text(
+                                "SELECT 1 FROM group_memberships WHERE student_id = :sid "
+                                "AND status = 'ACTIVE' AND group_id <> :gid LIMIT 1"
+                            ),
+                            {"sid": student_id, "gid": group_id},
+                        ).scalar_one_or_none()
+                        if in_other_group is not None:
+                            raise DomainError("MEMBER_ALREADY_IN_ANOTHER_GROUP", f"MSSV {member_code} đã là thành viên active của một nhóm khác.")
+                        if role == "LEADER":
+                            # Đảm bảo bất biến "1 leader active/nhóm" (uq_active_group_leader)
+                            # trước khi gán leader mới, bất kể thứ tự dòng trong sheet.
+                            db.execute(
+                                text(
+                                    "UPDATE group_memberships SET membership_role = 'MEMBER' "
+                                    "WHERE group_id = :gid AND status = 'ACTIVE' AND membership_role = 'LEADER' AND student_id <> :sid"
+                                ),
+                                {"gid": group_id, "sid": student_id},
+                            )
+                        db.execute(
+                            text(
+                                "INSERT INTO group_memberships (group_id, student_id, membership_role) "
+                                "VALUES (:gid, :sid, CAST(:role AS membership_role)) "
+                                "ON CONFLICT (group_id, student_id) WHERE status = 'ACTIVE' "
+                                "DO UPDATE SET membership_role = EXCLUDED.membership_role"
+                            ),
+                            {"gid": group_id, "sid": student_id, "role": role},
+                        )
+                    # Ghi cache/đếm SAU khi savepoint commit thành công — cùng lý do major_by_code ở trên:
+                    # rollback (VD MEMBER_ALREADY_IN_ANOTHER_GROUP) không được để lại state ma trong dict/counter.
+                    student_by_code[member_code] = student_id
+                    if is_new_student:
+                        students_created += 1
+                    members_assigned += 1
+                except DomainError as exc:
+                    errors.append({"row": member["row"], "code": exc.code, "message": str(exc)})
+                except Exception:
+                    logging.getLogger(__name__).exception("projects/import member row %s failed", member["row"])
+                    errors.append({"row": member["row"], "code": "MEMBER_ROW_INVALID", "message": f"Không import được sinh viên ở dòng {member['row']}."})
 
         db.execute(
             text(
                 "INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) "
                 "VALUES (:actor_id, 'PROJECTS_IMPORTED', 'project', 'bulk', CAST(:after_json AS JSONB))"
             ),
-            {"actor_id": _actor_id(db, user), "after_json": _json({"semesterId": semester_id, "created": created, "updated": updated, "skipped": len(errors)})},
+            {
+                "actor_id": _actor_id(db, user),
+                "after_json": _json({
+                    "semesterId": semester_id, "created": created, "updated": updated,
+                    "studentsCreated": students_created, "membersAssigned": members_assigned,
+                    "skipped": len(errors),
+                }),
+            },
         )
-    return {"created": created, "updated": updated, "skipped": len(errors), "errors": errors}
+    return {
+        "created": created, "updated": updated, "skipped": len(errors), "errors": errors,
+        "students_created": students_created, "members_assigned": members_assigned,
+    }
 
 
 @router.post("/groups/import", status_code=status.HTTP_201_CREATED, response_model=ImportResponse)

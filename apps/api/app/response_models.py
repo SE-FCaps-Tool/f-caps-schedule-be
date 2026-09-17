@@ -774,6 +774,8 @@ class AccountImportResponse(ImportResponse):
 
 class ProjectImportResponse(ImportResponse):
     updated: int = 0
+    students_created: int = 0
+    members_assigned: int = 0
 
 
 class UnscheduledReportResponse(ResponseModel):

@@ -252,3 +252,274 @@ def test_import_projects_requires_admin_or_manager_role(client):
         files={"file": ("projects.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
     assert response.status_code == 403
+
+
+STUDENT_HEADER_ROW = [
+    "STT", "MSSV", "Ho va ten", "Ma nhom", "Ma de tai",
+    "Ten de tai Tieng Anh/ Tieng Nhat", "Ten de tai Tieng Viet", "GVHD 1", "GVHD 2", "Nganh",
+]
+
+
+def _student_workbook(rows: list[list[object]]) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(STUDENT_HEADER_ROW)
+    for row in rows:
+        sheet.append(row)
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def _seed_semester_and_named_lecturer(client, display_name: str) -> tuple[int, str]:
+    client.post("/api/v1/admin/seed-fixture", headers=ADMIN_HEADERS)
+    semester_id = client.get("/api/v1/semesters", headers=ADMIN_HEADERS).json()["data"][0]["id"]
+    suffix = uuid4().hex[:8]
+    lecturer_code = f"GVIMP{suffix}"
+    create = client.post(
+        "/api/v1/accounts",
+        headers=ADMIN_HEADERS,
+        json={
+            "email": f"gvimp.{suffix}@example.com",
+            "displayName": display_name,
+            "password": "P@ssword12345",
+            "role": "LECTURER",
+            "lecturerCode": lecturer_code,
+        },
+    )
+    assert create.status_code == 201, create.text
+    return semester_id, lecturer_code
+
+
+def _add_named_lecturer(client, display_name: str) -> str:
+    suffix = uuid4().hex[:8]
+    lecturer_code = f"GVIMP{suffix}"
+    create = client.post(
+        "/api/v1/accounts",
+        headers=ADMIN_HEADERS,
+        json={
+            "email": f"gvimp.{suffix}@example.com",
+            "displayName": display_name,
+            "password": "P@ssword12345",
+            "role": "LECTURER",
+            "lecturerCode": lecturer_code,
+        },
+    )
+    assert create.status_code == 201, create.text
+    return lecturer_code
+
+
+@pytest.mark.integration
+def test_import_projects_student_format_creates_group_with_leader_and_members(client):
+    """1 dòng/sinh viên, GVHD khớp theo tên — dòng đầu (có Mã nhóm) là Leader."""
+    suffix = uuid4().hex[:8]
+    lecturer_name = f"GVHD Test {suffix}"
+    semester_id, _ = _seed_semester_and_named_lecturer(client, lecturer_name)
+    code, group = f"PRJ{suffix}", f"GRP{suffix}"
+    mssv_leader, mssv_member = f"SE{suffix}A", f"SE{suffix}B"
+    content = _student_workbook([
+        [1, mssv_leader, "Leader Name", group, code, "Title EN", "Title VI", lecturer_name, None, "SE"],
+        [2, mssv_member, "Member Name", None, None, None, None, None, None, None],
+    ])
+
+    response = _upload(client, semester_id, content)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["created"] == 1
+    assert body["skipped"] == 0
+    assert body["studentsCreated"] == 2
+    assert body["membersAssigned"] == 2
+
+    project = next(p for p in client.get("/api/v1/projects", headers=ADMIN_HEADERS, params={"semesterId": semester_id}).json() if p["code"] == code.upper())
+    assert project["majorCode"] == "SE"
+    detail = client.get(f"/api/v1/projects/{project['id']}", headers=ADMIN_HEADERS).json()["data"]
+    members = client.get(f"/api/v1/groups/{detail['group']['id']}/members", headers=ADMIN_HEADERS).json()["data"]
+    roles = {m["studentCode"]: m["role"] for m in members}
+    assert roles[mssv_leader.upper()] == "LEADER"
+    assert roles[mssv_member.upper()] == "MEMBER"
+
+
+@pytest.mark.integration
+def test_import_projects_student_format_creates_student_without_account(client):
+    suffix = uuid4().hex[:8]
+    lecturer_name = f"GVHD Test {suffix}"
+    semester_id, _ = _seed_semester_and_named_lecturer(client, lecturer_name)
+    code, group, mssv = f"PRJ{suffix}", f"GRP{suffix}", f"SE{suffix}"
+    content = _student_workbook([[1, mssv, "Some Student", group, code, "Title EN", "Title VI", lecturer_name, None, None]])
+
+    response = _upload(client, semester_id, content)
+
+    assert response.status_code == 201, response.text
+    assert response.json()["studentsCreated"] == 1
+    students = client.get("/api/v1/students", headers=ADMIN_HEADERS, params={"search": mssv}).json()["data"]
+    assert len(students) == 1
+    assert students[0]["fullName"] == "Some Student"
+
+
+@pytest.mark.integration
+def test_import_projects_student_format_gvhd_name_ambiguous_is_not_found(client):
+    suffix = uuid4().hex[:8]
+    lecturer_name = f"GVHD Dup {suffix}"
+    semester_id, _ = _seed_semester_and_named_lecturer(client, lecturer_name)
+    _add_named_lecturer(client, lecturer_name)
+    content = _student_workbook([[1, f"SE{suffix}", "Some Student", f"GRP{suffix}", f"PRJ{suffix}", "Title EN", "Title VI", lecturer_name, None, None]])
+
+    response = _upload(client, semester_id, content)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["created"] == 0
+    assert body["errors"][0]["code"] == "GVHD_NOT_FOUND"
+
+
+@pytest.mark.integration
+def test_import_projects_student_format_member_already_in_another_group_errors(client):
+    suffix = uuid4().hex[:8]
+    lecturer_name = f"GVHD Test {suffix}"
+    semester_id, _ = _seed_semester_and_named_lecturer(client, lecturer_name)
+    mssv = f"SE{suffix}"
+    first_group = _student_workbook([[1, mssv, "Shared Student", f"GRP{suffix}A", f"PRJ{suffix}A", "Title EN", "Title VI", lecturer_name, None, None]])
+    first = _upload(client, semester_id, first_group)
+    assert first.json()["created"] == 1
+
+    second_group = _student_workbook([[1, mssv, "Shared Student", f"GRP{suffix}B", f"PRJ{suffix}B", "Title EN", "Title VI", lecturer_name, None, None]])
+    second = _upload(client, semester_id, second_group)
+
+    assert second.status_code == 201, second.text
+    body = second.json()
+    assert body["created"] == 1
+    assert any(e["code"] == "MEMBER_ALREADY_IN_ANOTHER_GROUP" for e in body["errors"])
+
+
+@pytest.mark.integration
+def test_import_projects_student_format_rerun_reassigns_leader(client):
+    suffix = uuid4().hex[:8]
+    lecturer_name = f"GVHD Test {suffix}"
+    semester_id, _ = _seed_semester_and_named_lecturer(client, lecturer_name)
+    code, group = f"PRJ{suffix}", f"GRP{suffix}"
+    mssv_a, mssv_b = f"SE{suffix}A", f"SE{suffix}B"
+    first = _student_workbook([
+        [1, mssv_a, "Student A", group, code, "Title EN", "Title VI", lecturer_name, None, None],
+        [2, mssv_b, "Student B", None, None, None, None, None, None, None],
+    ])
+    assert _upload(client, semester_id, first).json()["created"] == 1
+
+    # Re-run with the members swapped: mssv_b is now the header row -> new leader.
+    second = _student_workbook([
+        [1, mssv_b, "Student B", group, code, "Title EN", "Title VI", lecturer_name, None, None],
+        [2, mssv_a, "Student A", None, None, None, None, None, None, None],
+    ])
+    response = _upload(client, semester_id, second)
+
+    assert response.status_code == 201, response.text
+    project = next(p for p in client.get("/api/v1/projects", headers=ADMIN_HEADERS, params={"semesterId": semester_id}).json() if p["code"] == code.upper())
+    detail = client.get(f"/api/v1/projects/{project['id']}", headers=ADMIN_HEADERS).json()["data"]
+    members = client.get(f"/api/v1/groups/{detail['group']['id']}/members", headers=ADMIN_HEADERS).json()["data"]
+    roles = {m["studentCode"]: m["role"] for m in members}
+    assert roles[mssv_b.upper()] == "LEADER"
+    assert roles[mssv_a.upper()] == "MEMBER"
+
+
+@pytest.mark.integration
+def test_import_projects_legacy_row_missing_group_code_is_rejected_not_dropped(client):
+    """Regression: block-grouping must not silently swallow a legacy (no-MSSV) row that
+    has no Mã nhóm — it must still surface REQUIRED_FIELD_MISSING like every other row."""
+    semester_id, lecturer_code = _seed_semester_and_lecturer(client)
+    suffix = uuid4().hex[:8]
+    good_code = f"PRJ{suffix}A"
+    content = _workbook([
+        [1, good_code, f"GRP{suffix}A", "Title EN", "Title VI", lecturer_code, None],
+        [2, f"PRJ{suffix}B", None, "Title EN", "Title VI", lecturer_code, None],  # blank Ma nhom
+    ])
+
+    response = _upload(client, semester_id, content)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["created"] == 1
+    assert body["skipped"] == 1
+    assert body["errors"][0]["code"] == "REQUIRED_FIELD_MISSING"
+
+
+@pytest.mark.integration
+def test_import_projects_student_format_duplicate_mssv_in_block_is_rejected(client):
+    suffix = uuid4().hex[:8]
+    lecturer_name = f"GVHD Test {suffix}"
+    semester_id, _ = _seed_semester_and_named_lecturer(client, lecturer_name)
+    code, group, mssv = f"PRJ{suffix}", f"GRP{suffix}", f"SE{suffix}"
+    content = _student_workbook([
+        [1, mssv, "Student", group, code, "Title EN", "Title VI", lecturer_name, None, None],
+        [2, mssv, "Student", None, None, None, None, None, None, None],  # same MSSV again
+    ])
+
+    response = _upload(client, semester_id, content)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["created"] == 1
+    assert body["membersAssigned"] == 1
+    assert any(e["code"] == "MEMBERSHIP_DUPLICATE" for e in body["errors"])
+
+
+@pytest.mark.integration
+def test_import_projects_student_format_department_cache_survives_a_later_row_failure(client):
+    """Regression: major_by_code must not be poisoned when the row that FIRST creates a new
+    Department also fails inside its own savepoint (e.g. GROUP_CODE_MISMATCH, raised after
+    the major INSERT but before commit) — the savepoint rollback must undo the major insert
+    at the DB level too, so a later row reusing that Department creates it fresh instead of
+    inheriting a cached id that no longer exists (which would 500→PROJECT_ROW_INVALID)."""
+    suffix = uuid4().hex[:8]
+    lecturer_name = f"GVHD Test {suffix}"
+    semester_id, _ = _seed_semester_and_named_lecturer(client, lecturer_name)
+    dept = f"DPT{suffix}"[:20].upper()
+    clash_code = f"PRJ{suffix}CLASH"
+
+    # Row 1: claims clash_code under group G1 — unrelated department, succeeds normally.
+    first = _upload(client, semester_id, _student_workbook([
+        [1, f"SE{suffix}A", "Student A", f"GRP{suffix}G1", clash_code, "Title EN", "Title VI", lecturer_name, None, None],
+    ]))
+    assert first.json()["created"] == 1
+
+    # Row 2 introduces `dept` for the first time (fresh INSERT INTO majors inside its
+    # savepoint) but reuses clash_code under a DIFFERENT group -> GROUP_CODE_MISMATCH,
+    # rolling back the whole savepoint including the majors insert.
+    # Row 3 reuses the same never-successfully-created `dept` on a brand new project.
+    second = _upload(client, semester_id, _student_workbook([
+        [1, f"SE{suffix}B", "Student B", f"GRP{suffix}G2", clash_code, "Title EN", "Title VI", lecturer_name, None, dept],
+        [2, f"SE{suffix}C", "Student C", f"GRP{suffix}G3", f"PRJ{suffix}NEW", "Title EN", "Title VI", lecturer_name, None, dept],
+    ]))
+
+    assert second.status_code == 201, second.text
+    body = second.json()
+    assert body["created"] == 1
+    assert any(e["code"] == "GROUP_CODE_MISMATCH" for e in body["errors"])
+    assert _get_major_code(client, semester_id, f"PRJ{suffix}NEW") == dept
+
+
+@pytest.mark.integration
+def test_import_projects_student_format_account_can_be_created_after_import(client):
+    """Regression: students.student_code UNIQUE must not block linking a login account to
+    a student row that this import already created without one."""
+    suffix = uuid4().hex[:8]
+    lecturer_name = f"GVHD Test {suffix}"
+    semester_id, _ = _seed_semester_and_named_lecturer(client, lecturer_name)
+    mssv = f"SE{suffix}"
+    content = _student_workbook([[1, mssv, "Some Student", f"GRP{suffix}", f"PRJ{suffix}", "Title EN", "Title VI", lecturer_name, None, None]])
+    assert _upload(client, semester_id, content).json()["studentsCreated"] == 1
+
+    create = client.post(
+        "/api/v1/accounts",
+        headers=ADMIN_HEADERS,
+        json={
+            "email": f"student.{suffix}@example.com",
+            "displayName": "Some Student",
+            "password": "P@ssword12345",
+            "role": "STUDENT",
+            "studentCode": mssv,
+        },
+    )
+    assert create.status_code == 201, create.text
+
+    students = client.get("/api/v1/students", headers=ADMIN_HEADERS, params={"search": mssv}).json()["data"]
+    assert students[0]["email"] == f"student.{suffix}@example.com"

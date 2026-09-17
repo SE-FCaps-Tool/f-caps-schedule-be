@@ -511,7 +511,20 @@ def create_account(payload: AccountCreate, db: Db, user: User) -> dict[str, obje
                     },
                 )
             elif payload.role == "STUDENT":
-                db.execute(text("INSERT INTO students (account_id, student_code) VALUES (:account_id, :student_code)"), {"account_id": account_id, "student_code": normalize_code(payload.student_code)})
+                # student_code có thể đã tồn tại từ import (sinh viên tạo trước, chưa có tài
+                # khoản — students.account_id NULL) — link vào thay vì báo trùng, chỉ báo
+                # trùng thật khi student_code đó đã gắn account khác.
+                linked = db.execute(
+                    text(
+                        "INSERT INTO students (account_id, student_code) VALUES (:account_id, :student_code) "
+                        "ON CONFLICT (student_code) DO UPDATE SET account_id = EXCLUDED.account_id "
+                        "WHERE students.account_id IS NULL "
+                        "RETURNING id"
+                    ),
+                    {"account_id": account_id, "student_code": normalize_code(payload.student_code)},
+                ).scalar_one_or_none()
+                if linked is None:
+                    raise HTTPException(status_code=409, detail={"code": "ACCOUNT_DUPLICATE", "message": "Email or code already exists."})
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, after_json) VALUES (:actor_id, 'ACCOUNT_CREATED', 'account', :entity_id, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(account_id), "after_json": _json({"email": payload.email.strip().lower(), "role": payload.role})})
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail={"code": "ACCOUNT_DUPLICATE", "message": "Email or code already exists."}) from exc
@@ -690,11 +703,20 @@ async def import_accounts(
                             },
                         )
                     elif role == "STUDENT":
-                        db.execute(
-                            text("INSERT INTO students (account_id, student_code) VALUES (:account_id, :code)"),
+                        # student_code có thể đã tồn tại từ import (sinh viên tạo trước, chưa
+                        # có tài khoản) — link vào thay vì báo trùng, trừ khi đã gắn account khác.
+                        linked = db.execute(
+                            text(
+                                "INSERT INTO students (account_id, student_code) VALUES (:account_id, :code) "
+                                "ON CONFLICT (student_code) DO UPDATE SET account_id = EXCLUDED.account_id "
+                                "WHERE students.account_id IS NULL "
+                                "RETURNING id"
+                            ),
                             {"account_id": account_id, "code": normalize_code(code)},
-                        )
-            except IntegrityError:
+                        ).scalar_one_or_none()
+                        if linked is None:
+                            raise DomainError("ACCOUNT_DUPLICATE", "Email hoặc mã số đã tồn tại trong hệ thống.")
+            except (IntegrityError, DomainError):
                 errors.append({"row": row_number, "code": "ACCOUNT_DUPLICATE", "message": "Email hoặc mã số đã tồn tại trong hệ thống."})
                 continue
 
@@ -749,7 +771,19 @@ def add_account_role(account_id: Annotated[int, Path(alias="accountId")], payloa
                 if has_student is None:
                     if not payload.student_code:
                         raise HTTPException(status_code=422, detail={"code": "STUDENT_CODE_REQUIRED", "message": "student_code is required when granting the STUDENT role."})
-                    db.execute(text("INSERT INTO students (account_id, student_code) VALUES (:account_id, :student_code)"), {"account_id": account_id, "student_code": normalize_code(payload.student_code)})
+                    # student_code có thể đã tồn tại từ import (sinh viên tạo trước, chưa có
+                    # tài khoản) — link vào thay vì báo trùng, trừ khi đã gắn account khác.
+                    linked = db.execute(
+                        text(
+                            "INSERT INTO students (account_id, student_code) VALUES (:account_id, :student_code) "
+                            "ON CONFLICT (student_code) DO UPDATE SET account_id = EXCLUDED.account_id "
+                            "WHERE students.account_id IS NULL "
+                            "RETURNING id"
+                        ),
+                        {"account_id": account_id, "student_code": normalize_code(payload.student_code)},
+                    ).scalar_one_or_none()
+                    if linked is None:
+                        raise HTTPException(status_code=409, detail={"code": "CODE_DUPLICATE", "message": "lecturer_code or student_code already exists."})
             db.execute(text("INSERT INTO audit_events (actor_id, action, entity_type, entity_id, reason, after_json) VALUES (:actor_id, 'ACCOUNT_ROLE_ADDED', 'account', :entity_id, :reason, CAST(:after_json AS JSONB))"), {"actor_id": _actor_id(db, user), "entity_id": str(account_id), "reason": payload.reason.strip(), "after_json": _json({"role": payload.role})})
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail={"code": "CODE_DUPLICATE", "message": "lecturer_code or student_code already exists."}) from exc
@@ -823,12 +857,13 @@ def list_students(
     offset = (page - 1) * page_size
     rows = db.execute(
         text(
-            "SELECT st.id, st.student_code, a.display_name AS full_name, a.email, "
+            "SELECT st.id, st.student_code, COALESCE(a.display_name, st.full_name) AS full_name, a.email, "
             "COUNT(*) OVER() AS total_count "
             "FROM students st LEFT JOIN accounts a ON a.id = st.account_id "
             "WHERE (CAST(:search AS text) IS NULL "
             "OR st.student_code ILIKE '%' || CAST(:search AS text) || '%' "
-            "OR a.display_name ILIKE '%' || CAST(:search AS text) || '%') "
+            "OR a.display_name ILIKE '%' || CAST(:search AS text) || '%' "
+            "OR st.full_name ILIKE '%' || CAST(:search AS text) || '%') "
             "AND (CAST(:has_group AS boolean) IS NULL OR EXISTS ("
             "SELECT 1 FROM group_memberships gm "
             "JOIN groups g ON g.id = gm.group_id "
@@ -1177,7 +1212,7 @@ def list_groups(
                    p.title_vi, p.title_en
                    , COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE') AS active_member_count
                    , COUNT(gm.id) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_count
-                   , MAX(a.display_name) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_name
+                   , MAX(COALESCE(a.display_name, st.full_name)) FILTER (WHERE gm.status = 'ACTIVE' AND gm.membership_role = 'LEADER') AS leader_name
              FROM groups g LEFT JOIN projects p ON p.id = g.project_id
              LEFT JOIN group_memberships gm ON gm.group_id = g.id
              LEFT JOIN students st ON st.id = gm.student_id LEFT JOIN accounts a ON a.id = st.account_id
@@ -1313,7 +1348,7 @@ def create_group(payload: GroupCreate, db: Db, user: User) -> dict[str, object]:
             )
             member_rows = db.execute(
                 text(
-                    "SELECT st.id AS student_id, st.student_code, a.display_name, a.email, "
+                    "SELECT st.id AS student_id, st.student_code, COALESCE(a.display_name, st.full_name) AS display_name, a.email, "
                     "gm.membership_role AS role, gm.status "
                     "FROM group_memberships gm "
                     "JOIN students st ON st.id = gm.student_id "
