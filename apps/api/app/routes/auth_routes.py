@@ -206,7 +206,7 @@ def google_callback(
     # render the multi-role choice without calling /auth/pending; the actual
     # selection remains protected by the short-lived challenge cookie below.
     response = _frontend_redirect(settings, roles)
-    _clear_google_cookies(response)
+    _clear_google_cookies(response, settings)
     try:
         if identity is None:
             db.execute(

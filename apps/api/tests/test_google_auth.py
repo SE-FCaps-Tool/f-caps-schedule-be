@@ -4,7 +4,12 @@ import base64
 import hashlib
 
 from app.config import Settings
-from app.routes.auth_routes import _frontend_redirect, _pkce_challenge, google_start
+from app.routes.auth_routes import (
+    _frontend_redirect,
+    _pkce_challenge,
+    google_callback,
+    google_start,
+)
 
 
 def test_pkce_challenge_uses_base64url_sha256_without_padding() -> None:
@@ -59,6 +64,68 @@ def test_google_start_scopes_flow_cookies_to_shared_parent_domain(monkeypatch) -
     assert len(set_cookie_headers) == 3
     assert all("Domain=.f-caps.net" in header for header in set_cookie_headers)
     assert all("Path=/api/v1/auth/google" in header for header in set_cookie_headers)
+
+
+def test_google_callback_success_path_passes_settings_to_cookie_cleanup(monkeypatch) -> None:
+    class FakeResult:
+        def __init__(self, *, mapping=None, scalar=None) -> None:
+            self.mapping = mapping
+            self.scalar = scalar
+
+        def mappings(self):
+            return self
+
+        def one_or_none(self):
+            return self.mapping
+
+        def scalar_one_or_none(self):
+            return self.scalar
+
+    class FakeDb:
+        def __init__(self) -> None:
+            self.results = [
+                FakeResult(mapping={"id": 1, "status": "ACTIVE"}),
+                FakeResult(),
+                FakeResult(scalar=None),
+                FakeResult(scalar=None),
+                FakeResult(),
+            ]
+
+        def execute(self, *args, **kwargs):
+            return self.results.pop(0)
+
+        def rollback(self) -> None:
+            pass
+
+    class FakeRequest:
+        def __init__(self) -> None:
+            self.cookies = {
+                "scheduler_google_state": "state",
+                "scheduler_google_pkce": "verifier",
+                "scheduler_google_nonce": "nonce",
+            }
+
+    monkeypatch.setattr(
+        "app.routes.auth_routes._verify_google_code",
+        lambda *args: {"subject": "google-subject", "email": "person@example.com", "display_name": "Person"},
+    )
+    monkeypatch.setattr("app.routes.auth_routes._roles_for_account", lambda *args: ["ADMIN"])
+    monkeypatch.setattr("app.routes.auth_routes._create_session", lambda *args, **kwargs: None)
+
+    response = google_callback(
+        FakeRequest(),
+        FakeDb(),
+        Settings(
+            app_env="production",
+            cookie_domain=".f-caps.net",
+            frontend_url="https://schedule.f-caps.net",
+        ),
+        code="authorization-code",
+        state="state",
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "https://schedule.f-caps.net/auth/callback?roles=ADMIN"
 
 
 def test_frontend_redirect_carries_server_resolved_roles() -> None:
