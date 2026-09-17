@@ -125,8 +125,18 @@ def google_start(settings: SettingsDep) -> RedirectResponse:
     )
     response = RedirectResponse(f"{GOOGLE_AUTH_URL}?{query}", status_code=status.HTTP_303_SEE_OTHER)
     secure = settings.app_env not in {"development", "test"}
+    cookie_domain = settings.cookie_domain or None
     for name, value in ((GOOGLE_STATE_COOKIE, state), (GOOGLE_PKCE_COOKIE, code_verifier), (GOOGLE_NONCE_COOKIE, nonce)):
-        response.set_cookie(name, value, httponly=True, secure=secure, samesite="lax", max_age=600, path=GOOGLE_COOKIE_PATH)
+        response.set_cookie(
+            name,
+            value,
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+            max_age=600,
+            path=GOOGLE_COOKIE_PATH,
+            domain=cookie_domain,
+        )
     return response
 
 
@@ -140,7 +150,7 @@ def google_callback(
     error: str | None = None,
 ) -> RedirectResponse:
     response = _frontend_redirect(settings)
-    _clear_google_cookies(response)
+    _clear_google_cookies(response, settings)
     if error:
         return _oauth_error_redirect(settings, "google_access_denied")
     expected_state = request.cookies.get(GOOGLE_STATE_COOKIE)
@@ -466,13 +476,14 @@ def _oauth_error_redirect(settings: Settings, code: str) -> RedirectResponse:
         f"{settings.frontend_url.rstrip('/')}/login?{urlencode({'oauth_error': code})}",
         status_code=status.HTTP_303_SEE_OTHER,
     )
-    _clear_google_cookies(response)
+    _clear_google_cookies(response, settings)
     return response
 
 
-def _clear_google_cookies(response: Response) -> None:
+def _clear_google_cookies(response: Response, settings: Settings) -> None:
+    cookie_domain = settings.cookie_domain or None
     for name in (GOOGLE_STATE_COOKIE, GOOGLE_PKCE_COOKIE, GOOGLE_NONCE_COOKIE):
-        response.delete_cookie(name, path=GOOGLE_COOKIE_PATH)
+        response.delete_cookie(name, path=GOOGLE_COOKIE_PATH, domain=cookie_domain)
 
 
 def _roles_for_account(db: Session, account_id: int) -> list[str]:

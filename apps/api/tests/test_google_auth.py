@@ -42,6 +42,25 @@ def test_google_start_redirects_with_pkce_and_oidc_parameters() -> None:
     assert "nonce=" in response.headers["location"]
 
 
+def test_google_start_scopes_flow_cookies_to_shared_parent_domain(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.routes.auth_routes._require_google_configuration",
+        lambda _: None,
+    )
+    response = google_start(
+        Settings(
+            app_env="production",
+            cookie_domain=".f-caps.net",
+        )
+    )
+
+    set_cookie_headers = response.headers.getlist("set-cookie")
+
+    assert len(set_cookie_headers) == 3
+    assert all("Domain=.f-caps.net" in header for header in set_cookie_headers)
+    assert all("Path=/api/v1/auth/google" in header for header in set_cookie_headers)
+
+
 def test_frontend_redirect_carries_server_resolved_roles() -> None:
     response = _frontend_redirect(
         Settings(app_env="test", frontend_url="https://schedule.example.com"),
